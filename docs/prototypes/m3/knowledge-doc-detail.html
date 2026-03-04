@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文档详情 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="#" class="nav-link">项目管理</a>
+        <a href="#" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目 · 运维平台后端</div>
+          <a href="#">概览</a>
+          <a href="knowledge-overview.html">知识库</a>
+          <a href="knowledge-doc-list.html" class="active">文档</a>
+          <a href="knowledge-code-index.html">代码索引</a>
+          <a href="knowledge-index-jobs.html">索引任务</a>
+          <a href="knowledge-settings.html">设置</a>
+          <a href="#">需求</a>
+          <a href="#">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <div class="breadcrumb">
+            <a href="knowledge-overview.html">知识库</a> / <a href="knowledge-doc-list.html">文档</a> / <span>部署手册</span>
+          </div>
+          <div class="page-header">
+            <div>
+              <h1 class="page-title" style="margin-bottom:8px">部署手册</h1>
+              <span class="tag tag-success">已索引</span>
+            </div>
+            <button type="button" class="btn btn-secondary">编辑</button>
+          </div>
+          <div class="grid-2">
+            <div>
+              <div class="card">
+                <h2 class="card-title">文档内容</h2>
+                <div class="card-body" style="white-space: pre-wrap; font-size: 14px; line-height: 1.6;">
+## 部署流程
+
+1. 构建镜像：在项目根目录执行 `docker build -t ops-backend:latest .`
+2. 推送至仓库：`docker push registry.example.com/ops-backend:latest`
+3. 更新 K8s 部署：`kubectl set image deployment/ops-backend ops-backend=registry.example.com/ops-backend:latest -n prod`
+4. 检查状态：`kubectl rollout status deployment/ops-backend -n prod`
+
+## 回滚
+
+执行 `kubectl rollout undo deployment/ops-backend -n prod` 可回滚至上一版本。
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="card">
+                <h2 class="card-title">元数据</h2>
+                <div class="card-body">
+                  <div class="row"><span class="label">文档类型</span><span class="value">上传</span></div>
+                  <div class="row"><span class="label">创建时间</span><span class="value">2025-03-03 16:20</span></div>
+                  <div class="row"><span class="label">更新时间</span><span class="value">2025-03-03 16:20</span></div>
+                  <div class="row"><span class="label">最近索引时间</span><span class="value">2025-03-03 16:20</span></div>
+                </div>
+              </div>
+              <div class="card">
+                <h2 class="card-title">操作</h2>
+                <div class="card-body">
+                  <p><a href="#" class="link">重新索引</a></p>
+                  <p><a href="#" class="link link-danger">删除文档</a></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

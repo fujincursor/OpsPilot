@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>项目管理 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="project-list.html" class="nav-link active">项目管理</a>
+        <a href="#" class="nav-link">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+    <aside class="sidebar">
+      <nav class="sidebar-nav">
+        <div class="sidebar-title">全局</div>
+        <a href="project-list.html" class="active">项目列表</a>
+      </nav>
+    </aside>
+    <main class="main-wrap">
+      <div class="content">
+        <h1 class="page-title">项目管理</h1>
+        <div class="filter-bar">
+          <div class="form-item">
+            <input type="text" class="input input-sm" placeholder="搜索项目名称">
+          </div>
+          <div class="form-item">
+            <select class="input input-sm">
+              <option>全部</option>
+              <option>启用</option>
+              <option>已归档</option>
+            </select>
+          </div>
+          <button type="button" class="btn btn-secondary">查询</button>
+          <a href="#" class="btn btn-link">重置</a>
+          <div style="flex:1"></div>
+          <a href="project-new.html" class="btn btn-primary">新建项目</a>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>项目名称</th>
+                <th style="width:90px">环境类型</th>
+                <th style="width:90px">状态</th>
+                <th style="width:100px">知识库就绪</th>
+                <th style="width:140px">更新时间</th>
+                <th style="width:180px">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <a href="project-detail.html" class="link">运维平台后端</a>
+                  <div class="meta">https://github.com/org/ops-backend.git</div>
+                </td>
+                <td><span class="tag tag-default">dev</span></td>
+                <td><span class="tag tag-success">启用</span></td>
+                <td>是</td>
+                <td class="meta">2025-03-04 10:30</td>
+                <td>
+                  <div class="actions">
+                    <a href="project-detail.html" class="link">进入</a>
+                    <a href="project-settings-basic.html" class="link">设置</a>
+                    <a href="#" class="link link-danger">归档</a>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <a href="project-detail.html" class="link">前端监控系统</a>
+                  <div class="meta">https://github.com/org/frontend-monitor.git</div>
+                </td>
+                <td><span class="tag tag-default">test</span></td>
+                <td><span class="tag tag-success">启用</span></td>
+                <td>否</td>
+                <td class="meta">2025-03-03 16:00</td>
+                <td>
+                  <div class="actions">
+                    <a href="project-detail.html" class="link">进入</a>
+                    <a href="project-settings-basic.html" class="link">设置</a>
+                    <a href="#" class="link link-danger">归档</a>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <a href="project-detail.html" class="link">API 网关</a>
+                  <div class="meta">https://github.com/org/api-gateway.git</div>
+                </td>
+                <td><span class="tag tag-default">pre</span></td>
+                <td><span class="tag tag-default">已归档</span></td>
+                <td>是</td>
+                <td class="meta">2025-02-28 09:00</td>
+                <td>
+                  <div class="actions">
+                    <a href="project-detail.html" class="link">进入</a>
+                    <a href="project-settings-basic.html" class="link">设置</a>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="pagination">
+            <span>共 3 条</span>
+            <div class="actions">
+              <select class="input" style="width:80px; height:32px">
+                <option>10 条/页</option>
+                <option>20 条/页</option>
+                <option>50 条/页</option>
+              </select>
+              <button type="button" class="btn btn-secondary" disabled>上一页</button>
+              <button type="button" class="btn btn-secondary">下一页</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+    </div>
+  </div>
+</body>
+</html>

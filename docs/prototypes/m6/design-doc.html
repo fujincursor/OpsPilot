@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>设计文档 - 增加用户操作审计日志功能 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="#" class="nav-link">项目管理</a>
+        <a href="feature-list.html" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目 · 运维平台后端</div>
+          <a href="#">概览</a>
+          <a href="#">Bug 工单</a>
+          <a href="feature-list.html" class="active">需求工单</a>
+          <a href="#">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <div class="breadcrumb">
+            <a href="#">运维平台后端</a>
+            <span>/</span>
+            <a href="feature-list.html">需求工单</a>
+            <span>/</span>
+            <a href="feature-detail.html">增加用户操作审计日志功能</a>
+            <span>/</span>
+            <span>设计文档</span>
+          </div>
+          <div class="page-header">
+            <h1 class="page-title" style="margin-bottom:0">设计文档</h1>
+            <div class="actions">
+              <button type="button" class="btn btn-secondary">重新生成</button>
+              <a href="#" class="btn btn-primary">去 Review</a>
+            </div>
+          </div>
+          <div class="card design-section">
+            <h2 class="card-title">设计概述</h2>
+            <div class="card-body">
+              <p style="margin:0; white-space: pre-wrap;">在现有权限与操作体系基础上，新增「审计日志」领域模块。采用事件驱动方式：在关键操作（登录、登出、敏感配置变更、数据导出、角色/权限变更等）执行后，由各业务模块发布审计事件，由统一审计服务落库并支持按条件查询与导出。存储建议独立表或独立库，便于保留与合规；查询接口需支持按时间、操作人、操作类型、资源类型等筛选，并做分页与导出。前端在管理后台增加「审计日志」菜单，列表展示与导出能力与现有列表风格一致。</p>
+            </div>
+          </div>
+          <div class="card design-section">
+            <h2 class="card-title">模块划分</h2>
+            <div class="card-body">
+              <ul class="design-list">
+                <li>
+                  <div><strong>1. 审计领域模块（audit）</strong></div>
+                  <p style="margin:8px 0 0; color: var(--text-secondary);">负责审计事件的接收、持久化、查询与导出。职责：定义 AuditEvent 模型与存储表；提供 record(event) 与 query(filters, page) 接口；支持按条件导出 CSV/Excel。</p>
+                </li>
+                <li>
+                  <div><strong>2. 审计事件发布（各业务模块）</strong></div>
+                  <p style="margin:8px 0 0; color: var(--text-secondary);">在登录/登出、配置修改、数据导出、权限变更等节点发布统一格式的审计事件至 audit 模块。职责：约定事件 schema（operatorId, action, resourceType, resourceId, detail, ip, timestamp）；在关键路径调用 audit.record()。</p>
+                </li>
+                <li>
+                  <div><strong>3. 审计查询 API 与前端</strong></div>
+                  <p style="margin:8px 0 0; color: var(--text-secondary);">提供 REST 查询接口与管理后台「审计日志」页面。职责：GET /api/audit/logs 支持筛选与分页；前端列表、筛选、导出按钮，与现有后台风格一致。</p>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div class="card design-section">
+            <h2 class="card-title">接口说明</h2>
+            <div class="card-body">
+              <ul class="design-list">
+                <li>
+                  <div><span class="method-tag method-post">POST</span><strong>/api/audit/events</strong></div>
+                  <div class="file-path">内部调用，接收审计事件并落库</div>
+                  <p style="margin:8px 0 0">Body: operatorId, action, resourceType, resourceId, detail?, ip?, timestamp。</p>
+                </li>
+                <li>
+                  <div><span class="method-tag method-get">GET</span><strong>/api/audit/logs</strong></div>
+                  <div class="file-path">查询审计日志，支持 operatorId, action, resourceType, startTime, endTime, page, pageSize</div>
+                  <p style="margin:8px 0 0">返回分页列表与总数，供管理后台展示与导出。</p>
+                </li>
+                <li>
+                  <div><span class="method-tag method-get">GET</span><strong>/api/audit/logs/export</strong></div>
+                  <div class="file-path">按当前筛选条件导出 CSV/Excel</div>
+                  <p style="margin:8px 0 0">需鉴权且仅限管理员或审计角色。</p>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div class="card design-section">
+            <h2 class="card-title">建议涉及文件</h2>
+            <div class="card-body">
+              <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                <span class="tag tag-info">src/audit/audit_service.js</span>
+                <span class="tag tag-info">src/audit/audit_model.js</span>
+                <span class="tag tag-info">src/audit/audit_router.js</span>
+                <span class="tag tag-info">src/auth/login_handler.js</span>
+                <span class="tag tag-info">src/admin/config_controller.js</span>
+                <span class="tag tag-info">frontend/src/pages/audit/AuditLogList.tsx</span>
+              </div>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary">重新生成</button>
+            <a href="#" class="btn btn-primary">去 Review</a>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

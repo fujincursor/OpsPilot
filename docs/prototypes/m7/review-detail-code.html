@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>代码 Review - 用户权限校验逻辑优化 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="../m1/project-list.html" class="nav-link">项目管理</a>
+        <a href="#" class="nav-link">工作台</a>
+        <a href="review-list.html" class="nav-link active">Review</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">Review</div>
+          <a href="review-list.html" class="active">待审列表</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <div class="breadcrumb">
+            <a href="review-list.html">Review 工作台</a>
+            <span>/</span>
+            <a href="review-list.html">待审列表</a>
+            <span>/</span>
+            <span>用户权限校验逻辑优化 · 代码 Review</span>
+          </div>
+          <div class="page-header">
+            <div>
+              <h1 class="page-title" style="margin-bottom:8px">用户权限校验逻辑优化</h1>
+              <span class="tag tag-info">新需求</span>
+              <span class="tag tag-default">代码</span>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div>
+              <div class="card">
+                <h2 class="card-title">语法/静态检查结果</h2>
+                <div class="card-body">
+                  <p style="margin:0 0 12px"><span class="tag tag-success">通过</span> ESLint · 无错误</p>
+                </div>
+              </div>
+              <div class="card">
+                <h2 class="card-title">代码变更 · src/auth/permission.js</h2>
+                <div class="diff-wrap">
+                  <div class="diff-line diff-del">- function checkPermission(user, resource) {</div>
+                  <div class="diff-line diff-add">+ function checkPermission(user, resource, options = {}) {</div>
+                  <div class="diff-line">  const role = user.role;</div>
+                  <div class="diff-line diff-add">+   if (options.skipCache) {</div>
+                  <div class="diff-line diff-add">+     return fetchAndCheck(role, resource);</div>
+                  <div class="diff-line diff-add">+   }</div>
+                  <div class="diff-line">  return cachedCheck(role, resource);</div>
+                  <div class="diff-line">}</div>
+                </div>
+              </div>
+              <div class="card">
+                <h2 class="card-title">变更文件列表</h2>
+                <div class="card-body">
+                  <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <span class="tag tag-info">src/auth/permission.js</span>
+                    <span class="tag tag-info">src/auth/middleware.js</span>
+                  </div>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="btn btn-primary">通过</button>
+                <button type="button" class="btn btn-danger">驳回</button>
+              </div>
+            </div>
+            <div>
+              <div class="card">
+                <h2 class="card-title">Review 历史</h2>
+                <ul class="review-history">
+                  <li>
+                    <div><strong>王五</strong> · <span class="tag tag-default">待审</span></div>
+                    <div class="meta">2025-03-04 10:30 待处理</div>
+                  </li>
+                  <li>
+                    <div><strong>李四</strong> · <span class="tag tag-success">通过</span> · 方案 Review</div>
+                    <div class="meta">2025-03-03 16:00 · 方案可行，进入代码生成</div>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>上传文档 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="#" class="nav-link">项目管理</a>
+        <a href="#" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目 · 运维平台后端</div>
+          <a href="#">概览</a>
+          <a href="knowledge-overview.html">知识库</a>
+          <a href="knowledge-doc-list.html" class="active">文档</a>
+          <a href="knowledge-code-index.html">代码索引</a>
+          <a href="knowledge-index-jobs.html">索引任务</a>
+          <a href="knowledge-settings.html">设置</a>
+          <a href="#">需求</a>
+          <a href="#">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content" style="max-width: 640px">
+          <div class="breadcrumb">
+            <a href="#">知识库</a> / <a href="knowledge-doc-list.html">文档</a> / <span>新建文档</span>
+          </div>
+          <h1 class="page-title">上传文档</h1>
+          <div class="form-card">
+            <div class="form-item">
+              <label class="form-label"><span class="required">*</span> 文档类型</label>
+              <select class="input">
+                <option value="">请选择</option>
+                <option>项目信息</option>
+                <option>上传</option>
+                <option>Runbook</option>
+                <option>其他</option>
+              </select>
+            </div>
+            <div class="form-item">
+              <label class="form-label"><span class="required">*</span> 标题</label>
+              <input type="text" class="input" placeholder="请输入文档标题">
+            </div>
+            <div class="form-item">
+              <label class="form-label">内容</label>
+              <textarea class="input" placeholder="粘贴或输入文档内容" rows="6"></textarea>
+              <div class="form-hint">与下方「文件上传」二选一填写</div>
+            </div>
+            <div class="form-item">
+              <label class="form-label">文件上传</label>
+              <input type="file" class="input" accept=".md,.txt,.pdf">
+              <div class="form-hint">支持 .md、.txt、.pdf；上传后将解析为内容并建立索引</div>
+            </div>
+            <div class="form-actions">
+              <a href="knowledge-doc-list.html" class="btn btn-secondary">取消</a>
+              <button type="button" class="btn btn-primary">保存并索引</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

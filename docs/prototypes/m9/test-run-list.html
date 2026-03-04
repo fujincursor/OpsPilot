@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>测试执行 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="#" class="nav-link">项目管理</a>
+        <a href="test-run-list.html" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目 · 运维平台后端</div>
+          <a href="#">概览</a>
+          <a href="#">需求</a>
+          <a href="test-run-list.html" class="active">测试执行</a>
+          <a href="#">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <div class="breadcrumb">
+            <a href="#">项目管理</a><span> / </span>
+            <a href="#">运维平台后端</a><span> / </span>
+            <a href="#">工单 #T-2025-0042</a><span> / </span>
+            <span>测试执行</span>
+          </div>
+          <div class="page-header">
+            <h1 class="page-title">测试执行</h1>
+            <button type="button" class="btn btn-primary">执行测试</button>
+          </div>
+          <div class="filter-bar">
+            <div class="form-item">
+              <input type="text" class="input input-sm" placeholder="搜索工单">
+            </div>
+            <div class="form-item">
+              <select class="input input-sm">
+                <option>全部状态</option>
+                <option>执行中</option>
+                <option>通过</option>
+                <option>失败</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn-secondary">查询</button>
+            <a href="#" class="btn btn-link">重置</a>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>工单</th>
+                  <th style="width:160px">执行时间</th>
+                  <th style="width:100px">状态</th>
+                  <th style="width:100px">通过率</th>
+                  <th style="width:180px">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="test-report-detail.html" class="link">修复登录超时问题 #T-2025-0042</a>
+                    <div class="meta">工单 ID: T-2025-0042</div>
+                  </td>
+                  <td>2025-03-04 14:32</td>
+                  <td><span class="tag tag-success">通过</span></td>
+                  <td>10/10 (100%)</td>
+                  <td>
+                    <div class="actions">
+                      <a href="test-report-detail.html" class="link">查看报告</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="test-report-detail.html" class="link">修复登录超时问题 #T-2025-0042</a>
+                    <div class="meta">工单 ID: T-2025-0042</div>
+                  </td>
+                  <td>2025-03-04 14:20</td>
+                  <td><span class="tag tag-error">失败</span></td>
+                  <td>8/10 (80%)</td>
+                  <td>
+                    <div class="actions">
+                      <a href="test-report-detail.html" class="link">查看报告</a>
+                      <button type="button" class="btn btn-secondary" style="height:28px;padding:0 12px">重跑</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="#" class="link">API 响应格式调整 #T-2025-0038</a>
+                    <div class="meta">工单 ID: T-2025-0038</div>
+                  </td>
+                  <td>2025-03-04 11:05</td>
+                  <td><span class="tag tag-info">执行中</span></td>
+                  <td>—</td>
+                  <td>
+                    <div class="actions">
+                      <a href="test-report-detail.html" class="link">查看报告</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="#" class="link">新增健康检查接口 #T-2025-0035</a>
+                    <div class="meta">工单 ID: T-2025-0035</div>
+                  </td>
+                  <td>2025-03-03 16:40</td>
+                  <td><span class="tag tag-success">通过</span></td>
+                  <td>6/6 (100%)</td>
+                  <td>
+                    <div class="actions">
+                      <a href="test-report-detail.html" class="link">查看报告</a>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="pagination">
+              <span>共 4 条</span>
+              <div class="actions">
+                <select class="input" style="width:80px; height:32px">
+                  <option>10 条/页</option>
+                  <option>20 条/页</option>
+                  <option>50 条/页</option>
+                </select>
+                <button type="button" class="btn btn-secondary" disabled>上一页</button>
+                <button type="button" class="btn btn-secondary">下一页</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

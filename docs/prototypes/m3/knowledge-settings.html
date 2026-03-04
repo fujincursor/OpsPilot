@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>知识库设置 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="#" class="nav-link">项目管理</a>
+        <a href="#" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目 · 运维平台后端</div>
+          <a href="#">概览</a>
+          <a href="knowledge-overview.html">知识库</a>
+          <a href="knowledge-doc-list.html">文档</a>
+          <a href="knowledge-code-index.html">代码索引</a>
+          <a href="knowledge-index-jobs.html">索引任务</a>
+          <a href="knowledge-settings.html" class="active">设置</a>
+          <a href="#">需求</a>
+          <a href="#">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content" style="max-width: 640px">
+          <div class="breadcrumb">
+            <a href="knowledge-overview.html">知识库</a> / <span>设置</span>
+          </div>
+          <h1 class="page-title">知识库设置</h1>
+          <div class="form-card">
+            <h2 class="card-title" style="margin-top:0">更新策略</h2>
+            <div class="form-item">
+              <label class="form-label" style="display:flex; align-items:center; gap:8px">
+                <input type="checkbox" checked> MR 合并触发
+              </label>
+              <div class="form-hint">开启后，MR 合并时自动触发代码增量索引（需与 Git 集成）</div>
+            </div>
+            <div class="form-item">
+              <label class="form-label" style="display:flex; align-items:center; gap:8px">
+                <input type="checkbox" checked> 定时全量索引
+              </label>
+              <input type="text" class="input" placeholder="如每日 2:00" style="margin-top:8px; width:200px">
+              <div class="form-hint">定时执行文档与代码全量索引</div>
+            </div>
+            <div class="form-item">
+              <label class="form-label" style="display:flex; align-items:center; gap:8px">
+                <input type="checkbox" checked> 新文档默认索引
+              </label>
+              <div class="form-hint">新文档创建后是否自动加入索引队列</div>
+            </div>
+            <hr style="border: none; border-top: 1px solid var(--border); margin: 24px 0;">
+            <h2 class="card-title">默认行为</h2>
+            <div class="form-item">
+              <label class="form-label">检索默认文档类型</label>
+              <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px">
+                <label style="display:flex; align-items:center; gap:4px"><input type="checkbox" checked> 项目信息</label>
+                <label style="display:flex; align-items:center; gap:4px"><input type="checkbox" checked> 上传</label>
+                <label style="display:flex; align-items:center; gap:4px"><input type="checkbox" checked> Runbook</label>
+                <label style="display:flex; align-items:center; gap:4px"><input type="checkbox" checked> 反馈摘要</label>
+              </div>
+              <div class="form-hint">Agent 检索时的默认过滤类型，可多选</div>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn btn-primary">保存</button>
+              <a href="knowledge-overview.html" class="btn btn-secondary">返回概览</a>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>设置 - Agent 配置 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="project-list.html" class="nav-link">项目管理</a>
+        <a href="#" class="nav-link">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+    <aside class="sidebar">
+      <nav class="sidebar-nav">
+        <div class="sidebar-title">当前项目</div>
+        <a href="project-detail.html">概览</a>
+        <a href="#">需求</a>
+        <a href="project-settings-basic.html" class="active">设置</a>
+      </nav>
+    </aside>
+    <main class="main-wrap">
+      <div class="content" style="max-width: 720px">
+        <h1 class="page-title">项目设置</h1>
+        <div class="tabs">
+          <a href="project-settings-basic.html">基本信息</a>
+          <a href="project-settings-agent.html" class="active">Agent 配置</a>
+          <a href="project-settings-members.html">成员管理</a>
+          <a href="project-settings-advanced.html">高级</a>
+        </div>
+        <div class="form-card">
+          <h2 class="card-title" style="margin-top:0">模型配置</h2>
+          <div class="form-item">
+            <label class="form-label">模型提供商</label>
+            <select class="input">
+              <option>OpenAI</option>
+              <option>国产大模型</option>
+              <option>私有化部署</option>
+            </select>
+          </div>
+          <div class="form-item">
+            <label class="form-label">模型名称</label>
+            <input type="text" class="input" value="gpt-4" placeholder="如 gpt-4、gpt-3.5-turbo">
+          </div>
+          <div class="form-item">
+            <label class="form-label">Temperature</label>
+            <input type="number" class="input" value="0.2" min="0" max="2" step="0.1" style="width:120px">
+            <span class="meta" style="margin-left:8px">0～2，默认 0.2</span>
+          </div>
+          <h2 class="card-title" style="margin-top:24px">Prompt 模板</h2>
+          <div class="form-item">
+            <label class="form-label">选择模板</label>
+            <select class="input">
+              <option>运维需求分析默认模板</option>
+              <option>Bug 修复专用模板</option>
+              <option>从零编辑</option>
+            </select>
+            <p class="meta" style="margin-top:8px">用于需求分析、方案生成的系统 Prompt。</p>
+          </div>
+          <h2 class="card-title" style="margin-top:24px">工具链配置</h2>
+          <div class="form-item">
+            <label class="form-label">Linter 类型</label>
+            <select class="input">
+              <option>ESLint</option>
+              <option>Pylint</option>
+              <option>go vet</option>
+            </select>
+          </div>
+          <div class="form-item">
+            <label class="form-label">测试框架</label>
+            <select class="input">
+              <option>pytest</option>
+              <option>Jest</option>
+              <option>go test</option>
+            </select>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-primary">保存</button>
+          </div>
+        </div>
+      </div>
+    </main>
+    </div>
+  </div>
+</body>
+</html>

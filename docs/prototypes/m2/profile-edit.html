@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>编辑项目信息 - 运维平台后端 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="../m1/project-list.html" class="nav-link">项目管理</a>
+        <a href="#" class="nav-link">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目</div>
+          <a href="../m1/project-detail.html">概览</a>
+          <a href="#">需求</a>
+          <a href="profile-overview.html" class="active">项目信息</a>
+          <a href="../m1/project-settings-basic.html">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content" style="max-width: 800px;">
+          <div class="breadcrumb">
+            <a href="../m1/project-list.html">项目管理</a> / <a href="../m1/project-detail.html">运维平台后端</a> / <a href="profile-overview.html">项目信息</a> / <span>编辑</span>
+          </div>
+          <h1 class="page-title">编辑项目信息</h1>
+          <div class="alert alert-info" style="margin-bottom: 24px;">
+            至少填写项目概述，以及架构说明或目录结构说明之一，方可提交需求与 Bug。
+          </div>
+          <div class="form-card">
+            <div class="form-item">
+              <label class="form-label"><span class="required">*</span> 项目概述</label>
+              <textarea class="input" placeholder="请描述项目用途、主要功能与边界" rows="5">后端服务与运维脚本统一管理仓库，包含 API 服务、定时任务与运维脚本。供 Agent 理解项目边界与主要功能。</textarea>
+            </div>
+            <div class="form-item">
+              <label class="form-label"><span class="required">*</span> 架构说明（与目录结构至少填一项）</label>
+              <textarea class="input" placeholder="如架构图说明、技术栈、模块划分" rows="5">技术栈：Node.js + Express；模块划分：api/、jobs/、scripts/；关键依赖见 package.json。</textarea>
+            </div>
+            <div class="form-item">
+              <label class="form-label"><span class="required">*</span> 目录结构说明（与架构说明至少填一项）</label>
+              <textarea class="input" placeholder="如关键目录、文件组织说明" rows="4">src/api 为接口层，src/jobs 为定时任务，scripts/ 为运维脚本；配置文件集中在 config/。</textarea>
+            </div>
+            <div class="form-item">
+              <label class="form-label">关键模块说明</label>
+              <textarea class="input" placeholder="关键模块职责与入口" rows="3">auth 模块负责鉴权，health 提供健康检查，cron 管理定时任务。</textarea>
+            </div>
+            <div class="form-item">
+              <label class="form-label">配置说明</label>
+              <textarea class="input" placeholder="环境变量、配置文件说明" rows="3">环境变量：DB_URL、REDIS_URL、LOG_LEVEL；本地开发见 .env.example。</textarea>
+            </div>
+            <div class="form-item">
+              <label class="form-label">Runbook</label>
+              <textarea class="input" placeholder="常见运维操作、故障处理步骤" rows="4">常见运维操作、部署步骤、故障排查见 docs/runbook.md。</textarea>
+            </div>
+            <div class="form-actions">
+              <a href="profile-overview.html" class="btn btn-secondary">取消</a>
+              <button type="button" class="btn btn-primary">保存</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

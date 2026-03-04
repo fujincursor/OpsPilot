@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>代码变更详情（已通过）- 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="#" class="nav-link">项目管理</a>
+        <a href="code-change-list.html" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目 · 运维平台后端</div>
+          <a href="#">概览</a>
+          <a href="#">需求</a>
+          <a href="code-change-list.html" class="active">代码与校验</a>
+          <a href="#">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <div class="breadcrumb">
+            <a href="code-change-list.html">工作台</a>
+            <span>/</span>
+            <a href="code-change-list.html">代码与校验</a>
+            <span>/</span>
+            <span>登录接口超时需增加重试逻辑</span>
+          </div>
+          <div class="page-header">
+            <div>
+              <h1 class="page-title" style="margin-bottom:8px">登录接口超时需增加重试逻辑</h1>
+              <span class="tag tag-success">已通过</span>
+            </div>
+            <div class="actions">
+              <a href="#" class="btn btn-primary">进入测试</a>
+              <a href="#" class="link">查看方案</a>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div>
+              <div class="card">
+                <h2 class="card-title">生成结果</h2>
+                <div class="card-body">
+                  <p style="margin: 0 0 12px; font-size: 14px; color: var(--text-secondary);">变更文件</p>
+                  <ul style="margin: 0; padding-left: 20px;">
+                    <li><code>src/auth/client.js</code> — 新增重试逻辑</li>
+                    <li><code>src/auth/config.js</code> — 增加超时与重试配置</li>
+                  </ul>
+                  <details style="margin-top: 16px;">
+                    <summary style="cursor: pointer; color: var(--primary); font-size: 14px;">查看 patch</summary>
+                    <pre class="code-block" style="margin-top: 8px;"><span class="line line-add">+ const MAX_RETRIES = 3;</span>
+<span class="line line-add">+ const RETRY_DELAY_MS = 1000;</span>
+<span class="line">  export async function login(credentials) {</span>
+<span class="line line-add">+   for (let i = 0; i &lt; MAX_RETRIES; i++) {</span>
+<span class="line line-add">+     try {</span>
+<span class="line line-add">+       return await doLogin(credentials);</span>
+<span class="line line-add">+     } catch (e) {</span>
+<span class="line line-add">+       if (i === MAX_RETRIES - 1) throw e;</span>
+<span class="line line-add">+       await sleep(RETRY_DELAY_MS);</span>
+<span class="line line-add">+     }</span>
+<span class="line">  }</span></pre>
+                  </details>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="card">
+                <h2 class="card-title">语法/静态检查</h2>
+                <div class="card-body">
+                  <p style="margin: 0 0 8px;"><span class="tag tag-success">已通过</span></p>
+                  <p style="margin: 0; font-size: 12px; color: var(--text-secondary);">工具：eslint · 执行时间：2025-03-04 11:18</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

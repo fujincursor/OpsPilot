@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 - OpsPilot 运维领航</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-card">
+      <h1 class="login-title"><span class="login-title-en">OpsPilot</span><span class="login-title-zh">运维领航</span></h1>
+      <p class="login-subtitle">统一登录后即可使用各模块，无需重复登录</p>
+      <form id="loginForm" action="index.html" method="get">
+        <div class="form-item">
+          <label class="form-label" for="login-user">账号</label>
+          <input type="text" id="login-user" class="input" name="user" placeholder="请输入账号（原型可任意输入）" autocomplete="username">
+        </div>
+        <div class="form-item">
+          <label class="form-label" for="login-pass">密码</label>
+          <input type="password" id="login-pass" class="input" name="pass" placeholder="请输入密码（原型可任意输入）" autocomplete="current-password">
+        </div>
+        <div class="form-item">
+          <button type="submit" class="btn btn-primary btn-block">登录</button>
+        </div>
+      </form>
+      <p class="login-note">原型说明：任意输入即可进入工作台</p>
+    </div>
+  </div>
+</body>
+</html>

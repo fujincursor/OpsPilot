@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>知识库概览 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="#" class="nav-link">项目管理</a>
+        <a href="#" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目 · 运维平台后端</div>
+          <a href="#">概览</a>
+          <a href="knowledge-overview.html" class="active">知识库</a>
+          <a href="knowledge-doc-list.html">文档</a>
+          <a href="knowledge-code-index.html">代码索引</a>
+          <a href="knowledge-index-jobs.html">索引任务</a>
+          <a href="knowledge-settings.html">设置</a>
+          <a href="#">需求</a>
+          <a href="#">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <div class="breadcrumb">
+            <a href="#">项目管理</a> / <a href="#">运维平台后端</a> / <span>知识库</span>
+          </div>
+          <h1 class="page-title">知识库</h1>
+          <div class="grid-2">
+            <div>
+              <div class="card">
+                <h2 class="card-title">文档概览</h2>
+                <div class="card-body">
+                  <div class="row"><span class="label">文档总数</span><span class="value">12</span></div>
+                  <div class="row"><span class="label">项目信息</span><span class="value">2</span></div>
+                  <div class="row"><span class="label">上传文档</span><span class="value">6</span></div>
+                  <div class="row"><span class="label">Runbook</span><span class="value">2</span></div>
+                  <div class="row"><span class="label">反馈摘要</span><span class="value">2</span></div>
+                  <div class="row"><span class="label">已索引</span><span class="value">10</span></div>
+                  <div class="row"><span class="label">待索引</span><span class="value">1</span></div>
+                  <div class="row"><span class="label">失败</span><span class="value">1</span></div>
+                  <p style="margin-top:16px"><a href="knowledge-doc-list.html" class="link">查看文档列表 →</a></p>
+                </div>
+              </div>
+              <div class="card">
+                <h2 class="card-title">代码索引状态</h2>
+                <div class="card-body">
+                  <div class="row"><span class="label">已配置</span><span class="value">是</span></div>
+                  <div class="row"><span class="label">最近全量索引</span><span class="value">2025-03-03 02:00</span></div>
+                  <div class="row"><span class="label">状态</span><span class="value"><span class="tag tag-success">成功</span></span></div>
+                  <p style="margin-top:16px"><a href="knowledge-code-index.html" class="link">去配置 →</a></p>
+                </div>
+              </div>
+              <div class="card">
+                <h2 class="card-title">最近任务</h2>
+                <div class="card-body">
+                  <div class="row"><span class="label">文档全量</span><span class="value"><span class="tag tag-success">成功</span> 2025-03-04 10:00</span></div>
+                  <div class="row"><span class="label">代码增量</span><span class="value"><span class="tag tag-success">成功</span> 2025-03-04 09:30</span></div>
+                  <div class="row"><span class="label">文档单条</span><span class="value"><span class="tag tag-success">成功</span> 2025-03-04 08:15</span></div>
+                  <p style="margin-top:16px"><a href="knowledge-index-jobs.html" class="link">全部任务 →</a></p>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="card">
+                <h2 class="card-title">快捷操作</h2>
+                <div class="card-body">
+                  <p><a href="knowledge-doc-new.html" class="btn btn-primary" style="display:inline-block; margin-bottom:12px">上传文档</a></p>
+                  <p><button type="button" class="btn btn-secondary">触发全量索引</button></p>
+                  <p><a href="knowledge-index-jobs.html" class="link">索引任务</a></p>
+                </div>
+              </div>
+              <div class="card">
+                <h2 class="card-title">说明</h2>
+                <div class="card-body">
+                  <p class="meta" style="font-size:12px; line-height:1.6">知识库用于为 Agent 提供项目上下文。文档与代码索引完成后，需求分析、方案设计等环节将自动检索相关内容。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

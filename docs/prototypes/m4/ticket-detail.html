@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录接口偶发超时 - 工单详情 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="../m1/project-list.html" class="nav-link">项目管理</a>
+        <a href="#" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目</div>
+          <a href="../m1/project-detail.html">概览</a>
+          <a href="ticket-list.html" class="active">需求</a>
+          <a href="../m1/project-settings-basic.html">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <div class="breadcrumb">
+            <a href="../m1/project-list.html">项目管理</a> / <a href="../m1/project-detail.html">运维平台后端</a> / <a href="ticket-list.html">需求</a> / <span>登录接口偶发超时</span>
+          </div>
+          <div class="page-header">
+            <div>
+              <h1 class="page-title" style="margin-bottom: 8px">登录接口偶发超时</h1>
+              <span class="tag tag-warning">Bug</span>
+              <span class="tag tag-success">已分析</span>
+            </div>
+            <a href="ticket-list.html" class="btn btn-secondary">返回列表</a>
+          </div>
+          <div class="grid-2">
+            <div>
+              <div class="card">
+                <h2 class="card-title">需求内容</h2>
+                <div class="card-body">
+                  <p style="margin: 0; white-space: pre-wrap;">生产环境用户反馈登录有时超时，约 5% 请求超过 3s 无响应。复现不规律，多出现在高峰期。需排查是否为数据库连接池、下游认证服务或网络问题。</p>
+                  <p class="meta" style="margin-top: 12px">无附件</p>
+                </div>
+              </div>
+              <div class="card">
+                <h2 class="card-title">分析结果</h2>
+                <div class="card-body">
+                  <div class="row">
+                    <span class="label">类型</span>
+                    <span class="value"><span class="tag tag-warning">Bug</span></span>
+                  </div>
+                  <div class="row">
+                    <span class="label">范围摘要</span>
+                    <span class="value">与登录接口超时相关，可能涉及认证服务调用、数据库连接或超时配置。建议优先排查连接池与下游服务响应。</span>
+                  </div>
+                  <div class="row">
+                    <span class="label">涉及模块/文件</span>
+                    <span class="value">
+                      <ul class="list-plain">
+                        <li>src/auth/login.ts</li>
+                        <li>src/services/user-service.ts</li>
+                        <li>config/db.ts</li>
+                      </ul>
+                    </span>
+                  </div>
+                  <div class="row">
+                    <span class="label">置信度</span>
+                    <span class="value">
+                      <span>92%</span>
+                      <div class="confidence-bar" style="width: 120px">
+                        <div class="fill" style="width: 92%"></div>
+                      </div>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="card">
+                <h2 class="card-title">工单状态</h2>
+                <div class="card-body">
+                  <div class="row"><span class="label">当前状态</span><span class="value">已分析</span></div>
+                  <div class="row"><span class="label">创建时间</span><span class="value">2025-03-04 10:30</span></div>
+                  <div class="row"><span class="label">更新时间</span><span class="value">2025-03-04 11:00</span></div>
+                  <div class="row"><span class="label">提交人</span><span class="value">张三</span></div>
+                </div>
+              </div>
+              <div class="card">
+                <h2 class="card-title">下一步</h2>
+                <div class="card-body">
+                  <p style="margin: 0 0 12px">已识别为 Bug，可进入修复方案流程。</p>
+                  <a href="#" class="link">进入修复方案</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

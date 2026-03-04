@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>知识库文档 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="#" class="nav-link">项目管理</a>
+        <a href="#" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目 · 运维平台后端</div>
+          <a href="#">概览</a>
+          <a href="knowledge-overview.html">知识库</a>
+          <a href="knowledge-doc-list.html" class="active">文档</a>
+          <a href="knowledge-code-index.html">代码索引</a>
+          <a href="knowledge-index-jobs.html">索引任务</a>
+          <a href="knowledge-settings.html">设置</a>
+          <a href="#">需求</a>
+          <a href="#">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <div class="page-header">
+            <h1 class="page-title">知识库文档</h1>
+            <a href="knowledge-doc-new.html" class="btn btn-primary">上传文档</a>
+          </div>
+          <div class="filter-bar">
+            <div class="form-item">
+              <select class="input input-sm">
+                <option>全部类型</option>
+                <option>项目信息</option>
+                <option>上传</option>
+                <option>Runbook</option>
+                <option>反馈摘要</option>
+              </select>
+            </div>
+            <div class="form-item">
+              <select class="input input-sm">
+                <option>全部状态</option>
+                <option>待索引</option>
+                <option>已索引</option>
+                <option>失败</option>
+              </select>
+            </div>
+            <div class="form-item">
+              <input type="text" class="input input-sm" placeholder="搜索标题">
+            </div>
+            <button type="button" class="btn btn-secondary">查询</button>
+            <a href="#" class="btn btn-link">重置</a>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>标题 / 名称</th>
+                  <th style="width:100px">类型</th>
+                  <th style="width:90px">状态</th>
+                  <th style="width:140px">索引时间</th>
+                  <th style="width:140px">更新时间</th>
+                  <th style="width:180px">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="knowledge-doc-detail.html" class="link">项目概述与架构说明</a>
+                    <div class="meta">项目信息</div>
+                  </td>
+                  <td><span class="tag tag-info">项目信息</span></td>
+                  <td><span class="tag tag-success">已索引</span></td>
+                  <td class="meta">2025-03-04 10:00</td>
+                  <td class="meta">2025-03-04 10:00</td>
+                  <td>
+                    <div class="actions">
+                      <a href="knowledge-doc-detail.html" class="link">查看</a>
+                      <a href="#" class="link">编辑</a>
+                      <a href="#" class="link link-danger">删除</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="knowledge-doc-detail.html" class="link">部署手册</a>
+                    <div class="meta">上传</div>
+                  </td>
+                  <td><span class="tag tag-default">上传</span></td>
+                  <td><span class="tag tag-success">已索引</span></td>
+                  <td class="meta">2025-03-03 16:20</td>
+                  <td class="meta">2025-03-03 16:20</td>
+                  <td>
+                    <div class="actions">
+                      <a href="knowledge-doc-detail.html" class="link">查看</a>
+                      <a href="#" class="link">编辑</a>
+                      <a href="#" class="link link-danger">删除</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="knowledge-doc-detail.html" class="link">登录超时修复摘要</a>
+                    <div class="meta">反馈摘要</div>
+                  </td>
+                  <td><span class="tag tag-default">反馈摘要</span></td>
+                  <td><span class="tag tag-warning">待索引</span></td>
+                  <td class="meta">—</td>
+                  <td class="meta">2025-03-04 09:00</td>
+                  <td>
+                    <div class="actions">
+                      <a href="knowledge-doc-detail.html" class="link">查看</a>
+                      <a href="#" class="link">编辑</a>
+                      <a href="#" class="link link-danger">删除</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="knowledge-doc-detail.html" class="link">故障处理 Runbook</a>
+                    <div class="meta">Runbook</div>
+                  </td>
+                  <td><span class="tag tag-default">Runbook</span></td>
+                  <td><span class="tag tag-error">失败</span></td>
+                  <td class="meta">—</td>
+                  <td class="meta">2025-03-02 14:00</td>
+                  <td>
+                    <div class="actions">
+                      <a href="knowledge-doc-detail.html" class="link">查看</a>
+                      <a href="#" class="link">编辑</a>
+                      <a href="#" class="link">重新索引</a>
+                      <a href="#" class="link link-danger">删除</a>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="pagination">
+              <span>共 4 条</span>
+              <div class="actions">
+                <select class="input" style="width:80px; height:32px">
+                  <option>10 条/页</option>
+                  <option>20 条/页</option>
+                  <option>50 条/页</option>
+                </select>
+                <button type="button" class="btn btn-secondary" disabled>上一页</button>
+                <button type="button" class="btn btn-secondary">下一页</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

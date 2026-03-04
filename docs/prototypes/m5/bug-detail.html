@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bug 工单详情 - 登录接口在并发下偶发 500 错误 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="#" class="nav-link">项目管理</a>
+        <a href="bug-list.html" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目 · 运维平台后端</div>
+          <a href="#">概览</a>
+          <a href="bug-list.html" class="active">Bug 工单</a>
+          <a href="#">需求工单</a>
+          <a href="#">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <div class="breadcrumb">
+            <a href="#">运维平台后端</a>
+            <span>/</span>
+            <a href="bug-list.html">Bug 工单</a>
+            <span>/</span>
+            <span>登录接口在并发下偶发 500 错误</span>
+          </div>
+          <div class="page-header">
+            <div>
+              <h1 class="page-title" style="margin-bottom:8px">登录接口在并发下偶发 500 错误</h1>
+              <span class="tag tag-success">方案已生成</span>
+              <span class="tag tag-error" style="margin-left:8px">Bug</span>
+            </div>
+            <a href="fix-plan.html" class="btn btn-primary">查看修复方案</a>
+          </div>
+          <div class="tabs">
+            <a href="bug-detail.html" class="active">工单信息</a>
+            <a href="fix-plan.html">修复方案</a>
+          </div>
+          <div class="card">
+            <h2 class="card-title">基本信息</h2>
+            <div class="card-body">
+              <div class="row"><span class="label">工单 ID</span><span class="value">TKT-20250304-001</span></div>
+              <div class="row"><span class="label">描述</span><span class="value">在高并发场景下，用户登录接口偶发返回 500，错误日志显示与 session 存储相关。需定位根因并给出修复方案。</span></div>
+              <div class="row"><span class="label">创建时间</span><span class="value">2025-03-04 10:00</span></div>
+              <div class="row"><span class="label">创建人</span><span class="value">张三</span></div>
+              <div class="row"><span class="label">项目</span><span class="value">运维平台后端</span></div>
+            </div>
+          </div>
+          <div class="card">
+            <h2 class="card-title">M4 分析结果</h2>
+            <div class="card-body">
+              <div class="row"><span class="label">类型</span><span class="value"><span class="tag tag-error">Bug</span></span></div>
+              <div class="row"><span class="label">范围摘要</span><span class="value">与认证模块、session 存储及并发安全相关，建议检查登录流程与缓存/会话实现。</span></div>
+              <div class="row"><span class="label">涉及模块</span><span class="value">auth、session、redis</span></div>
+              <div class="row"><span class="label">置信度</span><span class="value">高</span></div>
+            </div>
+          </div>
+          <div class="card">
+            <h2 class="card-title">修复方案</h2>
+            <div class="card-body">
+              <p style="margin:0 0 12px">修复方案已生成，可查看根因分析与变更说明。</p>
+              <a href="fix-plan.html" class="btn btn-primary">查看修复方案</a>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

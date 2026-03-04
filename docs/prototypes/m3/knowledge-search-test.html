@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>检索测试 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="#" class="nav-link">项目管理</a>
+        <a href="#" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目 · 运维平台后端</div>
+          <a href="#">概览</a>
+          <a href="knowledge-overview.html">知识库</a>
+          <a href="knowledge-doc-list.html">文档</a>
+          <a href="knowledge-code-index.html">代码索引</a>
+          <a href="knowledge-index-jobs.html">索引任务</a>
+          <a href="knowledge-settings.html">设置</a>
+          <a href="knowledge-search-test.html" class="active">检索测试</a>
+          <a href="#">需求</a>
+          <a href="#">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content" style="max-width: 800px">
+          <div class="breadcrumb">
+            <a href="knowledge-overview.html">知识库</a> / <span>检索测试</span>
+          </div>
+          <h1 class="page-title">检索测试</h1>
+          <p class="meta" style="margin-bottom:24px">输入查询内容，预览当前项目知识库检索结果，用于调试与验证。</p>
+          <div class="form-card">
+            <div class="form-item">
+              <label class="form-label">查询内容</label>
+              <textarea class="input" placeholder="如：登录接口在哪里实现的？" rows="3"></textarea>
+            </div>
+            <div class="form-item">
+              <label class="form-label">返回条数 (topK)</label>
+              <input type="number" class="input" value="5" style="width:100px">
+            </div>
+            <div class="form-item">
+              <label class="form-label">文档类型</label>
+              <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:8px">
+                <label style="display:flex; align-items:center; gap:4px"><input type="checkbox" checked> 项目信息</label>
+                <label style="display:flex; align-items:center; gap:4px"><input type="checkbox" checked> 上传</label>
+                <label style="display:flex; align-items:center; gap:4px"><input type="checkbox" checked> Runbook</label>
+                <label style="display:flex; align-items:center; gap:4px"><input type="checkbox" checked> 反馈摘要</label>
+              </div>
+            </div>
+            <div class="form-item">
+              <button type="button" class="btn btn-primary">检索</button>
+            </div>
+          </div>
+          <h2 class="card-title" style="margin-top:32px">检索结果</h2>
+          <div class="search-hit">
+            <div class="score">项目信息 · 相似度 0.92</div>
+            <div class="snippet">项目采用前后端分离架构，登录接口位于 auth 模块，路径为 /api/v1/auth/login...</div>
+          </div>
+          <div class="search-hit">
+            <div class="score">上传 · 相似度 0.88</div>
+            <div class="snippet">部署手册中说明：登录相关配置在 config/auth.yaml，超时时间可在此处修改...</div>
+          </div>
+          <div class="search-hit">
+            <div class="score">反馈摘要 · 相似度 0.85</div>
+            <div class="snippet">修复了登录超时问题，修改了 auth 模块的 token 过期时间与 Redis 缓存策略...</div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

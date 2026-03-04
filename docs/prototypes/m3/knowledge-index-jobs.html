@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>索引任务 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="#" class="nav-link">项目管理</a>
+        <a href="#" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目 · 运维平台后端</div>
+          <a href="#">概览</a>
+          <a href="knowledge-overview.html">知识库</a>
+          <a href="knowledge-doc-list.html">文档</a>
+          <a href="knowledge-code-index.html">代码索引</a>
+          <a href="knowledge-index-jobs.html" class="active">索引任务</a>
+          <a href="knowledge-settings.html">设置</a>
+          <a href="#">需求</a>
+          <a href="#">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <div class="breadcrumb">
+            <a href="knowledge-overview.html">知识库</a> / <span>索引任务</span>
+          </div>
+          <h1 class="page-title">索引任务</h1>
+          <div class="filter-bar">
+            <div class="form-item">
+              <select class="input input-sm">
+                <option>全部类型</option>
+                <option>文档</option>
+                <option>代码</option>
+              </select>
+            </div>
+            <div class="form-item">
+              <select class="input input-sm">
+                <option>全部范围</option>
+                <option>全量</option>
+                <option>增量</option>
+              </select>
+            </div>
+            <div class="form-item">
+              <select class="input input-sm">
+                <option>全部状态</option>
+                <option>运行中</option>
+                <option>成功</option>
+                <option>失败</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn-secondary">查询</button>
+            <a href="#" class="btn btn-link">重置</a>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th style="width:120px">任务 ID</th>
+                  <th style="width:80px">类型</th>
+                  <th style="width:80px">范围</th>
+                  <th style="width:90px">状态</th>
+                  <th style="width:140px">开始时间</th>
+                  <th style="width:140px">结束时间</th>
+                  <th style="width:80px">耗时</th>
+                  <th style="width:120px">统计</th>
+                  <th style="width:100px">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="meta">a1b2c3d4...</td>
+                  <td>文档</td>
+                  <td>全量</td>
+                  <td><span class="tag tag-success">成功</span></td>
+                  <td class="meta">2025-03-04 10:00</td>
+                  <td class="meta">2025-03-04 10:05</td>
+                  <td>5m</td>
+                  <td class="meta">12 文档 / 86 块</td>
+                  <td><a href="#" class="link">查看</a></td>
+                </tr>
+                <tr>
+                  <td class="meta">e5f6g7h8...</td>
+                  <td>代码</td>
+                  <td>增量</td>
+                  <td><span class="tag tag-success">成功</span></td>
+                  <td class="meta">2025-03-04 09:30</td>
+                  <td class="meta">2025-03-04 09:32</td>
+                  <td>2m</td>
+                  <td class="meta">3 文件 / 24 块</td>
+                  <td><a href="#" class="link">查看</a></td>
+                </tr>
+                <tr>
+                  <td class="meta">i9j0k1l2...</td>
+                  <td>文档</td>
+                  <td>单条</td>
+                  <td><span class="tag tag-success">成功</span></td>
+                  <td class="meta">2025-03-04 08:15</td>
+                  <td class="meta">2025-03-04 08:15</td>
+                  <td>&lt;1m</td>
+                  <td class="meta">1 文档</td>
+                  <td><a href="#" class="link">查看</a></td>
+                </tr>
+                <tr>
+                  <td class="meta">m3n4o5p6...</td>
+                  <td>代码</td>
+                  <td>全量</td>
+                  <td><span class="tag tag-error">失败</span></td>
+                  <td class="meta">2025-03-03 02:00</td>
+                  <td class="meta">2025-03-03 02:12</td>
+                  <td>12m</td>
+                  <td class="meta">—</td>
+                  <td><a href="#" class="link">查看</a> <a href="#" class="link">重试</a></td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="pagination">
+              <span>共 4 条</span>
+              <div class="actions">
+                <select class="input" style="width:80px; height:32px">
+                  <option>10 条/页</option>
+                  <option>20 条/页</option>
+                  <option>50 条/页</option>
+                </select>
+                <button type="button" class="btn btn-secondary" disabled>上一页</button>
+                <button type="button" class="btn btn-secondary">下一页</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

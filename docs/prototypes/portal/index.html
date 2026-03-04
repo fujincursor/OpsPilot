@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>工作台 - OpsPilot 运维领航</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">
+          <span class="logo-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg></span>
+          <span class="logo-brand"><span class="logo-en">OpsPilot</span><span class="logo-zh">运维领航</span></span>
+        </span>
+        <a href="index.html" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <span class="header-status">已登录</span>
+        <div class="user-avatar" aria-hidden="true">用</div>
+      </div>
+    </header>
+    <main class="content">
+      <div class="hero">
+        <h1 class="page-title">工作台</h1>
+        <p class="page-desc">一次登录，全站通行。</p>
+        <p class="hero-tagline">智能理解运维需求，自动生成方案与代码，人工 Review 把关，从需求到测试报告全流程闭环交付。</p>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab-btn active" role="tab" id="tabFlow" aria-selected="true" aria-controls="panelFlow">整体业务流程</button>
+        <button type="button" class="tab-btn" role="tab" id="tabModules" aria-selected="false" aria-controls="panelModules">功能模块</button>
+      </div>
+
+      <div class="tab-panel active" id="panelFlow" role="tabpanel" aria-labelledby="tabFlow">
+        <section class="flow-section">
+          <div class="flow-card">
+          <div class="flow-chart">
+            <div class="flow-node flow-node-decision">知识库已就绪？</div>
+            <div class="flow-arrow"></div>
+            <div class="flow-node">需求输入 → 分析分类（Bug / 新需求）</div>
+            <div class="flow-arrow"></div>
+            <div class="flow-node">方案设计</div>
+            <div class="flow-arrow"></div>
+            <div class="flow-node flow-node-decision">人工 Review 通过？</div>
+            <div class="flow-arrow"></div>
+            <div class="flow-node">代码生成 → 语法检查</div>
+            <div class="flow-arrow"></div>
+            <div class="flow-node">测试执行 → 测试报告</div>
+            <div class="flow-arrow"></div>
+            <div class="flow-node flow-node-decision">测试通过？</div>
+            <div class="flow-arrow"></div>
+            <div class="flow-node flow-node-end">发布（可选）→ 反馈与知识沉淀</div>
+            <p class="flow-note">未通过环节可退回修改后重试</p>
+          </div>
+        </div>
+        </section>
+      </div>
+
+      <div class="tab-panel" id="panelModules" role="tabpanel" aria-labelledby="tabModules" hidden>
+        <section class="modules-section">
+        <div class="module-grid">
+          <div class="module-card">
+            <span class="module-icon" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="2"/></svg></span>
+            <span class="module-id">M1</span>
+            <h3>多项目与 Agent 实例管理</h3>
+            <p>创建与管理运维项目，配置每个项目专属的 Agent 实例（模型、Prompt、工具链），管理项目成员与权限。</p>
+            <a href="../m1/project-list.html" class="link-primary">进入</a>
+          </div>
+          <div class="module-card">
+            <span class="module-icon" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
+            <span class="module-id">M2</span>
+            <h3>项目信息与知识库前置维护</h3>
+            <p>维护项目概述、架构、目录结构、配置说明与 Runbook；完成知识库就绪后，该项目方可提交需求与 Bug。</p>
+            <a href="../m2/profile-overview.html" class="link-primary">进入</a>
+          </div>
+          <div class="module-card">
+            <span class="module-icon" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/></svg></span>
+            <span class="module-id">M3</span>
+            <h3>知识库与系统理解增强</h3>
+            <p>管理文档与代码索引，支持 RAG 检索与反馈写入，提升 Agent 对当前项目的理解能力。</p>
+            <a href="../m3/knowledge-overview.html" class="link-primary">进入</a>
+          </div>
+          <div class="module-card">
+            <span class="module-icon" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+            <span class="module-id">M4</span>
+            <h3>需求理解与分类</h3>
+            <p>提交日常运维需求，由 Agent 自动分析并分类为 Bug 或新需求，并驱动后续修复或设计流程。</p>
+            <a href="../m4/ticket-list.html" class="link-primary">进入</a>
+          </div>
+          <div class="module-card">
+            <span class="module-icon" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94L6 16"/></svg></span>
+            <span class="module-id">M5</span>
+            <h3>Bug 修复流程</h3>
+            <p>查看 Bug 工单、生成与查看修复方案，经 Review 后进入代码生成与测试。</p>
+            <a href="../m5/bug-list.html" class="link-primary">进入</a>
+          </div>
+          <div class="module-card">
+            <span class="module-icon" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg></span>
+            <span class="module-id">M6</span>
+            <h3>新需求设计流程</h3>
+            <p>查看新需求工单、生成与查看技术方案/设计文档，经 Review 后进入代码实现与测试。</p>
+            <a href="../m6/feature-list.html" class="link-primary">进入</a>
+          </div>
+          <div class="module-card">
+            <span class="module-icon" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+            <span class="module-id">M7</span>
+            <h3>人工 Review 工作台</h3>
+            <p>对待审的方案、代码变更与测试报告进行通过/驳回操作，并查看 Review 历史与审计日志。</p>
+            <a href="../m7/review-list.html" class="link-primary">进入</a>
+          </div>
+          <div class="module-card">
+            <span class="module-icon" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span>
+            <span class="module-id">M8</span>
+            <h3>代码生成与语法校验</h3>
+            <p>查看根据方案生成的代码变更，执行语法/静态检查，直至通过后进入测试。</p>
+            <a href="../m8/code-change-list.html" class="link-primary">进入</a>
+          </div>
+          <div class="module-card">
+            <span class="module-icon" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94L6 16"/><path d="M9 9.5l-5 5"/><path d="M10 14l-4 4"/></svg></span>
+            <span class="module-id">M9</span>
+            <h3>测试用例生成与执行</h3>
+            <p>查看测试用例与执行结果，查看测试报告，失败可重新执行或回退修复。</p>
+            <a href="../m9/test-run-list.html" class="link-primary">进入</a>
+          </div>
+        </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    (function() {
+      var tabFlow = document.getElementById('tabFlow');
+      var tabModules = document.getElementById('tabModules');
+      var panelFlow = document.getElementById('panelFlow');
+      var panelModules = document.getElementById('panelModules');
+
+      function showFlow() {
+        tabFlow.classList.add('active');
+        tabFlow.setAttribute('aria-selected', 'true');
+        tabModules.classList.remove('active');
+        tabModules.setAttribute('aria-selected', 'false');
+        panelFlow.classList.add('active');
+        panelFlow.removeAttribute('hidden');
+        panelModules.classList.remove('active');
+        panelModules.setAttribute('hidden', '');
+      }
+
+      function showModules() {
+        tabModules.classList.add('active');
+        tabModules.setAttribute('aria-selected', 'true');
+        tabFlow.classList.remove('active');
+        tabFlow.setAttribute('aria-selected', 'false');
+        panelModules.classList.add('active');
+        panelModules.removeAttribute('hidden');
+        panelFlow.classList.remove('active');
+        panelFlow.setAttribute('hidden', '');
+      }
+
+      if (tabFlow) tabFlow.addEventListener('click', showFlow);
+      if (tabModules) tabModules.addEventListener('click', showModules);
+    })();
+  </script>
+</body>
+</html>

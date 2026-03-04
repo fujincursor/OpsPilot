@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bug 工单 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="#" class="nav-link">项目管理</a>
+        <a href="bug-list.html" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目 · 运维平台后端</div>
+          <a href="#">概览</a>
+          <a href="bug-list.html" class="active">Bug 工单</a>
+          <a href="#">需求工单</a>
+          <a href="#">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <h1 class="page-title">Bug 工单</h1>
+          <div class="filter-bar">
+            <div class="form-item">
+              <input type="text" class="input input-sm" placeholder="搜索工单标题或 ID">
+            </div>
+            <div class="form-item">
+              <select class="input input-sm">
+                <option>全部</option>
+                <option>待生成</option>
+                <option>已生成</option>
+                <option>生成失败</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn-secondary">查询</button>
+            <a href="#" class="btn btn-link">重置</a>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>工单标题</th>
+                  <th style="width:120px">项目</th>
+                  <th style="width:90px">分析结果</th>
+                  <th style="width:100px">方案状态</th>
+                  <th style="width:140px">更新时间</th>
+                  <th style="width:180px">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="bug-detail.html" class="link">登录接口在并发下偶发 500 错误</a>
+                    <div class="meta">TKT-20250304-001 · 2025-03-04 10:00</div>
+                  </td>
+                  <td>运维平台后端</td>
+                  <td><span class="tag tag-error">Bug</span></td>
+                  <td><span class="tag tag-success">已生成</span></td>
+                  <td class="meta">2025-03-04 11:30</td>
+                  <td>
+                    <div class="actions">
+                      <a href="bug-detail.html" class="link">查看</a>
+                      <a href="fix-plan.html" class="link">修复方案</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="bug-detail.html" class="link">定时任务重复执行导致数据重复</a>
+                    <div class="meta">TKT-20250303-002 · 2025-03-03 14:20</div>
+                  </td>
+                  <td>运维平台后端</td>
+                  <td><span class="tag tag-error">Bug</span></td>
+                  <td><span class="tag tag-warning">待生成</span></td>
+                  <td class="meta">2025-03-03 15:00</td>
+                  <td>
+                    <div class="actions">
+                      <a href="bug-detail.html" class="link">查看</a>
+                      <a href="bug-detail.html#generate" class="link">生成方案</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="bug-detail.html" class="link">导出 Excel 时大文件内存溢出</a>
+                    <div class="meta">TKT-20250302-003 · 2025-03-02 09:15</div>
+                  </td>
+                  <td>运维平台后端</td>
+                  <td><span class="tag tag-error">Bug</span></td>
+                  <td><span class="tag tag-default">生成失败</span></td>
+                  <td class="meta">2025-03-02 10:00</td>
+                  <td>
+                    <div class="actions">
+                      <a href="bug-detail.html" class="link">查看</a>
+                      <a href="#" class="link">重新生成</a>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="pagination">
+              <span>共 3 条</span>
+              <div class="actions">
+                <select class="input" style="width:80px; height:32px">
+                  <option>10 条/页</option>
+                  <option>20 条/页</option>
+                  <option>50 条/页</option>
+                </select>
+                <button type="button" class="btn btn-secondary" disabled>上一页</button>
+                <button type="button" class="btn btn-secondary">下一页</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

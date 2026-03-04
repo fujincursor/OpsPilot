@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>代码索引 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="#" class="nav-link">项目管理</a>
+        <a href="#" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目 · 运维平台后端</div>
+          <a href="#">概览</a>
+          <a href="knowledge-overview.html">知识库</a>
+          <a href="knowledge-doc-list.html">文档</a>
+          <a href="knowledge-code-index.html" class="active">代码索引</a>
+          <a href="knowledge-index-jobs.html">索引任务</a>
+          <a href="knowledge-settings.html">设置</a>
+          <a href="#">需求</a>
+          <a href="#">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content" style="max-width: 720px">
+          <div class="breadcrumb">
+            <a href="knowledge-overview.html">知识库</a> / <span>代码索引</span>
+          </div>
+          <h1 class="page-title">代码索引</h1>
+          <div class="form-card">
+            <h2 class="card-title" style="margin-top:0">索引范围</h2>
+            <div class="form-item">
+              <label class="form-label">包含路径</label>
+              <textarea class="input" placeholder="每行一个路径，如 src&#10;lib&#10;留空表示全库" rows="4"></textarea>
+              <div class="form-hint">仅对指定路径下的代码建立索引，便于 Agent 检索项目结构与关键模块。</div>
+            </div>
+            <div class="form-item">
+              <label class="form-label">排除路径</label>
+              <textarea class="input" placeholder="如 node_modules&#10;*.min.js" rows="3"></textarea>
+            </div>
+            <hr style="border: none; border-top: 1px solid var(--border); margin: 24px 0;">
+            <h2 class="card-title">更新触发</h2>
+            <div class="form-item">
+              <label class="form-label">触发方式</label>
+              <select class="input">
+                <option>Webhook（MR 合并时）</option>
+                <option>定时</option>
+                <option>仅手动</option>
+              </select>
+            </div>
+            <div class="form-item">
+              <label class="form-label">定时表达式</label>
+              <input type="text" class="input" placeholder="如 0 2 * * *（每日 2:00）">
+            </div>
+            <hr style="border: none; border-top: 1px solid var(--border); margin: 24px 0;">
+            <h2 class="card-title">立即执行</h2>
+            <div class="form-item">
+              <p class="form-hint" style="margin-bottom:12px">保存配置后，可立即触发一次全量或增量索引。全量索引可能耗时较久。</p>
+              <div class="actions">
+                <button type="button" class="btn btn-primary">全量索引</button>
+                <button type="button" class="btn btn-secondary">增量索引</button>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn btn-primary">保存配置</button>
+              <a href="knowledge-overview.html" class="btn btn-secondary">返回概览</a>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

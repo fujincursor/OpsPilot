@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>修复方案 - 待生成 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="#" class="nav-link">项目管理</a>
+        <a href="bug-list.html" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目 · 运维平台后端</div>
+          <a href="#">概览</a>
+          <a href="bug-list.html" class="active">Bug 工单</a>
+          <a href="#">需求工单</a>
+          <a href="#">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <div class="breadcrumb">
+            <a href="#">运维平台后端</a>
+            <span>/</span>
+            <a href="bug-list.html">Bug 工单</a>
+            <span>/</span>
+            <a href="bug-detail.html">定时任务重复执行导致数据重复</a>
+            <span>/</span>
+            <span>修复方案</span>
+          </div>
+          <h1 class="page-title">修复方案</h1>
+          <div class="card">
+            <h2 class="card-title">生成修复方案</h2>
+            <div class="card-body">
+              <p style="margin:0 0 16px; color: var(--text-secondary);">基于工单与知识库上下文，由 Agent 生成根因分析与修复建议。生成完成后可在此查看并提交 Review。</p>
+              <button type="button" class="btn btn-primary">生成修复方案</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

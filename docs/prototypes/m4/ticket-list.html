@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>需求与工单 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="../m1/project-list.html" class="nav-link">项目管理</a>
+        <a href="#" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目</div>
+          <a href="../m1/project-detail.html">概览</a>
+          <a href="ticket-list.html" class="active">需求</a>
+          <a href="../m1/project-settings-basic.html">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <div class="breadcrumb">
+            <a href="../m1/project-list.html">项目管理</a> / <a href="../m1/project-detail.html">运维平台后端</a> / <span>需求</span>
+          </div>
+          <h1 class="page-title">需求与工单</h1>
+          <div class="filter-bar">
+            <div class="form-item">
+              <input type="text" class="input input-sm" placeholder="搜索标题或描述">
+            </div>
+            <div class="form-item">
+              <select class="input input-sm">
+                <option>全部</option>
+                <option>Bug</option>
+                <option>新需求</option>
+              </select>
+            </div>
+            <div class="form-item">
+              <select class="input input-sm">
+                <option>全部</option>
+                <option>待分析</option>
+                <option>分析中</option>
+                <option>已分析</option>
+                <option>分析失败</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn-secondary">查询</button>
+            <a href="#" class="btn btn-link">重置</a>
+            <div style="flex:1"></div>
+            <a href="ticket-submit.html" class="btn btn-primary">提交需求</a>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>标题</th>
+                  <th style="width:90px">类型</th>
+                  <th style="width:100px">状态</th>
+                  <th style="width:140px">更新时间</th>
+                  <th style="width:160px">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="ticket-detail.html" class="link">登录接口偶发超时</a>
+                    <div class="meta">2025-03-04 10:30 · 张三提交</div>
+                  </td>
+                  <td><span class="tag tag-warning">Bug</span></td>
+                  <td><span class="tag tag-success">已分析</span></td>
+                  <td class="meta">2025-03-04 11:00</td>
+                  <td>
+                    <div class="actions">
+                      <a href="ticket-detail.html" class="link">查看</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="ticket-detail.html" class="link">监控大盘增加告警阈值配置</a>
+                    <div class="meta">2025-03-03 14:20 · 李四提交</div>
+                  </td>
+                  <td><span class="tag tag-info">新需求</span></td>
+                  <td><span class="tag tag-success">已分析</span></td>
+                  <td class="meta">2025-03-03 15:00</td>
+                  <td>
+                    <div class="actions">
+                      <a href="ticket-detail.html" class="link">查看</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="ticket-detail.html" class="link">定时任务执行失败无重试</a>
+                    <div class="meta">2025-03-04 09:00 · 王五提交</div>
+                  </td>
+                  <td><span class="tag tag-default">-</span></td>
+                  <td><span class="tag tag-warning">分析中</span></td>
+                  <td class="meta">2025-03-04 09:05</td>
+                  <td>
+                    <div class="actions">
+                      <a href="ticket-detail.html" class="link">查看</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="ticket-detail.html" class="link">API 响应格式不统一</a>
+                    <div class="meta">2025-03-02 16:00 · 张三提交</div>
+                  </td>
+                  <td><span class="tag tag-default">-</span></td>
+                  <td><span class="tag tag-error">分析失败</span></td>
+                  <td class="meta">2025-03-02 16:10</td>
+                  <td>
+                    <div class="actions">
+                      <a href="ticket-detail.html" class="link">查看</a>
+                      <a href="#" class="link link-danger">重新分析</a>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="pagination">
+              <span>共 4 条</span>
+              <div class="actions">
+                <select class="input" style="width:80px; height:32px">
+                  <option>10 条/页</option>
+                  <option>20 条/页</option>
+                  <option>50 条/页</option>
+                </select>
+                <button type="button" class="btn btn-secondary" disabled>上一页</button>
+                <button type="button" class="btn btn-secondary">下一页</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

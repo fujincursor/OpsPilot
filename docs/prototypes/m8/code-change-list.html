@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>代码与校验 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="#" class="nav-link">项目管理</a>
+        <a href="code-change-list.html" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目 · 运维平台后端</div>
+          <a href="#">概览</a>
+          <a href="#">需求</a>
+          <a href="code-change-list.html" class="active">代码与校验</a>
+          <a href="#">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <h1 class="page-title">代码与校验</h1>
+          <div class="filter-bar">
+            <div class="form-item">
+              <select class="input input-sm">
+                <option>运维平台后端</option>
+                <option>前端监控系统</option>
+              </select>
+            </div>
+            <div class="form-item">
+              <input type="text" class="input input-sm" placeholder="搜索工单">
+            </div>
+            <div class="form-item">
+              <select class="input input-sm">
+                <option>全部</option>
+                <option>生成中</option>
+                <option>待校验</option>
+                <option>已通过</option>
+                <option>未通过</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn-secondary">查询</button>
+            <a href="#" class="btn btn-link">重置</a>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>工单</th>
+                  <th style="width:100px">状态</th>
+                  <th style="width:100px">Linter</th>
+                  <th style="width:80px">版本</th>
+                  <th style="width:140px">更新时间</th>
+                  <th style="width:200px">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="code-change-detail-passed.html" class="link">登录接口超时需增加重试逻辑</a>
+                    <div class="meta">TKT-001 · Bug 修复</div>
+                  </td>
+                  <td><span class="tag tag-success">已通过</span></td>
+                  <td>通过</td>
+                  <td>v1</td>
+                  <td class="meta">2025-03-04 11:20</td>
+                  <td>
+                    <div class="actions">
+                      <a href="code-change-detail-passed.html" class="link">查看详情</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="code-change-detail-failed.html" class="link">监控大盘增加磁盘使用率图表</a>
+                    <div class="meta">TKT-002 · 新需求</div>
+                  </td>
+                  <td><span class="tag tag-error">未通过</span></td>
+                  <td>未通过</td>
+                  <td>v2</td>
+                  <td class="meta">2025-03-04 10:45</td>
+                  <td>
+                    <div class="actions">
+                      <a href="code-change-detail-failed.html" class="link">查看详情</a>
+                      <a href="#" class="link">重新生成</a>
+                      <a href="#" class="link">再次校验</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="code-change-detail-generating.html" class="link">修复 Redis 连接池泄漏</a>
+                    <div class="meta">TKT-003 · Bug 修复</div>
+                  </td>
+                  <td><span class="tag tag-warning">生成中</span></td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td class="meta">2025-03-04 10:30</td>
+                  <td>
+                    <div class="actions">
+                      <a href="code-change-detail-generating.html" class="link">查看详情</a>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="pagination">
+              <span>共 3 条</span>
+              <div class="actions">
+                <select class="input" style="width:80px; height:32px">
+                  <option>10 条/页</option>
+                  <option>20 条/页</option>
+                  <option>50 条/页</option>
+                </select>
+                <button type="button" class="btn btn-secondary" disabled>上一页</button>
+                <button type="button" class="btn btn-secondary">下一页</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

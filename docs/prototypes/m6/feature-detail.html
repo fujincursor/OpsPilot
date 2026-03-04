@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>需求工单详情 - 增加用户操作审计日志功能 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="#" class="nav-link">项目管理</a>
+        <a href="feature-list.html" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目 · 运维平台后端</div>
+          <a href="#">概览</a>
+          <a href="#">Bug 工单</a>
+          <a href="feature-list.html" class="active">需求工单</a>
+          <a href="#">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <div class="breadcrumb">
+            <a href="#">运维平台后端</a>
+            <span>/</span>
+            <a href="feature-list.html">需求工单</a>
+            <span>/</span>
+            <span>增加用户操作审计日志功能</span>
+          </div>
+          <div class="page-header">
+            <div>
+              <h1 class="page-title" style="margin-bottom:8px">增加用户操作审计日志功能</h1>
+              <span class="tag tag-success">设计已生成</span>
+              <span class="tag tag-info" style="margin-left:8px">新需求</span>
+            </div>
+            <a href="design-doc.html" class="btn btn-primary">查看设计文档</a>
+          </div>
+          <div class="tabs">
+            <a href="feature-detail.html" class="active">工单信息</a>
+            <a href="design-doc.html">设计文档</a>
+          </div>
+          <div class="card">
+            <h2 class="card-title">基本信息</h2>
+            <div class="card-body">
+              <div class="row"><span class="label">工单 ID</span><span class="value">TKT-20250304-101</span></div>
+              <div class="row"><span class="label">描述</span><span class="value">需要为系统增加用户操作审计日志功能，记录关键操作（登录、敏感配置修改、数据导出等）的操作人、时间、IP、操作内容，并支持按条件查询与导出。</span></div>
+              <div class="row"><span class="label">创建时间</span><span class="value">2025-03-04 09:00</span></div>
+              <div class="row"><span class="label">创建人</span><span class="value">李四</span></div>
+              <div class="row"><span class="label">项目</span><span class="value">运维平台后端</span></div>
+            </div>
+          </div>
+          <div class="card">
+            <h2 class="card-title">M4 分析结果</h2>
+            <div class="card-body">
+              <div class="row"><span class="label">类型</span><span class="value"><span class="tag tag-info">新需求</span></span></div>
+              <div class="row"><span class="label">范围摘要</span><span class="value">涉及审计日志模型、存储、查询接口与前端展示；建议新增审计模块，与现有权限与操作入口集成。</span></div>
+              <div class="row"><span class="label">涉及模块</span><span class="value">audit、auth、admin、api</span></div>
+              <div class="row"><span class="label">置信度</span><span class="value">高</span></div>
+            </div>
+          </div>
+          <div class="card">
+            <h2 class="card-title">设计文档</h2>
+            <div class="card-body">
+              <p style="margin:0 0 12px">设计文档已生成，可查看技术方案、模块划分与接口说明。</p>
+              <a href="design-doc.html" class="btn btn-primary">查看设计文档</a>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

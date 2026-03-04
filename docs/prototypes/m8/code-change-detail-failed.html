@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>代码变更详情（未通过）- 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="#" class="nav-link">项目管理</a>
+        <a href="code-change-list.html" class="nav-link active">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目 · 运维平台后端</div>
+          <a href="#">概览</a>
+          <a href="#">需求</a>
+          <a href="code-change-list.html" class="active">代码与校验</a>
+          <a href="#">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <div class="breadcrumb">
+            <a href="code-change-list.html">工作台</a>
+            <span>/</span>
+            <a href="code-change-list.html">代码与校验</a>
+            <span>/</span>
+            <span>监控大盘增加磁盘使用率图表</span>
+          </div>
+          <div class="page-header">
+            <div>
+              <h1 class="page-title" style="margin-bottom:8px">监控大盘增加磁盘使用率图表</h1>
+              <span class="tag tag-error">未通过</span>
+            </div>
+            <div class="actions">
+              <button type="button" class="btn btn-primary">重新生成</button>
+              <button type="button" class="btn btn-secondary">再次校验</button>
+            </div>
+          </div>
+          <div class="alert alert-warning">
+            存在语法/静态检查错误，请重新生成或修改后再次校验。
+          </div>
+          <div class="grid-2">
+            <div>
+              <div class="card">
+                <h2 class="card-title">生成结果</h2>
+                <div class="card-body">
+                  <p style="margin: 0 0 12px; font-size: 14px; color: var(--text-secondary);">变更文件</p>
+                  <ul style="margin: 0; padding-left: 20px;">
+                    <li><code>src/dashboard/DiskChart.jsx</code></li>
+                    <li><code>src/dashboard/index.js</code></li>
+                  </ul>
+                  <details style="margin-top: 16px;">
+                    <summary style="cursor: pointer; color: var(--primary); font-size: 14px;">查看 patch</summary>
+                    <pre class="code-block" style="margin-top: 8px;">（略）</pre>
+                  </details>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="card">
+                <h2 class="card-title">检查结果</h2>
+                <div class="card-body">
+                  <p style="margin: 0 0 12px;"><span class="tag tag-error">未通过</span> · eslint · 2025-03-04 10:44</p>
+                  <div class="table-wrap" style="padding: 0; box-shadow: none;">
+                    <table class="table">
+                      <thead>
+                        <tr>
+                          <th>文件</th>
+                          <th style="width:60px">行号</th>
+                          <th>描述</th>
+                          <th style="width:70px">级别</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>src/dashboard/DiskChart.jsx</td>
+                          <td>12</td>
+                          <td>React Hook useEffect has a missing dependency: 'fetchData'</td>
+                          <td><span class="tag tag-error">error</span></td>
+                        </tr>
+                        <tr>
+                          <td>src/dashboard/DiskChart.jsx</td>
+                          <td>28</td>
+                          <td>Unexpected var, use let or const instead</td>
+                          <td><span class="tag tag-error">error</span></td>
+                        </tr>
+                        <tr>
+                          <td>src/dashboard/index.js</td>
+                          <td>5</td>
+                          <td>'DiskChart' is defined but never used</td>
+                          <td><span class="tag tag-warning">warning</span></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

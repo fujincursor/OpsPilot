@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>测试报告 Review - 监控大盘接口超时告警 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="../m1/project-list.html" class="nav-link">项目管理</a>
+        <a href="#" class="nav-link">工作台</a>
+        <a href="review-list.html" class="nav-link active">Review</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">Review</div>
+          <a href="review-list.html" class="active">待审列表</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <div class="breadcrumb">
+            <a href="review-list.html">Review 工作台</a>
+            <span>/</span>
+            <a href="review-list.html">待审列表</a>
+            <span>/</span>
+            <span>监控大盘接口超时告警 · 测试报告 Review</span>
+          </div>
+          <div class="page-header">
+            <div>
+              <h1 class="page-title" style="margin-bottom:8px">监控大盘接口超时告警</h1>
+              <span class="tag tag-warning">Bug</span>
+              <span class="tag tag-warning">测试报告</span>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div>
+              <div class="card">
+                <h2 class="card-title">测试报告摘要</h2>
+                <div class="card-body">
+                  <div class="row"><span class="label">执行时间</span><span class="value">2025-03-03 16:15</span></div>
+                  <div class="row"><span class="label">总用例数</span><span class="value">12</span></div>
+                  <div class="row"><span class="label">通过</span><span class="value" style="color:var(--success)">11</span></div>
+                  <div class="row"><span class="label">失败</span><span class="value" style="color:var(--error)">1</span></div>
+                  <div class="row"><span class="label">状态</span><span class="value"><span class="tag tag-success">通过</span>（修复后重跑已全部通过）</span></div>
+                  <div class="row"><span class="label">报告链接</span><span class="value"><a href="#" class="link">查看完整报告</a></span></div>
+                </div>
+              </div>
+              <div class="card">
+                <h2 class="card-title">失败用例（已修复）</h2>
+                <div class="card-body">
+                  <p style="margin:0; font-size:13px; color:var(--text-secondary);">test_timeout_alert_trigger · 断言超时阈值与配置不一致，已修复并重跑通过。</p>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="btn btn-primary">通过</button>
+                <button type="button" class="btn btn-danger">驳回</button>
+              </div>
+            </div>
+            <div>
+              <div class="card">
+                <h2 class="card-title">Review 历史</h2>
+                <ul class="review-history">
+                  <li>
+                    <div><strong>赵六</strong> · <span class="tag tag-default">待审</span></div>
+                    <div class="meta">2025-03-03 16:20 待处理</div>
+                  </li>
+                  <li>
+                    <div><strong>王五</strong> · <span class="tag tag-success">通过</span> · 代码 Review</div>
+                    <div class="meta">2025-03-03 15:00 · 代码与 Lint 通过</div>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

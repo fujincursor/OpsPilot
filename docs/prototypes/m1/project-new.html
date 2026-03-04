@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>新建项目 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="project-list.html" class="nav-link active">项目管理</a>
+        <a href="#" class="nav-link">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+    <aside class="sidebar">
+      <nav class="sidebar-nav">
+        <div class="sidebar-title">全局</div>
+        <a href="project-list.html" class="active">项目列表</a>
+      </nav>
+    </aside>
+    <main class="main-wrap">
+      <div class="content" style="max-width: 560px">
+        <h1 class="page-title">新建项目</h1>
+        <div class="form-card">
+          <div class="form-item">
+            <label class="form-label"><span class="required">*</span> 项目名称</label>
+            <input type="text" class="input" placeholder="请输入项目名称">
+          </div>
+          <div class="form-item">
+            <label class="form-label">项目简介</label>
+            <textarea class="input" placeholder="选填" rows="3"></textarea>
+          </div>
+          <div class="form-item">
+            <label class="form-label"><span class="required">*</span> 代码库地址</label>
+            <input type="text" class="input" placeholder="如 https://github.com/org/repo.git">
+          </div>
+          <div class="form-item">
+            <label class="form-label">默认分支</label>
+            <input type="text" class="input" placeholder="main" value="main">
+          </div>
+          <div class="form-item">
+            <label class="form-label">环境类型</label>
+            <select class="input">
+              <option value="">请选择</option>
+              <option>开发</option>
+              <option>测试</option>
+              <option>预发</option>
+              <option>生产</option>
+            </select>
+          </div>
+          <div class="form-actions">
+            <a href="project-list.html" class="btn btn-secondary">取消</a>
+            <button type="button" class="btn btn-primary">创建</button>
+          </div>
+        </div>
+      </div>
+    </main>
+    </div>
+  </div>
+</body>
+</html>

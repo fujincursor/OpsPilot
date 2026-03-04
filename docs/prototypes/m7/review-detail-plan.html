@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>方案 Review - 登录接口偶发超时 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="../m1/project-list.html" class="nav-link">项目管理</a>
+        <a href="#" class="nav-link">工作台</a>
+        <a href="review-list.html" class="nav-link active">Review</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">Review</div>
+          <a href="review-list.html" class="active">待审列表</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <div class="breadcrumb">
+            <a href="review-list.html">Review 工作台</a>
+            <span>/</span>
+            <a href="review-list.html">待审列表</a>
+            <span>/</span>
+            <span>登录接口偶发超时 · 方案 Review</span>
+          </div>
+          <div class="page-header">
+            <div>
+              <h1 class="page-title" style="margin-bottom:8px">登录接口偶发超时</h1>
+              <span class="tag tag-warning">Bug</span>
+              <span class="tag tag-info">方案</span>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div>
+              <div class="card plan-section">
+                <h2 class="card-title">根因分析</h2>
+                <div class="card-body">
+                  <p style="margin:0; white-space: pre-wrap;">并发场景下，多个请求同时访问同一用户的 session 时，Redis 会话存储的读写未做串行化或锁保护，导致竞态条件。部分请求在 session 尚未完全写入或过期边界被清理时读取，触发空指针或序列化异常，进而返回 500。建议在 session 读写路径增加分布式锁或改用原子操作，并确保 session 过期与续期逻辑在并发下一致。</p>
+                </div>
+              </div>
+              <div class="card plan-section">
+                <h2 class="card-title">变更说明</h2>
+                <div class="card-body">
+                  <ul class="plan-list">
+                    <li>
+                      <div><strong>1. 登录成功后 session 写入</strong></div>
+                      <div class="file-path">src/auth/session_service.js</div>
+                      <div class="line-range">约 45–78 行</div>
+                      <p style="margin:8px 0 0">对「获取-修改-写回」改为单次原子写入，或对 key 加分布式锁后再读写，避免并发下覆盖或读到中间状态。</p>
+                    </li>
+                    <li>
+                      <div><strong>2. Session 续期与过期检查</strong></div>
+                      <div class="file-path">src/auth/session_middleware.js</div>
+                      <div class="line-range">约 22–35 行</div>
+                      <p style="margin:8px 0 0">在续期时先加锁再读-续期-写回，确保同一 session 在并发请求下只被续期一次。</p>
+                    </li>
+                    <li>
+                      <div><strong>3. Redis 连接与错误处理</strong></div>
+                      <div class="file-path">src/infra/redis_client.js</div>
+                      <div class="line-range">可选</div>
+                      <p style="margin:8px 0 0">对 Redis 超时与连接失败增加重试与明确错误码，避免将底层异常直接透传为 500。</p>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div class="card plan-section">
+                <h2 class="card-title">建议涉及文件</h2>
+                <div class="card-body">
+                  <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <span class="tag tag-info">src/auth/session_service.js</span>
+                    <span class="tag tag-info">src/auth/session_middleware.js</span>
+                    <span class="tag tag-info">src/infra/redis_client.js</span>
+                  </div>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="btn btn-primary">通过</button>
+                <button type="button" class="btn btn-danger">驳回</button>
+              </div>
+            </div>
+            <div>
+              <div class="card">
+                <h2 class="card-title">Review 历史</h2>
+                <ul class="review-history">
+                  <li>
+                    <div><strong>李四</strong> · <span class="tag tag-default">待审</span></div>
+                    <div class="meta">2025-03-04 11:00 待处理</div>
+                  </li>
+                  <li>
+                    <div><strong>张三</strong> · <span class="tag tag-success">通过</span> · 需求分析</div>
+                    <div class="meta">2025-03-04 10:35 · 分析结果已确认</div>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

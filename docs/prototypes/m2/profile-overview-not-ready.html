@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>项目信息（未就绪） - 前端监控系统 - 运维 Agent 工作台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <div class="header-left">
+        <span class="logo">运维 Agent 工作台</span>
+        <a href="../m1/project-list.html" class="nav-link">项目管理</a>
+        <a href="#" class="nav-link">工作台</a>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">用</div>
+      </div>
+    </header>
+    <div class="layout-body">
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <div class="sidebar-title">当前项目</div>
+          <a href="../m1/project-detail.html">概览</a>
+          <a href="#">需求</a>
+          <a href="profile-overview-not-ready.html" class="active">项目信息</a>
+          <a href="../m1/project-settings-basic.html">设置</a>
+        </nav>
+      </aside>
+      <main class="main-wrap">
+        <div class="content">
+          <div class="breadcrumb">
+            <a href="../m1/project-list.html">项目管理</a> / <a href="../m1/project-detail.html">前端监控系统</a> / <span>项目信息</span>
+          </div>
+          <div class="page-header">
+            <h1 class="page-title" style="margin-bottom: 0;">项目信息</h1>
+            <a href="profile-edit.html" class="btn btn-primary">编辑项目信息</a>
+          </div>
+          <div class="alert alert-warning" style="margin-bottom: 24px;">
+            知识库未就绪，无法提交需求与 Bug。请完善以下内容后再提交。
+          </div>
+          <div class="grid-2">
+            <div>
+              <div class="card">
+                <h2 class="card-title">信息摘要</h2>
+                <div class="card-body">
+                  <div class="profile-item">
+                    <div class="name">项目概述</div>
+                    <div class="status empty">未填写</div>
+                    <a href="profile-edit.html" class="link">编辑</a>
+                  </div>
+                  <div class="profile-item">
+                    <div class="name">架构说明</div>
+                    <div class="status empty">未填写</div>
+                    <a href="profile-edit.html" class="link">编辑</a>
+                  </div>
+                  <div class="profile-item">
+                    <div class="name">目录结构说明</div>
+                    <div class="status filled">已填写</div>
+                    <div class="preview">前端监控大屏与告警配置，Vue3 + ECharts；目录见 README。</div>
+                    <a href="profile-edit.html" class="link">编辑</a>
+                  </div>
+                  <div class="profile-item">
+                    <div class="name">关键模块说明</div>
+                    <div class="status empty">未填写</div>
+                    <a href="profile-edit.html" class="link">编辑</a>
+                  </div>
+                  <div class="profile-item">
+                    <div class="name">配置说明</div>
+                    <div class="status empty">未填写</div>
+                    <a href="profile-edit.html" class="link">编辑</a>
+                  </div>
+                  <div class="profile-item">
+                    <div class="name">Runbook</div>
+                    <div class="status empty">未填写</div>
+                    <a href="profile-edit.html" class="link">编辑</a>
+                  </div>
+                  <div class="meta">最后更新：2025-03-03 16:00</div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="card">
+                <h2 class="card-title">知识库就绪状态</h2>
+                <div class="card-body">
+                  <p style="margin: 0 0 12px;"><span class="tag tag-warning">未就绪</span></p>
+                  <p style="margin: 0 0 8px; font-size: 13px; color: var(--text-secondary);">请完善以下内容后再提交需求：</p>
+                  <ul class="missing-list">
+                    <li>项目概述（必填）</li>
+                    <li>架构说明 或 目录结构说明 至少填一项（当前仅填了目录结构，还差项目概述）</li>
+                  </ul>
+                  <div class="meta">校验时间：2025-03-03 16:00</div>
+                  <div style="margin-top: 16px;">
+                    <a href="profile-edit.html" class="btn btn-primary">编辑项目信息</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
