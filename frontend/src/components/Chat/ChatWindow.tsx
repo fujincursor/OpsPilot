@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import MessageList, { Message } from './MessageList'
 import MessageInput from './MessageInput'
+import { deerflowService, AgentStatus } from '../../services/deerflowService'
 
 interface QuickAction {
   emoji: string
@@ -27,9 +28,15 @@ export default function ChatWindow({
 }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [isLoading, setIsLoading] = useState(false)
+  const [threadId, setThreadId] = useState<string | undefined>(sessionId)
+  const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null)
   const messageAreaRef = useRef<HTMLDivElement>(null)
 
   const isNewSession = !sessionId && messages.length === 0
+
+  useEffect(() => {
+    deerflowService.getStatus().then(setAgentStatus).catch(console.error)
+  }, [])
 
   useEffect(() => {
     if (messageAreaRef.current) {
@@ -37,7 +44,7 @@ export default function ChatWindow({
     }
   }, [messages])
 
-  const handleSendMessage = (content: string) => {
+  const handleSendMessage = useCallback(async (content: string) => {
     const newUserMessage: Message = {
       id: `user-${Date.now()}`,
       type: 'user',
@@ -49,20 +56,45 @@ export default function ChatWindow({
     setMessages((prev) => [...prev, newUserMessage])
     setIsLoading(true)
 
-    setTimeout(() => {
+    try {
+      const response = await deerflowService.chat({
+        message: content,
+        thread_id: threadId,
+        context: { project_name: projectName }
+      })
+
+      if (response.thread_id) {
+        setThreadId(response.thread_id)
+      }
+
+      const modeIndicator = response.data?.mode === 'mock' ? ' [模拟模式]' : ''
+      
       const agentResponse: Message = {
         id: `agent-${Date.now()}`,
         type: 'agent',
-        content: '我已收到您的请求，正在分析中...',
+        content: response.message + modeIndicator,
         sender: 'Lead Agent',
         timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
         agentType: 'lead',
-        status: 'analyzing',
+        status: response.success ? 'complete' : 'error',
       }
       setMessages((prev) => [...prev, agentResponse])
+    } catch (error) {
+      console.error('Chat error:', error)
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        type: 'agent',
+        content: `抱歉，发生错误：${error instanceof Error ? error.message : '未知错误'}`,
+        sender: 'System',
+        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+        agentType: 'lead',
+        status: 'error',
+      }
+      setMessages((prev) => [...prev, errorMessage])
+    } finally {
       setIsLoading(false)
-    }, 1500)
-  }
+    }
+  }, [threadId, projectName])
 
   const handleQuickAction = (action: QuickAction) => {
     handleSendMessage(action.value)
