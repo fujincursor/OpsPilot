@@ -5,3 +5,21 @@ pydantic-settings>=2.1.0
 python-dotenv>=1.0.0
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
+
+# DeerFlow 依赖（核心）
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-openai>=0.2.0
+langchain-anthropic>=0.2.0
+langgraph>=0.2.0
+httpx>=0.27.0
+aiohttp>=3.9.0
+pyyaml>=6.0.0
+
+# 可选：用于知识检索
+# faiss-cpu>=1.7.0
+# sentence-transformers>=2.2.0
+
+# 可选：用于 DeerFlow 完整安装
+# 请参考 deerflow/backend/pyproject.toml 获取完整依赖列表
+# 或运行: pip install -e ./deerflow/backend/packages/harness

@@ -176,6 +176,12 @@ temp/
 # ===================
 # Project Specific
 # ===================
+# DeerFlow framework (cloned separately)
+deerflow/
+
+# OpsPilot data directory
+.opspilot/
+
 # Knowledge base uploads
 uploads/
 storage/
