@@ -359,3 +359,59 @@ export interface CodeGenTaskSummary {
   files_count: number
   created_at: string
 }
+
+// Test Types
+export type TestStatus = 'pending' | 'generating' | 'running' | 'completed' | 'failed'
+export type TestCaseType = 'unit' | 'integration' | 'e2e'
+export type TestResultStatus = 'passed' | 'failed' | 'skipped'
+
+export interface TestCase {
+  id: string
+  name: string
+  description: string
+  type: TestCaseType
+  code: string
+  expected_result: string
+}
+
+export interface TestResult {
+  test_case_id: string
+  status: TestResultStatus
+  actual_result: string
+  error_message?: string
+  duration: number
+}
+
+export interface TestReport {
+  task_id: string
+  total: number
+  passed: number
+  failed: number
+  skipped: number
+  coverage_percent: number
+  duration: number
+}
+
+export interface TestTask {
+  id: string
+  codegen_task_id: string
+  requirement_id: string
+  status: TestStatus
+  test_cases: TestCase[]
+  results: TestResult[]
+  coverage: number
+  created_at: string
+}
+
+export interface TestTaskSummary {
+  id: string
+  status: TestStatus
+  total_cases: number
+  passed: number
+  failed: number
+  created_at: string
+}
+
+export interface CreateTestTaskRequest {
+  codegen_task_id: string
+}

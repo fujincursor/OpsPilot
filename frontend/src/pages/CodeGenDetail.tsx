@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import type { CodeGenTask, CodeFile, CodeGenStatus } from '../types'
-import { codegenService } from '../services'
+import type { CodeGenTask, CodeFile, CodeGenStatus, TestTaskSummary } from '../types'
+import { codegenService, testService } from '../services'
 import {
   CodeGenStatusBadge,
   CodeGenProgress,
@@ -10,6 +10,7 @@ import {
   DiffViewer,
   LintResultCard,
 } from '../components/CodeGen'
+import { TestStatusBadge } from '../components/Tests'
 
 const mockCodeGenTask: CodeGenTask = {
   id: 'cg-1',
@@ -238,6 +239,17 @@ export default function CodeGenDetail() {
   const [viewMode, setViewMode] = useState<ViewMode>('code')
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [testTasks, setTestTasks] = useState<TestTaskSummary[]>([])
+  const [isCreatingTest, setIsCreatingTest] = useState(false)
+
+  const loadTestTasks = useCallback(async (codegenTaskId: string) => {
+    try {
+      const tasks = await testService.getTasksByCodegen(codegenTaskId)
+      setTestTasks(tasks)
+    } catch {
+      setTestTasks([])
+    }
+  }, [])
 
   const loadTask = useCallback(async (id: string) => {
     setIsLoading(true)
@@ -261,8 +273,9 @@ export default function CodeGenDetail() {
   useEffect(() => {
     if (taskId) {
       loadTask(taskId)
+      loadTestTasks(taskId)
     }
-  }, [taskId, loadTask])
+  }, [taskId, loadTask, loadTestTasks])
 
   useEffect(() => {
     if (!task || task.status === 'completed' || task.status === 'failed') return
@@ -297,6 +310,19 @@ export default function CodeGenDetail() {
       console.log('Submit failed')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleCreateTest = async () => {
+    if (!taskId) return
+    setIsCreatingTest(true)
+    try {
+      const newTestTask = await testService.createTestTask(taskId)
+      navigate(`/tests/${newTestTask.id}`)
+    } catch {
+      console.log('Create test failed')
+    } finally {
+      setIsCreatingTest(false)
     }
   }
 
@@ -386,20 +412,36 @@ export default function CodeGenDetail() {
                     )}
                   </button>
                   {task.status === 'completed' && task.lint_result?.passed && (
-                    <button
-                      onClick={handleSubmitForReview}
-                      disabled={isSubmitting}
-                      className="px-3 py-1.5 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          提交中...
-                        </>
-                      ) : (
-                        <>📤 提交审核</>
-                      )}
-                    </button>
+                    <>
+                      <button
+                        onClick={handleCreateTest}
+                        disabled={isCreatingTest}
+                        className="px-3 py-1.5 text-sm font-medium text-green-600 bg-green-100 hover:bg-green-200 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {isCreatingTest ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+                            创建中...
+                          </>
+                        ) : (
+                          <>🧪 运行测试</>
+                        )}
+                      </button>
+                      <button
+                        onClick={handleSubmitForReview}
+                        disabled={isSubmitting}
+                        className="px-3 py-1.5 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            提交中...
+                          </>
+                        ) : (
+                          <>📤 提交审核</>
+                        )}
+                      </button>
+                    </>
                   )}
                 </>
               ) : null}
@@ -437,6 +479,51 @@ export default function CodeGenDetail() {
             </div>
           )}
         </div>
+
+        {testTasks.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <span>🧪</span>
+                测试任务
+              </h3>
+              <span className="text-sm text-gray-500">{testTasks.length} 个任务</span>
+            </div>
+            <div className="space-y-2">
+              {testTasks.map((testTask) => (
+                <div
+                  key={testTask.id}
+                  onClick={() => navigate(`/tests/${testTask.id}`)}
+                  className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <TestStatusBadge status={testTask.status} size="sm" />
+                    <span className="text-sm text-gray-600">
+                      {testTask.total_cases} 个用例
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {testTask.status === 'completed' && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-green-600">✓ {testTask.passed}</span>
+                        <span className="text-red-600">✗ {testTask.failed}</span>
+                      </div>
+                    )}
+                    <span className="text-xs text-gray-400">
+                      {new Date(testTask.created_at).toLocaleString('zh-CN', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                    <span className="text-gray-400">→</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <CodeGenProgress status={task.status} className="mb-6" />
 
