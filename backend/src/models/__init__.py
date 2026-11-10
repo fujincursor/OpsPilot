@@ -26,6 +26,21 @@ from .knowledge import (
     KnowledgeSearchResult,
     KnowledgeSearchResponse,
 )
+from .requirement import (
+    RequirementType,
+    RequirementStatus,
+    RequirementPriority,
+    RequirementSource,
+    Requirement,
+    RequirementCreate,
+    RequirementUpdate,
+    RequirementResponse,
+    RequirementFilters,
+    RequirementStatusUpdate,
+    RequirementAssignUpdate,
+    RequirementAnalysis,
+    RequirementAnalyzeRequest,
+)
 
 __all__ = [
     "Project",
@@ -62,4 +77,17 @@ __all__ = [
     "KnowledgeSearchQuery",
     "KnowledgeSearchResult",
     "KnowledgeSearchResponse",
+    "RequirementType",
+    "RequirementStatus",
+    "RequirementPriority",
+    "RequirementSource",
+    "Requirement",
+    "RequirementCreate",
+    "RequirementUpdate",
+    "RequirementResponse",
+    "RequirementFilters",
+    "RequirementStatusUpdate",
+    "RequirementAssignUpdate",
+    "RequirementAnalysis",
+    "RequirementAnalyzeRequest",
 ]
