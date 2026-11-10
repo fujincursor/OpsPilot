@@ -101,6 +101,23 @@ from .codegen import (
     SandboxExecuteResult,
     FileWriteRequest,
 )
+from .test import (
+    TestStatus,
+    TestCaseType,
+    TestResultStatus,
+    TestCase,
+    TestResult,
+    CoverageInfo,
+    TestReport,
+    TestTask,
+    TestTaskCreate,
+    TestTaskResponse,
+    TestRerunRequest,
+    TestReviewSubmitRequest,
+    CITriggerRequest,
+    CIPipelineInfo,
+    TestFilters,
+)
 
 __all__ = [
     "Project",
@@ -204,4 +221,19 @@ __all__ = [
     "SandboxExecuteRequest",
     "SandboxExecuteResult",
     "FileWriteRequest",
+    "TestStatus",
+    "TestCaseType",
+    "TestResultStatus",
+    "TestCase",
+    "TestResult",
+    "CoverageInfo",
+    "TestReport",
+    "TestTask",
+    "TestTaskCreate",
+    "TestTaskResponse",
+    "TestRerunRequest",
+    "TestReviewSubmitRequest",
+    "CITriggerRequest",
+    "CIPipelineInfo",
+    "TestFilters",
 ]
