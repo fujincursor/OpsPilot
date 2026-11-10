@@ -1250,43 +1250,250 @@ metrics:
 
 ---
 
-## 十三、迁移计划
+## 十三、业务架构与功能全景
 
-### 13.1 迁移阶段
+### 13.1 业务架构图
 
-| 阶段 | 内容 | 依赖 |
-|------|------|------|
-| **Phase 1** | DeerFlow 基础设施部署 | 无 |
-| **Phase 2** | Lead Agent + M4 需求分类迁移 | Phase 1 |
-| **Phase 3** | M3 知识库迁移到 RAGFlow | Phase 1 |
-| **Phase 4** | M5/M6 Bug修复/新需求设计 Agent 迁移 | Phase 2, 3 |
-| **Phase 5** | M7 Review 中间件迁移 | Phase 4 |
-| **Phase 6** | M8/M9 代码生成/测试执行 Agent 迁移 | Phase 5 |
-| **Phase 7** | M1 多项目管理迁移 | Phase 6 |
-| **Phase 8** | 全量切换与旧系统下线 | Phase 7 |
+```mermaid
+flowchart TB
+    subgraph 用户入口["用户入口"]
+        WebUI[Web 工作台]
+        IM[即时通讯<br/>飞书/Slack/钉钉]
+        API[REST API]
+        CLI[命令行工具]
+    end
 
-### 13.2 数据迁移
+    subgraph 核心业务功能["核心业务功能"]
+        subgraph 项目管理["项目管理中心"]
+            ProjCreate[项目创建与配置]
+            ProjConfig[Agent 实例配置]
+            ProjAuth[项目权限管理]
+            ProjKB[知识库管理]
+        end
 
-```yaml
-# 迁移脚本配置
-migration:
-  # 知识库迁移
-  knowledge:
-    source: "existing_vector_db"
-    target: "ragflow"
-    batch_size: 1000
+        subgraph 需求处理["智能需求处理"]
+            DemandInput[需求/Bug 提交]
+            DemandAnalysis[需求理解与分类]
+            DemandRoute[智能路由分发]
+        end
+
+        subgraph Bug修复["Bug 自动修复"]
+            BugLocate[问题定位分析]
+            BugRoot[根因分析]
+            BugFix[修复方案生成]
+            BugPatch[补丁代码生成]
+        end
+
+        subgraph 需求设计["需求设计中心"]
+            FeatureAnalysis[需求分析]
+            TechDesign[技术方案设计]
+            APIDesign[接口设计]
+            ModuleDesign[模块划分]
+        end
+
+        subgraph 代码生成["代码生成引擎"]
+            CodeGen[代码自动生成]
+            CodeLint[语法检查]
+            CodeFormat[代码格式化]
+            CodeOptimize[代码优化建议]
+        end
+
+        subgraph 测试执行["测试执行中心"]
+            TestGen[测试用例生成]
+            TestRun[自动化测试执行]
+            TestReport[测试报告生成]
+            TestCoverage[覆盖率分析]
+        end
+
+        subgraph Review工作台["Review 工作台"]
+            ReviewList[待审列表]
+            ReviewAction[通过/驳回操作]
+            ReviewComment[评审意见]
+            ReviewHistory[审计追溯]
+        end
+    end
+
+    subgraph 知识服务["知识服务"]
+        KBSearch[知识检索]
+        KBIndex[代码索引]
+        KBFeedback[知识反馈]
+        KBMemory[长期记忆]
+    end
+
+    subgraph 集成服务["外部集成"]
+        GitIntegration[Git 仓库集成]
+        CICDIntegration[CI/CD 集成]
+        IMNotify[消息通知]
+        Webhook[Webhook 回调]
+    end
+
+    %% 连接关系
+    WebUI & IM & API & CLI --> DemandInput
+    DemandInput --> DemandAnalysis
+    DemandAnalysis --> DemandRoute
     
-  # 项目配置迁移
-  projects:
-    source: "existing_db"
-    target: "deerflow_projects"
+    DemandRoute -->|Bug| BugLocate
+    DemandRoute -->|新需求| FeatureAnalysis
     
-  # 历史任务迁移
-  tasks:
-    source: "existing_workflow_db"
-    target: "deerflow_threads"
-    preserve_history: true
+    BugLocate --> BugRoot --> BugFix --> BugPatch
+    FeatureAnalysis --> TechDesign --> APIDesign & ModuleDesign
+    
+    BugPatch --> ReviewList
+    TechDesign --> ReviewList
+    
+    ReviewList --> ReviewAction
+    ReviewAction -->|通过| CodeGen
+    ReviewAction -->|驳回| BugFix & TechDesign
+    
+    CodeGen --> CodeLint --> CodeFormat
+    CodeLint -->|通过| TestGen
+    
+    TestGen --> TestRun --> TestReport
+    TestReport --> TestCoverage
+    
+    BugLocate & FeatureAnalysis --> KBSearch
+    TestReport --> KBFeedback
+    
+    CodeGen --> GitIntegration
+    TestRun --> CICDIntegration
+    ReviewAction --> IMNotify
 ```
+
+### 13.2 功能清单
+
+#### 13.2.1 项目管理功能
+
+| 功能模块 | 功能点 | 说明 |
+|----------|--------|------|
+| **项目创建** | 创建新项目 | 配置项目基本信息、代码仓库、团队成员 |
+| | 项目模板 | 支持从模板快速创建项目配置 |
+| **Agent 配置** | 模型选择 | 为项目配置专属的 LLM 模型 |
+| | Prompt 定制 | 自定义项目专属的系统提示词 |
+| | Skills 配置 | 启用/禁用项目所需的 Skills |
+| | 工具授权 | 配置项目可用的工具集 |
+| **权限管理** | 角色定义 | 需求方、开发者、审核者等角色 |
+| | 项目成员 | 管理项目团队成员和权限 |
+| **知识库管理** | 文档上传 | 上传项目文档、架构说明、Runbook |
+| | 代码索引 | 配置代码仓库索引范围 |
+| | 知识就绪检查 | 校验知识库是否满足最小要求 |
+
+#### 13.2.2 智能需求处理功能
+
+| 功能模块 | 功能点 | 说明 |
+|----------|--------|------|
+| **多渠道接入** | Web 提交 | 通过工作台提交需求/Bug |
+| | IM 对话 | 通过飞书/Slack/钉钉直接对话提交 |
+| | API 集成 | 通过 REST API 程序化提交 |
+| **智能分类** | 意图识别 | 自动识别 Bug/新需求/咨询 |
+| | 优先级判断 | 根据内容自动判断优先级 |
+| | 模块关联 | 自动关联影响的代码模块 |
+| **上下文增强** | 知识检索 | 自动检索相关项目知识 |
+| | 历史关联 | 关联相似的历史问题 |
+
+#### 13.2.3 Bug 自动修复功能
+
+| 功能模块 | 功能点 | 说明 |
+|----------|--------|------|
+| **问题定位** | 错误分析 | 分析错误日志、堆栈信息 |
+| | 代码定位 | 定位问题所在的代码位置 |
+| | 影响范围 | 评估 Bug 影响范围 |
+| **根因分析** | 原因推断 | 基于知识库推断问题根因 |
+| | 关联问题 | 发现相关联的潜在问题 |
+| **修复方案** | 方案生成 | 生成结构化的修复方案 |
+| | 多方案对比 | 提供多种修复方案供选择 |
+| | 风险评估 | 评估修复方案的风险 |
+| **补丁生成** | 代码补丁 | 自动生成修复代码 |
+| | 差异预览 | 展示代码变更 diff |
+
+#### 13.2.4 需求设计功能
+
+| 功能模块 | 功能点 | 说明 |
+|----------|--------|------|
+| **需求分析** | 需求拆解 | 将大需求拆解为子任务 |
+| | 依赖分析 | 分析需求依赖关系 |
+| **技术方案** | 方案设计 | 生成技术实现方案 |
+| | 架构建议 | 提供架构调整建议 |
+| **接口设计** | API 定义 | 设计 REST/RPC 接口 |
+| | 数据模型 | 设计数据结构 |
+| **模块划分** | 代码结构 | 建议代码目录结构 |
+| | 职责划分 | 明确模块职责边界 |
+
+#### 13.2.5 代码生成功能
+
+| 功能模块 | 功能点 | 说明 |
+|----------|--------|------|
+| **代码生成** | 骨架代码 | 生成代码框架和骨架 |
+| | 业务代码 | 根据设计生成业务代码 |
+| | 配置文件 | 生成相关配置文件 |
+| **质量保障** | 语法检查 | 自动语法检查（ESLint/Pylint/go vet） |
+| | 格式化 | 代码自动格式化 |
+| | 最佳实践 | 检查代码是否符合最佳实践 |
+| **代码优化** | 优化建议 | 提供代码优化建议 |
+| | 重构建议 | 提供重构改进建议 |
+
+#### 13.2.6 测试执行功能
+
+| 功能模块 | 功能点 | 说明 |
+|----------|--------|------|
+| **用例生成** | 单元测试 | 自动生成单元测试用例 |
+| | 集成测试 | 生成接口测试用例 |
+| | 边界用例 | 生成边界条件测试 |
+| **测试执行** | 沙箱执行 | 在隔离环境中执行测试 |
+| | 并行执行 | 支持测试并行执行 |
+| | 失败重试 | 失败用例自动重试 |
+| **报告生成** | 测试报告 | 生成详细测试报告 |
+| | 覆盖率 | 生成代码覆盖率报告 |
+| | 趋势分析 | 测试通过率趋势分析 |
+
+#### 13.2.7 Review 工作台功能
+
+| 功能模块 | 功能点 | 说明 |
+|----------|--------|------|
+| **待审管理** | 待审列表 | 查看所有待审项 |
+| | 分类筛选 | 按类型/项目/优先级筛选 |
+| | 优先排序 | 智能排序待审项 |
+| **审核操作** | 通过/驳回 | 一键通过或驳回 |
+| | 评审意见 | 添加详细评审意见 |
+| | 修改建议 | 提供具体修改建议 |
+| **审计追溯** | 操作记录 | 记录所有审核操作 |
+| | 历史查询 | 查询历史审核记录 |
+| | 统计报表 | 审核效率统计 |
+
+#### 13.2.8 知识服务功能
+
+| 功能模块 | 功能点 | 说明 |
+|----------|--------|------|
+| **知识检索** | 语义检索 | 基于语义的知识检索 |
+| | 代码检索 | 检索相关代码片段 |
+| | 多源聚合 | 聚合多个知识源结果 |
+| **知识积累** | 自动沉淀 | 任务完成后自动沉淀知识 |
+| | 经验总结 | 总结 Bug 修复经验 |
+| | 案例库 | 建立案例知识库 |
+| **长期记忆** | 项目记忆 | 记住项目特定信息 |
+| | 用户偏好 | 学习用户偏好 |
+| | 上下文延续 | 跨会话上下文延续 |
+
+#### 13.2.9 外部集成功能
+
+| 功能模块 | 功能点 | 说明 |
+|----------|--------|------|
+| **Git 集成** | 代码拉取 | 自动拉取代码仓库 |
+| | MR/PR 创建 | 自动创建合并请求 |
+| | Webhook | 监听代码变更事件 |
+| **CI/CD 集成** | 触发构建 | 触发 CI/CD 流水线 |
+| | 状态同步 | 同步构建/部署状态 |
+| **消息通知** | IM 通知 | 推送任务状态到 IM |
+| | 邮件通知 | 发送邮件通知 |
+| | Webhook 回调 | 支持自定义 Webhook |
+
+### 13.3 用户角色与功能矩阵
+
+| 角色 | 提交需求 | Bug 修复 | 需求设计 | 代码生成 | Review | 项目管理 | 知识管理 |
+|------|:--------:|:--------:|:--------:|:--------:|:------:|:--------:|:--------:|
+| **需求方** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | 只读 |
+| **开发者** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | 编辑 |
+| **审核者** | ✅ | 只读 | 只读 | 只读 | ✅ | ❌ | 只读 |
+| **管理员** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 管理 |
 
 ---
 
