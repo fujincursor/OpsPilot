@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from uuid import UUID
 
+from ..db import DocumentDict
 from ..models.agent import (
     AgentConfig,
     AgentConfigCreate,
@@ -13,14 +14,13 @@ from ..models.agent import (
 
 
 class AgentService:
-    """Agent 配置管理服务
-
-    当前使用内存存储，后续可替换为数据库实现
-    """
+    """Agent 配置管理服务。配置保存在数据库中。"""
 
     def __init__(self):
-        self._agents: Dict[UUID, AgentConfig] = {}
+        self._agents: Dict[UUID, AgentConfig] = DocumentDict("agents", model=AgentConfig)
         self._project_agents: Dict[UUID, List[UUID]] = {}
+        for agent in self._agents.values():
+            self._project_agents.setdefault(agent.project_id, []).append(agent.id)
 
     def get_agents_by_project(self, project_id: UUID) -> List[AgentConfig]:
         """获取项目的所有 Agent 配置"""
@@ -74,6 +74,7 @@ class AgentService:
             setattr(agent, field, value)
 
         agent.updated_at = datetime.utcnow()
+        self._agents[agent.id] = agent
         return agent
 
     def delete_agent(self, agent_id: UUID) -> bool:

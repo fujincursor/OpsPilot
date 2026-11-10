@@ -97,6 +97,9 @@ class Requirement(RequirementBase):
     created_by: Optional[str] = Field(None, description="创建人")
     keywords: List[str] = Field(default_factory=list, description="关键词")
     analysis_confidence: float = Field(default=0.0, description="AI 分析置信度")
+    session_id: Optional[UUID] = Field(None, description="来源对话会话")
+    auto_advance: bool = Field(default=True, description="是否允许流程自动推进")
+    rework_count: int = Field(default=0, description="测试失败后自动回到代码生成的次数")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="创建时间")
     updated_at: datetime = Field(default_factory=datetime.utcnow, description="更新时间")
 

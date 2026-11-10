@@ -75,7 +75,7 @@ export default function DiffViewer({ diff, fileName, className = '' }: DiffViewe
           <table className="w-full border-collapse">
             <tbody>
               {diff.map((line, index) => {
-                const config = lineTypeConfig[line.type]
+                const config = lineTypeConfig[line.type] || lineTypeConfig.context
                 return (
                   <tr key={index} className={`${config.bgColor} hover:brightness-110`}>
                     <td
@@ -102,7 +102,9 @@ export default function DiffViewer({ diff, fileName, className = '' }: DiffViewe
       </div>
 
       <div className="px-4 py-2 border-t border-gray-200 bg-gray-50 text-xs text-gray-500">
-        共 {diff.length} 行变更
+        {additions === 0 && deletions === 0
+          ? `相关代码 ${diff.length} 行，本次没有修改`
+          : `共 ${diff.length} 行，新增 ${additions} 行，删除 ${deletions} 行`}
       </div>
     </div>
   )

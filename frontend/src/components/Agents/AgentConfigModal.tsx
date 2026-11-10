@@ -37,6 +37,8 @@ const agentTypeLabels: Record<AgentConfig['agent_type'], string> = {
   feature: 'Feature Agent - 需求实现',
   doc: 'Doc Agent - 文档生成',
   review: 'Review Agent - 代码审查',
+  codegen: 'CodeGen Agent - 代码生成',
+  test: 'Test Agent - 测试执行',
 }
 
 export default function AgentConfigModal({
@@ -94,7 +96,7 @@ export default function AgentConfigModal({
         <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
           <h2 className="text-lg font-semibold text-gray-800">配置 Agent</h2>
           <p className="text-sm text-gray-500 mt-1">
-            {agentTypeLabels[agent.agent_type]}
+            {agentTypeLabels[agent.agent_type] ?? agent.agent_type}
           </p>
         </div>
 

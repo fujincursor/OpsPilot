@@ -23,6 +23,7 @@ from ..models.analytics import (
     ExportResponse,
 )
 from ..models.requirement import RequirementStatus
+from ..models.review import ReviewStatus
 
 if TYPE_CHECKING:
     from .requirement_service import RequirementService
@@ -250,31 +251,23 @@ class AnalyticsService:
         """
         agents: List[AgentPerformance] = []
 
-        agent_types = [
-            ("lead_agent", "Lead Agent", 15, 18, 83.3, 0.5),
-            ("feature_agent", "Feature Design Agent", 12, 14, 85.7, 2.0),
-            ("bugfix_agent", "Bug Fix Agent", 8, 9, 88.9, 1.5),
-            ("codegen_agent", "Code Generation Agent", 20, 22, 90.9, 3.0),
-            ("test_agent", "Test Agent", 18, 20, 90.0, 1.0),
-        ]
-
-        total_success_rate = 0.0
-        for agent_type, agent_name, completed, total, success_rate, avg_time in agent_types:
-            agents.append(AgentPerformance(
-                agent_type=agent_type,
-                agent_name=agent_name,
-                tasks_completed=completed,
-                tasks_total=total,
-                success_rate=success_rate,
-                avg_time=avg_time,
-                error_count=total - completed,
-            ))
-            total_success_rate += success_rate
+        if self._agent_service:
+            for config in self._agent_service.get_agents_by_project(project_id):
+                agent_type = config.agent_type.value if hasattr(config.agent_type, "value") else str(config.agent_type)
+                agents.append(AgentPerformance(
+                    agent_type=agent_type,
+                    agent_name=config.name,
+                    tasks_completed=0,
+                    tasks_total=0,
+                    success_rate=0.0,
+                    avg_time=0.0,
+                    error_count=0,
+                ))
 
         return AgentPerformanceResponse(
             items=agents,
             total_agents=len(agents),
-            avg_success_rate=round(total_success_rate / len(agents), 2) if agents else 0.0,
+            avg_success_rate=0.0,
         )
 
     def get_quality_metrics(self, project_id: UUID) -> QualityMetrics:
@@ -286,30 +279,50 @@ class AnalyticsService:
         Returns:
             QualityMetrics: 质量指标
         """
-        first_pass_rate = 75.0
-        code_quality_score = 82.5
-        test_coverage_avg = 78.0
-        bug_density = 0.5
-        review_approval_rate = 85.0
-        regression_rate = 5.0
+        test_coverage_avg = 0.0
+        review_approval_rate = 0.0
+        first_pass_rate = 0.0
 
-        if self._test_service:
-            test_tasks = [
-                t for t in self._test_service._test_tasks.values()
-                if t.project_id == project_id
-            ]
-            if test_tasks:
-                coverages = [t.coverage.overall if t.coverage else 0 for t in test_tasks]
-                if coverages:
-                    test_coverage_avg = sum(coverages) / len(coverages)
+        if self._test_service and self._requirement_service:
+            project_requirement_ids = {
+                requirement.id
+                for requirement in self._requirement_service._requirements.values()
+                if requirement.project_id == project_id
+            }
+            coverages = []
+            passed = 0
+            total_cases = 0
+            for task in self._test_service._tasks.values():
+                if task.requirement_id not in project_requirement_ids:
+                    continue
+                if task.coverage is not None:
+                    coverages.append(task.coverage.lines_percent)
+                report = self._test_service._reports.get(task.id)
+                if report is not None:
+                    passed += report.passed
+                    total_cases += report.total
+            if coverages:
+                test_coverage_avg = sum(coverages) / len(coverages)
+            if total_cases:
+                first_pass_rate = passed / total_cases * 100
+
+        from .hitl_service import hitl_service
+        decided = [
+            review for review in hitl_service._review_items.values()
+            if review.project_id == project_id
+            and review.status in (ReviewStatus.APPROVED, ReviewStatus.REJECTED)
+        ]
+        if decided:
+            approved = len([review for review in decided if review.status == ReviewStatus.APPROVED])
+            review_approval_rate = approved / len(decided) * 100
 
         return QualityMetrics(
             first_pass_rate=round(first_pass_rate, 2),
-            code_quality_score=round(code_quality_score, 2),
+            code_quality_score=0.0,
             test_coverage_avg=round(test_coverage_avg, 2),
-            bug_density=round(bug_density, 2),
+            bug_density=0.0,
             review_approval_rate=round(review_approval_rate, 2),
-            regression_rate=round(regression_rate, 2),
+            regression_rate=0.0,
         )
 
     def get_efficiency_metrics(self, project_id: UUID) -> EfficiencyMetrics:
@@ -321,15 +334,8 @@ class AnalyticsService:
         Returns:
             EfficiencyMetrics: 效率指标
         """
-        avg_analysis_time = 0.5
-        avg_design_time = 2.0
-        avg_coding_time = 4.0
-        avg_test_time = 1.5
-        avg_review_time = 1.0
-
-        total_cycle_time = avg_analysis_time + avg_design_time + avg_coding_time + avg_test_time + avg_review_time
-
         throughput = 0.0
+        total_cycle_time = 0.0
         if self._requirement_service:
             requirements = [
                 r for r in self._requirement_service._requirements.values()
@@ -337,15 +343,18 @@ class AnalyticsService:
             ]
             completed = [r for r in requirements if r.status in [RequirementStatus.COMPLETED, RequirementStatus.CLOSED]]
             if completed:
-                date_range = 30
-                throughput = len(completed) / date_range
+                throughput = len(completed) / 30
+                total_cycle_time = sum(
+                    (r.updated_at - r.created_at).total_seconds() / 3600
+                    for r in completed
+                ) / len(completed)
 
         return EfficiencyMetrics(
-            avg_analysis_time=round(avg_analysis_time, 2),
-            avg_design_time=round(avg_design_time, 2),
-            avg_coding_time=round(avg_coding_time, 2),
-            avg_test_time=round(avg_test_time, 2),
-            avg_review_time=round(avg_review_time, 2),
+            avg_analysis_time=0.0,
+            avg_design_time=0.0,
+            avg_coding_time=0.0,
+            avg_test_time=0.0,
+            avg_review_time=0.0,
             total_cycle_time=round(total_cycle_time, 2),
             throughput=round(throughput, 2),
         )
@@ -372,25 +381,25 @@ class AnalyticsService:
             return CompletionFunnel(total_input=0, total_output=0, conversion_rate=0.0)
 
         stage_configs = [
-            ("pending", "待处理", RequirementStatus.PENDING, 0.5),
-            ("analyzing", "分析中", RequirementStatus.ANALYZING, 0.5),
-            ("designing", "设计中", RequirementStatus.DESIGNING, 2.0),
-            ("reviewing", "审核中", RequirementStatus.REVIEWING, 1.0),
-            ("coding", "编码中", RequirementStatus.CODING, 4.0),
-            ("testing", "测试中", RequirementStatus.TESTING, 1.5),
-            ("completed", "已完成", RequirementStatus.COMPLETED, 0.0),
-            ("closed", "已关闭", RequirementStatus.CLOSED, 0.0),
+            ("pending", "待处理", RequirementStatus.PENDING),
+            ("analyzing", "分析中", RequirementStatus.ANALYZING),
+            ("designing", "设计中", RequirementStatus.DESIGNING),
+            ("reviewing", "审核中", RequirementStatus.REVIEWING),
+            ("coding", "编码中", RequirementStatus.CODING),
+            ("testing", "测试中", RequirementStatus.TESTING),
+            ("completed", "已完成", RequirementStatus.COMPLETED),
+            ("closed", "已关闭", RequirementStatus.CLOSED),
         ]
 
         stages: List[FunnelStage] = []
-        for stage_id, stage_name, status, avg_time in stage_configs:
+        for _stage_id, stage_name, status in stage_configs:
             count = len([r for r in requirements if r.status == status])
             percentage = (count / total * 100) if total > 0 else 0.0
             stages.append(FunnelStage(
                 stage=stage_name,
                 count=count,
                 percentage=round(percentage, 2),
-                avg_time=avg_time,
+                avg_time=0.0,
             ))
 
         completed_count = len([
@@ -441,7 +450,7 @@ class AnalyticsService:
             total_completed=total_completed,
             active_agents=active_agents,
             avg_completion_rate=round(avg_completion_rate, 2),
-            avg_quality_score=82.5,
+            avg_quality_score=0.0,
         )
 
     def export_report(

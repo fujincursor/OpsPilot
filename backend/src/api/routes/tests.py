@@ -22,6 +22,8 @@ from ...models.test import (
 )
 from ...services.test_service import test_service
 from ...services.codegen_service import codegen_service
+from ...services.hitl_service import hitl_service
+from ...models.review import ReviewItemType, ReviewStatus
 
 router = APIRouter()
 
@@ -54,6 +56,10 @@ async def create_test_task(
             status_code=400,
             detail=f"Cannot create test task. Code generation task status: {codegen_task.status.value}"
         )
+
+    code_review = hitl_service.find_by_item(ReviewItemType.CODE, task_id)
+    if code_review is None or code_review.status != ReviewStatus.APPROVED:
+        raise HTTPException(status_code=400, detail="代码尚未审批通过，不能创建测试")
 
     test_task = test_service.create_test_task(
         codegen_task_id=task_id,
@@ -324,7 +330,7 @@ async def trigger_ci_pipeline(
     run_full_suite = data.run_full_suite if data else False
     extra_args = data.extra_args if data else None
 
-    pipeline_info = test_service.trigger_ci_pipeline(
+    pipeline_info = await test_service.trigger_ci_pipeline(
         task_id=test_task_id,
         target_branch=target_branch,
         run_full_suite=run_full_suite,

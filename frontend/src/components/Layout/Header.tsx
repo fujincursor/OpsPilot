@@ -1,19 +1,35 @@
+import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { NotificationBell } from '../Reviews'
+import { authService } from '../../services/authService'
+import api from '../../services/api'
 
 interface HeaderProps {
   agentStatus?: 'ready' | 'busy' | 'offline'
   userName?: string
 }
 
-export default function Header({ agentStatus = 'ready', userName = '张' }: HeaderProps) {
+export default function Header({ agentStatus, userName }: HeaderProps) {
+  const storedUser = authService.getUser()
+  const [status, setStatus] = useState<'ready' | 'busy' | 'offline'>(agentStatus || 'offline')
+  const displayName = userName || storedUser?.username || '用户'
+
+  useEffect(() => {
+    if (agentStatus) {
+      setStatus(agentStatus)
+      return
+    }
+    api.get<{ available: boolean }>('/deerflow/status')
+      .then((response) => setStatus(response.data.available ? 'ready' : 'offline'))
+      .catch(() => setStatus('offline'))
+  }, [agentStatus])
   const statusConfig = {
     ready: { emoji: '🟢', text: 'Agent 就绪' },
     busy: { emoji: '🟡', text: 'Agent 执行中' },
     offline: { emoji: '🔴', text: 'Agent 离线' },
   }
 
-  const status = statusConfig[agentStatus]
+  const statusInfo = statusConfig[status]
 
   return (
     <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 sticky top-0 z-50">
@@ -98,12 +114,12 @@ export default function Header({ agentStatus = 'ready', userName = '张' }: Head
 
         {/* Agent Status */}
         <span className="text-sm text-gray-600 flex items-center gap-1">
-          {status.emoji} {status.text}
+          {statusInfo.emoji} {statusInfo.text}
         </span>
 
         {/* User Avatar */}
         <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-medium">
-          {userName.charAt(0)}
+          {displayName.charAt(0)}
         </div>
       </div>
     </header>

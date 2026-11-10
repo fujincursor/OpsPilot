@@ -17,11 +17,27 @@ class CodeGenStatus(str, Enum):
     FAILED = "failed"
 
 
+class CodeGenStepStatus(str, Enum):
+    """方案步骤执行状态"""
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
 class FileAction(str, Enum):
     """文件操作类型"""
     CREATE = "create"
     MODIFY = "modify"
     DELETE = "delete"
+    VIEW = "view"
+
+
+class DiffLine(BaseModel):
+    """一行差异"""
+    type: str = Field(..., description="add/remove/context")
+    content: str = Field(default="", description="行内容")
+    line_number: int = Field(default=0, description="行号")
 
 
 class CodeFile(BaseModel):
@@ -30,9 +46,29 @@ class CodeFile(BaseModel):
     content: str = Field(default="", description="文件内容")
     language: str = Field(default="python", description="编程语言")
     action: FileAction = Field(default=FileAction.CREATE, description="文件操作类型")
+    diff: List[DiffLine] = Field(default_factory=list, description="用于页面展示的差异")
 
     class Config:
         from_attributes = True
+
+
+class CodeLocation(BaseModel):
+    """源码中的一处定位结果"""
+    path: str = Field(..., description="相对路径")
+    line: int = Field(default=1, ge=1, description="行号")
+    snippet: str = Field(default="", description="命中的代码")
+    reason: str = Field(default="", description="为什么与问题相关")
+
+
+class CodeGenStep(BaseModel):
+    """方案中的一个执行步骤"""
+    index: int = Field(..., ge=1, description="步骤序号，从 1 开始")
+    title: str = Field(..., description="步骤内容")
+    status: CodeGenStepStatus = Field(default=CodeGenStepStatus.PENDING, description="步骤状态")
+    output: str = Field(default="", description="这一步的执行结论")
+    locations: List[CodeLocation] = Field(default_factory=list, description="定位到的代码位置")
+    files: List[CodeFile] = Field(default_factory=list, description="这一步产出的文件")
+    error_message: Optional[str] = Field(None, description="失败原因")
 
 
 class LintError(BaseModel):
@@ -102,10 +138,14 @@ class CodeGenTask(BaseModel):
     status: CodeGenStatus = Field(default=CodeGenStatus.PENDING, description="任务状态")
     language: str = Field(default="python", description="主要编程语言")
     files: List[CodeFile] = Field(default_factory=list, description="生成的文件列表")
+    steps: List[CodeGenStep] = Field(default_factory=list, description="按方案逐步执行的记录")
     lint_result: Optional[LintResult] = Field(None, description="Lint 检查结果")
     error_message: Optional[str] = Field(None, description="错误信息")
     sandbox_id: Optional[str] = Field(None, description="沙箱 ID")
+    sandbox_profile: Optional[str] = Field(None, description="执行时使用的沙箱配置摘要")
     mr_info: Optional[MergeRequestInfo] = Field(None, description="MR 信息")
+    applied_at: Optional[datetime] = Field(None, description="写回项目的时间")
+    applied_paths: List[str] = Field(default_factory=list, description="已写回项目的相对路径")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="创建时间")
     updated_at: datetime = Field(default_factory=datetime.utcnow, description="更新时间")
     completed_at: Optional[datetime] = Field(None, description="完成时间")

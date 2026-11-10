@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from uuid import UUID, uuid4
 
+from ..db import DocumentDict
 from ..models.review import (
     ReviewItem,
     ReviewDecision,
@@ -16,13 +17,17 @@ from ..models.review import (
 class NotificationService:
     """通知服务
 
-    负责发送和管理审核相关的通知。
-    当前使用内存存储，后续可替换为数据库和消息队列实现。
+    负责发送和管理审核相关的通知。通知保存在数据库中。
     """
 
     def __init__(self):
-        self._notifications: Dict[UUID, Notification] = {}
+        self._notifications: Dict[UUID, Notification] = DocumentDict(
+            "notifications",
+            model=Notification,
+        )
         self._user_notifications: Dict[str, List[UUID]] = {}
+        for notification in self._notifications.values():
+            self._user_notifications.setdefault(notification.user_id, []).append(notification.id)
 
     def notify_review_created(self, review_item: ReviewItem) -> Notification:
         """通知新审核项创建
@@ -146,6 +151,24 @@ class NotificationService:
         self._store_notification(notification)
         return notification
 
+    def notify_timeout_escalation(self, review_item: ReviewItem) -> None:
+        """超时后通知管理员。"""
+        from .user_service import UserService
+
+        content = f"[{review_item.item_type.value}] {review_item.title} 已超过 24 小时未处理，优先级已升级。"
+        admins = [user for user in UserService.list_all() if user.role.value == "admin" and user.is_active]
+        recipients = admins or [None]
+        for user in recipients:
+            notification = Notification(
+                id=uuid4(),
+                user_id=user.id if user else "admin",
+                type=NotificationType.REVIEW_TIMEOUT_WARNING,
+                title="审核已超时并升级",
+                content=content,
+                review_item_id=review_item.id,
+            )
+            self._store_notification(notification)
+
     def notify_comment_added(
         self,
         review_item: ReviewItem,
@@ -261,6 +284,7 @@ class NotificationService:
             return None
 
         notification.is_read = True
+        self._notifications[notification.id] = notification
         return notification
 
     def mark_all_as_read(self, user_id: str) -> int:
@@ -277,8 +301,10 @@ class NotificationService:
 
         for nid in notification_ids:
             if nid in self._notifications:
-                if not self._notifications[nid].is_read:
-                    self._notifications[nid].is_read = True
+                notification = self._notifications[nid]
+                if not notification.is_read:
+                    notification.is_read = True
+                    self._notifications[nid] = notification
                     count += 1
 
         return count

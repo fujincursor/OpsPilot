@@ -56,6 +56,8 @@ class Requirement:
 | `security` | 安全相关 | 修复 SQL 注入 |
 | `question` | 咨询问题 | 如何配置连接池 |
 
+当前落地的类型是 `bug`、`feature`、`question`。表中的增强、维护、安全类描述归入 `bug` 或 `feature`，不单独开辟流程。`question` 只检索知识并回答，不建编码工单。
+
 ### 2.3 优先级
 
 | 优先级 | 级别 | 说明 | 响应时间 |
@@ -67,20 +69,31 @@ class Requirement:
 
 ### 2.4 需求状态
 
-```
-创建 → pending → analyzing → analyzed → processing → resolved
-                     │                       │
-                     └→ analysis_failed      └→ closed
+状态与架构第 5.3 节的阶段一致。咨询不进入 `designing` 之后的阶段。
+
+```mermaid
+flowchart LR
+    pending[pending] --> analyzing[analyzing]
+    analyzing --> designing[designing]
+    designing --> reviewing[reviewing]
+    reviewing --> coding[coding]
+    coding --> reviewing
+    reviewing --> testing[testing]
+    testing --> reviewing
+    testing --> completed[completed]
+    reviewing --> closed[closed]
 ```
 
 | 状态 | 说明 |
 |------|------|
-| `pending` | 待处理 |
-| `analyzing` | 分析中 |
-| `analyzed` | 已分析 |
-| `processing` | 处理中 |
-| `resolved` | 已解决 |
-| `closed` | 已关闭 |
+| `pending` | 已接收，尚未分析 |
+| `analyzing` | 正在分类 |
+| `designing` | 正在生成方案 |
+| `reviewing` | 等待方案或代码审批 |
+| `coding` | 正在生成代码并做语法检查 |
+| `testing` | 正在执行测试 |
+| `completed` | 测试通过且知识已回写 |
+| `closed` | 审批拒绝或人工终止 |
 
 ## 3. 需求接收
 
@@ -378,7 +391,7 @@ async def auto_route(requirement: Requirement):
         await create_feature_task(requirement)
     
     elif analysis.type == RequirementType.QUESTION:
-        # 直接检索知识库
+        # 只回答，不建编码工单，也不进入方案、代码和测试
         await search_and_answer(requirement)
 ```
 

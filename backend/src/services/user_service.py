@@ -1,24 +1,28 @@
-"""用户服务 - 内存存储模拟实现"""
+"""用户服务。用户保存在数据库中。"""
 
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Optional
 from uuid import uuid4
 
+from ..db import DocumentDict
 from ..models.user import User, UserCreate, UserRole
 from ..api.middleware.auth import get_password_hash, verify_password
 
 
 class UserService:
-    """用户服务（内存存储）"""
+    """用户服务。用户保存在数据库中。"""
 
-    _users: Dict[str, User] = {}
+    _users: DocumentDict | None = None
     _initialized: bool = False
 
     @classmethod
     def _init_default_users(cls) -> None:
-        """初始化默认用户"""
+        """从数据库加载用户，并补齐缺失的默认账号。"""
         if cls._initialized:
             return
+
+        cls._users = DocumentDict("users", model=User, key_type=str)
+        existing_names = {user.username for user in cls._users.values()}
 
         admin_user = User(
             id="admin-001",
@@ -29,7 +33,8 @@ class UserService:
             is_active=True,
             created_at=datetime.utcnow(),
         )
-        cls._users[admin_user.id] = admin_user
+        if admin_user.username not in existing_names:
+            cls._users[admin_user.id] = admin_user
 
         operator_user = User(
             id="operator-001",
@@ -40,7 +45,8 @@ class UserService:
             is_active=True,
             created_at=datetime.utcnow(),
         )
-        cls._users[operator_user.id] = operator_user
+        if operator_user.username not in existing_names:
+            cls._users[operator_user.id] = operator_user
 
         viewer_user = User(
             id="viewer-001",
@@ -51,7 +57,20 @@ class UserService:
             is_active=True,
             created_at=datetime.utcnow(),
         )
-        cls._users[viewer_user.id] = viewer_user
+        if viewer_user.username not in existing_names:
+            cls._users[viewer_user.id] = viewer_user
+
+        reviewer_user = User(
+            id="reviewer-001",
+            username="reviewer",
+            email="reviewer@opspilot.example.com",
+            role=UserRole.REVIEWER,
+            hashed_password=get_password_hash("reviewer123"),
+            is_active=True,
+            created_at=datetime.utcnow(),
+        )
+        if reviewer_user.username not in existing_names:
+            cls._users[reviewer_user.id] = reviewer_user
 
         cls._initialized = True
 

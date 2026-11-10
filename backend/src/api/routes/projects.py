@@ -4,6 +4,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 from ...models.project import (
     Project,
@@ -65,6 +66,25 @@ async def update_project(project_id: UUID, data: ProjectUpdate) -> Project:
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return project
+
+
+class SandboxTestResult(BaseModel):
+    """沙箱连通性检查结果。"""
+    ok: bool
+    message: str
+
+
+@router.post("/{project_id}/sandbox/test", response_model=SandboxTestResult)
+async def test_sandbox(project_id: UUID) -> SandboxTestResult:
+    """检查当前沙箱配置能否作为执行环境使用。"""
+    project = project_service.get(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    sandbox = project.sandbox
+    backend = sandbox.get("backend") if isinstance(sandbox, dict) else sandbox.backend
+    if backend == "local":
+        return SandboxTestResult(ok=True, message="本地执行环境可用")
+    return SandboxTestResult(ok=False, message=f"{backend} 尚未接入真实集群，配置已保存")
 
 
 @router.delete("/{project_id}", status_code=204)

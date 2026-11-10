@@ -48,15 +48,9 @@ export default function CreateRequirementModal({
         setType(result.type)
         setPriority(result.priority)
       }
-    } catch {
-      console.log('Analysis failed, using defaults')
-      const mockResult: AnalysisResult = {
-        type: 'feature',
-        priority: 'medium',
-        keywords: text.split(/\s+/).slice(0, 5),
-        confidence: 0.75,
-      }
-      setAnalysisResult(mockResult)
+    } catch (error) {
+      console.error(error)
+      setAnalysisResult(null)
     } finally {
       setIsAnalyzing(false)
     }

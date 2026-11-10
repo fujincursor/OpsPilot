@@ -106,7 +106,7 @@ export default function TestReportCard({ report }: TestReportCardProps) {
 
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-600">运行耗时</span>
-          <span className="font-medium text-gray-800">{formatDuration(report.duration)}</span>
+          <span className="font-medium text-gray-800">{formatDuration(report.duration_ms ?? report.duration ?? 0)}</span>
         </div>
       </div>
     </div>

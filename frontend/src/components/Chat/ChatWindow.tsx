@@ -1,103 +1,203 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import MessageList, { Message } from './MessageList'
 import MessageInput from './MessageInput'
-import { deerflowService, AgentStatus } from '../../services/deerflowService'
+import api from '../../services/api'
+import { authService } from '../../services/authService'
+import { chatService, toChatMessages } from '../../services/chatService'
+import { reviewService } from '../../services/reviewService'
 
 interface QuickAction {
   emoji: string
   text: string
   value: string
+  placeholder: string
 }
 
 interface ChatWindowProps {
   sessionId?: string
   initialMessages?: Message[]
+  projectId?: string
   projectName?: string
+  onSessionReady?: (sessionId: string) => void
+}
+
+interface ChatResponse {
+  success: boolean
+  message: string
+  thread_id?: string
+  data?: {
+    knowledge_results?: Array<{
+      title: string
+      snippet: string
+      score: number
+    }>
+    classification?: {
+      type: 'bug' | 'feature' | 'question'
+      priority: 'high' | 'medium' | 'low'
+      title?: string
+      ticket_id?: string
+    }
+    knowledge_ready?: boolean
+    project_id?: string
+  }
 }
 
 const quickActions: QuickAction[] = [
-  { emoji: '🐛', text: '报告 Bug', value: '我遇到了一个 Bug：' },
-  { emoji: '✨', text: '提需求', value: '我有一个新需求：' },
-  { emoji: '❓', text: '咨询问题', value: '我想咨询一个问题：' },
+  { emoji: '🐛', text: '报告 Bug', value: '我遇到了一个 Bug：', placeholder: '请描述出错现象、复现步骤和影响范围...' },
+  { emoji: '✨', text: '提需求', value: '我有一个新需求：', placeholder: '请描述希望新增或改进的功能...' },
+  { emoji: '❓', text: '咨询问题', value: '我想咨询一个问题：', placeholder: '请写出想了解的问题...' },
 ]
 
 export default function ChatWindow({
   sessionId,
   initialMessages = [],
-  projectName = '项目 Alpha',
+  projectId,
+  projectName = '未选择项目',
+  onSessionReady,
 }: ChatWindowProps) {
+  const navigate = useNavigate()
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [isLoading, setIsLoading] = useState(false)
-  const [threadId, setThreadId] = useState<string | undefined>(sessionId)
-  const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null)
+  const [historyLoading, setHistoryLoading] = useState(Boolean(sessionId))
+  const [historyError, setHistoryError] = useState('')
+  const [prefillText, setPrefillText] = useState('')
+  const [prefillToken, setPrefillToken] = useState(0)
+  const [inputPlaceholder, setInputPlaceholder] = useState('请描述您遇到的问题或需求...')
   const messageAreaRef = useRef<HTMLDivElement>(null)
+  const skipReloadRef = useRef<string | null>(null)
 
-  const isNewSession = !sessionId && messages.length === 0
+  const isNewSession = !sessionId && messages.length === 0 && !isLoading
 
   useEffect(() => {
-    deerflowService.getStatus().then(setAgentStatus).catch(console.error)
-  }, [])
+    if (!sessionId) {
+      setHistoryLoading(false)
+      setHistoryError('')
+      setMessages([])
+      return
+    }
+    if (skipReloadRef.current === sessionId) {
+      skipReloadRef.current = null
+      setHistoryLoading(false)
+      return
+    }
+    let active = true
+    setHistoryLoading(true)
+    setHistoryError('')
+    chatService.getSession(sessionId)
+      .then((session) => {
+        if (active) setMessages(toChatMessages(session.messages, session.project_id))
+      })
+      .catch(() => {
+        if (active) {
+          setMessages([])
+          setHistoryError('对话记录加载失败')
+        }
+      })
+      .finally(() => {
+        if (active) setHistoryLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [sessionId])
 
   useEffect(() => {
     if (messageAreaRef.current) {
       messageAreaRef.current.scrollTop = messageAreaRef.current.scrollHeight
     }
-  }, [messages])
+  }, [messages, historyLoading])
 
-  const handleSendMessage = useCallback(async (content: string) => {
+  const handleSendMessage = async (content: string) => {
+    const timestamp = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     const newUserMessage: Message = {
       id: `user-${Date.now()}`,
       type: 'user',
       content,
-      sender: '张三',
-      timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+      sender: authService.getUser()?.username || '我',
+      timestamp,
     }
 
     setMessages((prev) => [...prev, newUserMessage])
     setIsLoading(true)
 
     try {
-      const response = await deerflowService.chat({
+      const response = await api.post<ChatResponse>('/deerflow/chat', {
         message: content,
-        thread_id: threadId,
-        context: { project_name: projectName }
-      })
-
-      if (response.thread_id) {
-        setThreadId(response.thread_id)
-      }
-
-      const modeIndicator = response.data?.mode === 'mock' ? ' [模拟模式]' : ''
-      
+        thread_id: sessionId,
+        project_id: projectId,
+        sender: authService.getUser()?.username || '我',
+      }, { timeout: 120000 })
+      const knowledgeResults = (response.data.data?.knowledge_results || []).map((item) => ({
+        title: item.title,
+        snippet: item.snippet,
+        relevance: Math.round(item.score * 100),
+      }))
+      const classification = response.data.data?.classification
       const agentResponse: Message = {
         id: `agent-${Date.now()}`,
         type: 'agent',
-        content: response.message + modeIndicator,
+        content: response.data.message,
         sender: 'Lead Agent',
         timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
         agentType: 'lead',
-        status: response.success ? 'complete' : 'error',
+        status: response.data.success ? 'complete' : 'error',
+        knowledgeResults,
+        classifyResult: classification
+          ? {
+              type: classification.type,
+              priority: classification.priority,
+              ticketId: classification.ticket_id || '',
+            }
+          : undefined,
+        knowledgeProjectId: response.data.data?.knowledge_ready === false ? projectId : undefined,
       }
-      setMessages((prev) => [...prev, agentResponse])
-    } catch (error) {
-      console.error('Chat error:', error)
-      const errorMessage: Message = {
-        id: `error-${Date.now()}`,
+      if (response.data.thread_id) {
+        const session = await chatService.getSession(response.data.thread_id)
+        setMessages(toChatMessages(session.messages, session.project_id))
+        skipReloadRef.current = response.data.thread_id
+        onSessionReady?.(response.data.thread_id)
+      } else {
+        setMessages((prev) => [...prev, agentResponse])
+      }
+    } catch {
+      const agentResponse: Message = {
+        id: `agent-${Date.now()}`,
         type: 'agent',
-        content: `抱歉，发生错误：${error instanceof Error ? error.message : '未知错误'}`,
-        sender: 'System',
+        content: '对话请求失败',
+        sender: 'Lead Agent',
         timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
         agentType: 'lead',
         status: 'error',
       }
-      setMessages((prev) => [...prev, errorMessage])
+      setMessages((prev) => [...prev, agentResponse])
     } finally {
       setIsLoading(false)
     }
-  }, [threadId, projectName])
+  }
+
+  const handleDecide = async (
+    reviewId: string,
+    decision: 'approve' | 'reject' | 'revision',
+    reason: string
+  ) => {
+    if (decision === 'approve') {
+      await reviewService.approve(reviewId, reason)
+    } else if (decision === 'reject') {
+      await reviewService.reject(reviewId, reason)
+    } else {
+      await reviewService.requestRevision(reviewId, reason)
+    }
+    if (sessionId) {
+      const session = await chatService.getSession(sessionId)
+      setMessages(toChatMessages(session.messages, session.project_id))
+    }
+  }
 
   const handleQuickAction = (action: QuickAction) => {
-    handleSendMessage(action.value)
+    setPrefillText(action.value)
+    setPrefillToken(Date.now())
+    setInputPlaceholder(action.placeholder)
   }
 
   return (
@@ -105,7 +205,11 @@ export default function ChatWindow({
       {/* Message Area */}
       <div ref={messageAreaRef} className="flex-1 overflow-y-auto p-6">
         <div className="max-w-[900px] mx-auto">
-          {isNewSession ? (
+          {historyLoading ? (
+            <div className="text-center py-16 text-sm text-gray-500">正在加载对话...</div>
+          ) : historyError ? (
+            <div className="text-center py-16 text-sm text-red-500">{historyError}</div>
+          ) : isNewSession ? (
             /* Welcome Screen */
             <div className="text-center py-16">
               <div className="w-16 h-16 bg-primary-light rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
@@ -139,13 +243,24 @@ export default function ChatWindow({
               </div>
             </div>
           ) : (
-            <MessageList messages={messages} isLoading={isLoading} />
+            <MessageList
+              messages={messages}
+              isLoading={isLoading}
+              onDecide={handleDecide}
+              onOpenKnowledge={(id) => navigate(`/projects/${id}/knowledge`)}
+            />
           )}
         </div>
       </div>
 
       {/* Input Area */}
-      <MessageInput onSend={handleSendMessage} disabled={isLoading} />
+      <MessageInput
+        onSend={handleSendMessage}
+        disabled={isLoading || historyLoading}
+        placeholder={inputPlaceholder}
+        prefillText={prefillText}
+        prefillToken={prefillToken}
+      />
     </div>
   )
 }

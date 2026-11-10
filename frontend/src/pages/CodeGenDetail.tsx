@@ -5,228 +5,14 @@ import { codegenService, testService } from '../services'
 import {
   CodeGenStatusBadge,
   CodeGenProgress,
+  SolutionSteps,
   FileTree,
   CodeViewer,
   DiffViewer,
   LintResultCard,
 } from '../components/CodeGen'
 import { TestStatusBadge } from '../components/Tests'
-
-const mockCodeGenTask: CodeGenTask = {
-  id: 'cg-1',
-  solution_id: 'sol-1',
-  requirement_id: 'req-1',
-  status: 'completed',
-  language: 'typescript',
-  files: [
-    {
-      path: 'src/utils/tokenManager.ts',
-      content: `let isRefreshing = false
-let refreshSubscribers: ((token: string) => void)[] = []
-
-function subscribeTokenRefresh(callback: (token: string) => void) {
-  refreshSubscribers.push(callback)
-}
-
-export async function refreshToken(): Promise<string> {
-  if (isRefreshing) {
-    return new Promise<string>((resolve) => {
-      subscribeTokenRefresh(resolve)
-    })
-  }
-  
-  isRefreshing = true
-  try {
-    const response = await fetch('/api/auth/refresh', {
-      method: 'POST',
-      credentials: 'include',
-    })
-    
-    if (!response.ok) {
-      throw new Error('Token refresh failed')
-    }
-    
-    const { token } = await response.json()
-    refreshSubscribers.forEach(cb => cb(token))
-    return token
-  } finally {
-    isRefreshing = false
-    refreshSubscribers = []
-  }
-}
-
-export function isTokenExpiring(token: string): boolean {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    const expiresAt = payload.exp * 1000
-    const now = Date.now()
-    const threshold = 5 * 60 * 1000 // 5 minutes
-    return expiresAt - now < threshold
-  } catch {
-    return true
-  }
-}`,
-      language: 'typescript',
-      action: 'modify',
-      diff: [
-        { type: 'context', content: 'let isRefreshing = false', line_number: 1 },
-        { type: 'context', content: 'let refreshSubscribers: ((token: string) => void)[] = []', line_number: 2 },
-        { type: 'context', content: '', line_number: 3 },
-        { type: 'add', content: 'function subscribeTokenRefresh(callback: (token: string) => void) {', line_number: 4 },
-        { type: 'add', content: '  refreshSubscribers.push(callback)', line_number: 5 },
-        { type: 'add', content: '}', line_number: 6 },
-        { type: 'add', content: '', line_number: 7 },
-        { type: 'context', content: 'export async function refreshToken(): Promise<string> {', line_number: 8 },
-        { type: 'remove', content: '  const response = await fetch(\'/api/auth/refresh\')', line_number: 0 },
-        { type: 'add', content: '  if (isRefreshing) {', line_number: 9 },
-        { type: 'add', content: '    return new Promise<string>((resolve) => {', line_number: 10 },
-        { type: 'add', content: '      subscribeTokenRefresh(resolve)', line_number: 11 },
-        { type: 'add', content: '    })', line_number: 12 },
-        { type: 'add', content: '  }', line_number: 13 },
-        { type: 'add', content: '', line_number: 14 },
-        { type: 'add', content: '  isRefreshing = true', line_number: 15 },
-        { type: 'context', content: '  try {', line_number: 16 },
-      ],
-    },
-    {
-      path: 'src/middleware/authMiddleware.ts',
-      content: `import { refreshToken } from '../utils/tokenManager'
-
-const MAX_RETRY = 3
-
-interface AuthError extends Error {
-  code: string
-  config: RequestConfig
-}
-
-interface RequestConfig {
-  url: string
-  method: string
-  headers: Record<string, string>
-  body?: string
-}
-
-export async function handleAuthError(
-  error: AuthError,
-  retryCount = 0
-): Promise<Response> {
-  if (retryCount >= MAX_RETRY) {
-    await logout()
-    throw new Error('Max retry attempts reached')
-  }
-  
-  if (error.code === 'TOKEN_EXPIRED') {
-    const newToken = await refreshToken()
-    return retryRequest(error.config, newToken)
-  }
-  
-  throw error
-}
-
-async function retryRequest(
-  config: RequestConfig,
-  token: string
-): Promise<Response> {
-  return fetch(config.url, {
-    method: config.method,
-    headers: {
-      ...config.headers,
-      Authorization: \`Bearer \${token}\`,
-    },
-    body: config.body,
-  })
-}
-
-async function logout(): Promise<void> {
-  localStorage.removeItem('auth_token')
-  window.location.href = '/login'
-}`,
-      language: 'typescript',
-      action: 'modify',
-    },
-    {
-      path: 'src/hooks/useAuth.ts',
-      content: `import { useState, useEffect, useCallback } from 'react'
-import { refreshToken, isTokenExpiring } from '../utils/tokenManager'
-
-interface User {
-  id: string
-  email: string
-  name: string
-}
-
-interface AuthState {
-  user: User | null
-  isAuthenticated: boolean
-  isLoading: boolean
-}
-
-export function useAuth() {
-  const [state, setState] = useState<AuthState>({
-    user: null,
-    isAuthenticated: false,
-    isLoading: true,
-  })
-
-  const checkAuth = useCallback(async () => {
-    const token = localStorage.getItem('auth_token')
-    
-    if (!token) {
-      setState({ user: null, isAuthenticated: false, isLoading: false })
-      return
-    }
-
-    if (isTokenExpiring(token)) {
-      try {
-        await refreshToken()
-      } catch {
-        setState({ user: null, isAuthenticated: false, isLoading: false })
-        return
-      }
-    }
-
-    // Decode user from token
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]))
-      setState({
-        user: { id: payload.sub, email: payload.email, name: payload.name },
-        isAuthenticated: true,
-        isLoading: false,
-      })
-    } catch {
-      setState({ user: null, isAuthenticated: false, isLoading: false })
-    }
-  }, [])
-
-  useEffect(() => {
-    checkAuth()
-    
-    // Check auth status periodically
-    const interval = setInterval(checkAuth, 60000)
-    return () => clearInterval(interval)
-  }, [checkAuth])
-
-  return state
-}`,
-      language: 'typescript',
-      action: 'create',
-    },
-  ],
-  lint_result: {
-    passed: true,
-    errors: [],
-    warnings: [
-      {
-        file: 'src/middleware/authMiddleware.ts',
-        line: 45,
-        column: 3,
-        message: '\'logout\' function should be exported or moved to a separate module',
-        rule: 'import/no-internal-modules',
-      },
-    ],
-  },
-  created_at: '2024-03-16T15:45:00Z',
-}
+import FlowStateBanner from '../components/FlowStateBanner'
 
 type ViewMode = 'code' | 'diff'
 
@@ -239,6 +25,8 @@ export default function CodeGenDetail() {
   const [viewMode, setViewMode] = useState<ViewMode>('code')
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isApplying, setIsApplying] = useState(false)
+  const [applyMessage, setApplyMessage] = useState('')
   const [testTasks, setTestTasks] = useState<TestTaskSummary[]>([])
   const [isCreatingTest, setIsCreatingTest] = useState(false)
 
@@ -251,24 +39,21 @@ export default function CodeGenDetail() {
     }
   }, [])
 
-  const loadTask = useCallback(async (id: string) => {
-    setIsLoading(true)
+  const loadTask = useCallback(async (id: string, silent = false) => {
+    if (!silent) setIsLoading(true)
     try {
       const data = await codegenService.getTaskStatus(id)
       setTask(data)
-      if (data.files.length > 0 && !selectedFile) {
-        setSelectedFile(data.files[0].path)
+      if (data.files && data.files.length > 0) {
+        setSelectedFile((current) => current || data.files[0].path)
       }
-    } catch {
-      console.log('Using mock data')
-      setTask(mockCodeGenTask)
-      if (mockCodeGenTask.files.length > 0 && !selectedFile) {
-        setSelectedFile(mockCodeGenTask.files[0].path)
-      }
+    } catch (error) {
+      console.error(error)
+      if (!silent) setTask(null)
     } finally {
-      setIsLoading(false)
+      if (!silent) setIsLoading(false)
     }
-  }, [selectedFile])
+  }, [])
 
   useEffect(() => {
     if (taskId) {
@@ -281,7 +66,7 @@ export default function CodeGenDetail() {
     if (!task || task.status === 'completed' || task.status === 'failed') return
 
     const pollInterval = setInterval(() => {
-      if (taskId) loadTask(taskId)
+      if (taskId) loadTask(taskId, true)
     }, 3000)
 
     return () => clearInterval(pollInterval)
@@ -294,9 +79,30 @@ export default function CodeGenDetail() {
       const newTask = await codegenService.regenerate(taskId)
       setTask(newTask)
     } catch {
-      console.log('Regenerate failed')
+      setTask((current) => current ? { ...current, status: 'failed', error_message: current.error_message || '重新生成失败' } : current)
     } finally {
       setIsRegenerating(false)
+    }
+  }
+
+  const handleApply = async () => {
+    if (!taskId || !task) return
+    const paths = task.files
+      .filter((file) => file.action === 'create' || file.action === 'modify' || file.action === 'delete')
+      .map((file) => file.path)
+    if (paths.length === 0) return
+    const confirmed = window.confirm(`把以下文件写回项目？\n${paths.join('\n')}`)
+    if (!confirmed) return
+    setIsApplying(true)
+    setApplyMessage('')
+    try {
+      const updated = await codegenService.applyToProject(taskId)
+      setTask(updated)
+      setApplyMessage(`已写回 ${updated.applied_paths?.length || paths.length} 个文件`)
+    } catch {
+      setApplyMessage('写回失败，请再试一次')
+    } finally {
+      setIsApplying(false)
     }
   }
 
@@ -387,6 +193,19 @@ export default function CodeGenDetail() {
           返回方案详情
         </button>
 
+        {(task.status === 'pending' || task.status === 'generating' || task.status === 'linting' || isRegenerating) && (
+          <FlowStateBanner mode="running" title={task.status === 'linting' ? '正在做语法检查' : '正在生成代码'} detail="这一页会保持当前任务，状态变化后自动刷新。" />
+        )}
+        {task.status === 'failed' && (
+          <FlowStateBanner
+            mode="failed"
+            title="代码生成失败"
+            detail={task.error_message || (task.lint_result?.errors || []).map((error) => `${error.file}:${error.line} ${error.message}`).join('\n') || '没有记录失败原因'}
+            onRetry={handleRegenerate}
+            retryLabel="重新生成"
+          />
+        )}
+
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -397,6 +216,22 @@ export default function CodeGenDetail() {
             <div className="flex items-center gap-2">
               {task.status === 'failed' || task.status === 'completed' ? (
                 <>
+                  {task.status === 'completed' && task.files.some((file) => file.action !== 'view') && (
+                    <button
+                      onClick={handleApply}
+                      disabled={isApplying}
+                      className="px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-100 hover:bg-indigo-200 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {isApplying ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                          写回中...
+                        </>
+                      ) : (
+                        <>📥 应用代码</>
+                      )}
+                    </button>
+                  )}
                   <button
                     onClick={handleRegenerate}
                     disabled={isRegenerating}
@@ -465,7 +300,19 @@ export default function CodeGenDetail() {
               <span>💻</span>
               {task.language}
             </span>
+            {task.sandbox_profile && (
+              <span className="flex items-center gap-1.5">
+                <span>📦</span>
+                {task.sandbox_profile}
+              </span>
+            )}
           </div>
+
+          {(applyMessage || (task.applied_paths && task.applied_paths.length > 0)) && (
+            <p className={`mt-4 text-sm ${applyMessage.includes('失败') ? 'text-red-600' : 'text-green-700'}`}>
+              {applyMessage || `已写回 ${task.applied_paths?.join('、')}`}
+            </p>
+          )}
 
           {task.error_message && (
             <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -526,16 +373,17 @@ export default function CodeGenDetail() {
         )}
 
         <CodeGenProgress status={task.status} className="mb-6" />
+        <SolutionSteps steps={task.steps || []} className="mb-6" />
 
-        {isInProgress(task.status) ? (
+        {isInProgress(task.status) && task.files.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
             <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-800 mb-2">
-              {task.status === 'pending' && '准备生成...'}
-              {task.status === 'generating' && '正在生成代码...'}
+              {task.status === 'pending' && '准备读取方案步骤...'}
+              {task.status === 'generating' && '正在按方案步骤执行...'}
               {task.status === 'linting' && '正在进行代码检查...'}
             </h3>
-            <p className="text-gray-500">请稍候，这可能需要几分钟时间</p>
+            <p className="text-gray-500">每一步都会单独执行，完成后结果会出现在上面</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

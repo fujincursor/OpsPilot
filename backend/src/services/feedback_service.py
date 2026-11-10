@@ -12,6 +12,9 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
+from ..db import DocumentDict
+from ..models.solution import SolutionStatus
+
 if TYPE_CHECKING:
     from .requirement_service import RequirementService
     from .solution_service import SolutionService
@@ -81,10 +84,18 @@ class FeedbackService:
     """
 
     def __init__(self):
-        self._completion_records: Dict[UUID, CompletionRecord] = {}
-        self._case_studies: Dict[UUID, CaseStudy] = {}
-        self._knowledge_updates: Dict[UUID, KnowledgeUpdate] = {}
+        self._completion_records: Dict[UUID, CompletionRecord] = DocumentDict(
+            "completion_records",
+            model=CompletionRecord,
+        )
+        self._case_studies: Dict[UUID, CaseStudy] = DocumentDict("case_studies", model=CaseStudy)
+        self._knowledge_updates: Dict[UUID, KnowledgeUpdate] = DocumentDict(
+            "knowledge_updates",
+            model=KnowledgeUpdate,
+        )
         self._requirement_to_records: Dict[UUID, List[UUID]] = {}
+        for record in self._completion_records.values():
+            self._requirement_to_records.setdefault(record.requirement_id, []).append(record.id)
         self._requirement_service: Optional["RequirementService"] = None
         self._solution_service: Optional["SolutionService"] = None
         self._knowledge_service: Optional["KnowledgeService"] = None
@@ -301,8 +312,12 @@ class FeedbackService:
         if self._solution_service:
             solutions = self._solution_service.get_solutions_by_requirement(requirement_id)
             if solutions:
-                solution = solutions[0]
-                solution_summary = solution.description
+                solution = solutions[-1]
+                for item in reversed(solutions):
+                    if item.status in {SolutionStatus.APPROVED, SolutionStatus.IMPLEMENTED}:
+                        solution = item
+                        break
+                solution_summary = getattr(solution, "content", "") or ""
 
         implementation = ""
         if self._codegen_service and solution:

@@ -8,9 +8,13 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class UserRole(str, Enum):
-    """用户角色枚举"""
+    """用户角色枚举。
+
+    operator 对应开发者，viewer 对应只读需求方，reviewer 负责审批。
+    """
     ADMIN = "admin"
     OPERATOR = "operator"
+    REVIEWER = "reviewer"
     VIEWER = "viewer"
 
 

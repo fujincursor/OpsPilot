@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
+from .db import flush_registered
 from .api.routes import api_router
 from .api.routes.health import router as health_router
 from .api.middleware import JWTAuthMiddleware, ProjectContextMiddleware
@@ -28,6 +29,15 @@ app.add_middleware(
     allow_methods=settings.cors_allow_methods,
     allow_headers=settings.cors_allow_headers,
 )
+
+@app.middleware("http")
+async def persist_request_changes(request, call_next):
+    """写操作结束后把内存中的修改同步到数据库。"""
+    response = await call_next(request)
+    if request.method not in {"GET", "HEAD", "OPTIONS"}:
+        flush_registered()
+    return response
+
 
 app.include_router(health_router)
 app.include_router(api_router, prefix=settings.api_v1_prefix)

@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, TYPE_CHECKING
 from uuid import UUID
 
+from ..db import DocumentDict
 from ..models.project import Project, ProjectCreate, ProjectUpdate, ProjectStatus
 
 if TYPE_CHECKING:
@@ -11,15 +12,11 @@ if TYPE_CHECKING:
 
 
 class ProjectService:
-    """项目管理服务
-
-    当前使用内存存储，后续可替换为数据库实现
-    """
+    """项目管理服务。项目数据保存在数据库中。"""
 
     def __init__(self):
-        self._projects: Dict[UUID, Project] = {}
+        self._projects: Dict[UUID, Project] = DocumentDict("projects", model=Project)
         self._agent_service: Optional["AgentService"] = None
-        self._init_demo_data()
 
     def set_agent_service(self, agent_service: "AgentService"):
         """设置 Agent 服务引用（避免循环导入）"""
@@ -99,6 +96,7 @@ class ProjectService:
             setattr(project, field, value)
 
         project.updated_at = datetime.utcnow()
+        self._projects[project.id] = project
         return project
 
     def delete(self, project_id: UUID) -> bool:

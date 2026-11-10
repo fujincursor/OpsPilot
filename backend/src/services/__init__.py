@@ -26,11 +26,8 @@ from .agents import (
 )
 
 project_service.set_agent_service(agent_service)
-project_service.init_demo_agents()
 
 knowledge_service.set_project_service(project_service)
-for pid in list(project_service._projects.keys()):
-    knowledge_service.init_demo_knowledge(pid)
 
 requirement_service.set_project_service(project_service)
 

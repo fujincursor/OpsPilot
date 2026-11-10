@@ -14,6 +14,7 @@ from ..models.solution import (
     SolutionUpdate,
     SolutionFilters,
 )
+from ..db import DocumentDict
 from .agents.bugfix_agent import bugfix_agent_service
 from .agents.feature_agent import feature_agent_service
 
@@ -26,12 +27,27 @@ class SolutionService:
     """方案管理服务
 
     负责方案的 CRUD 操作，以及调用对应的 Agent 生成方案。
-    当前使用内存存储，后续可替换为数据库实现。
+    方案数据保存在数据库中。
     """
 
     def __init__(self):
-        self._solutions: Dict[UUID, Union[Solution, BugFixSolution, FeatureDesignSolution]] = {}
+        self._solutions: Dict[UUID, Union[Solution, BugFixSolution, FeatureDesignSolution]] = DocumentDict(
+            "solutions",
+            model=Solution,
+            loader=self._load_solution,
+        )
         self._requirement_to_solutions: Dict[UUID, List[UUID]] = {}
+        for solution in self._solutions.values():
+            self._requirement_to_solutions.setdefault(solution.requirement_id, []).append(solution.id)
+
+    @staticmethod
+    def _load_solution(payload: dict) -> Union[Solution, BugFixSolution, FeatureDesignSolution]:
+        kind = payload.get("type")
+        if kind == SolutionType.BUGFIX.value:
+            return BugFixSolution.model_validate(payload)
+        if kind == SolutionType.FEATURE_DESIGN.value:
+            return FeatureDesignSolution.model_validate(payload)
+        return Solution.model_validate(payload)
         self._requirement_service: Optional["RequirementService"] = None
         self._knowledge_service: Optional["KnowledgeService"] = None
 
@@ -64,6 +80,8 @@ class SolutionService:
 
         requirement = self._requirement_service.get(requirement_id)
         if not requirement:
+            return None
+        if requirement.type == RequirementType.QUESTION:
             return None
 
         existing_solutions = self.get_solutions_by_requirement(requirement_id)

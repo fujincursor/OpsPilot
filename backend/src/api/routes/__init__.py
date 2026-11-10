@@ -14,6 +14,8 @@ from .codegen import router as codegen_router
 from .tests import router as tests_router
 from .analytics import router as analytics_router
 from .deerflow import router as deerflow_router
+from .chat import router as chat_router
+from .workflow import router as workflow_router
 
 api_router = APIRouter()
 api_router.include_router(health_router, tags=["health"])
@@ -28,3 +30,5 @@ api_router.include_router(codegen_router, tags=["codegen"])
 api_router.include_router(tests_router, tags=["tests"])
 api_router.include_router(analytics_router, tags=["analytics"])
 api_router.include_router(deerflow_router)
+api_router.include_router(chat_router)
+api_router.include_router(workflow_router, tags=["workflow"])

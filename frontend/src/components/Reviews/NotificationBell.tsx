@@ -16,42 +16,19 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString('zh-CN')
 }
 
-const typeIcons = {
+const typeIcons: Record<string, string> = {
   review_assigned: '📋',
   review_completed: '✓',
+  review_approved: '✓',
+  review_created: '📋',
   comment_added: '💬',
+  review_commented: '💬',
   revision_requested: '↻',
+  review_revision_requested: '↻',
+  review_rejected: '✕',
+  review_timeout_warning: '⏰',
 }
 
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    type: 'review_assigned',
-    title: '新的审核任务',
-    message: '用户登录超时问题修复方案需要审核',
-    read: false,
-    created_at: new Date(Date.now() - 30 * 60000).toISOString(),
-    link: '/reviews/1',
-  },
-  {
-    id: '2',
-    type: 'comment_added',
-    title: '新评论',
-    message: '张三在"API 响应优化"方案中添加了评论',
-    read: false,
-    created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
-    link: '/reviews/2',
-  },
-  {
-    id: '3',
-    type: 'review_completed',
-    title: '审核完成',
-    message: '你提交的数据库优化方案已通过审核',
-    read: true,
-    created_at: new Date(Date.now() - 24 * 3600000).toISOString(),
-    link: '/reviews/3',
-  },
-]
 
 export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false)
@@ -82,8 +59,8 @@ export default function NotificationBell() {
       setNotifications(data)
       setUnreadCount(count)
     } catch {
-      setNotifications(mockNotifications)
-      setUnreadCount(mockNotifications.filter((n) => !n.read).length)
+      setNotifications([])
+      setUnreadCount(0)
     }
   }
 
@@ -93,8 +70,7 @@ export default function NotificationBell() {
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
       setUnreadCount(0)
     } catch {
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
-      setUnreadCount(0)
+      console.error('Failed to mark notifications read')
     }
   }
 
@@ -107,10 +83,7 @@ export default function NotificationBell() {
         )
         setUnreadCount((prev) => Math.max(0, prev - 1))
       } catch {
-        setNotifications((prev) =>
-          prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n))
-        )
-        setUnreadCount((prev) => Math.max(0, prev - 1))
+        console.error('Failed to mark notification read')
       }
     }
     if (notification.link) {

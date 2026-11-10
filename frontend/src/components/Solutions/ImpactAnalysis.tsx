@@ -3,7 +3,8 @@ interface ImpactAnalysisProps {
 }
 
 export default function ImpactAnalysis({ analysis }: ImpactAnalysisProps) {
-  const sections = analysis.split('\n\n').filter(Boolean)
+  const text = typeof analysis === 'string' ? analysis : ''
+  const sections = text.split('\n\n').filter(Boolean)
 
   return (
     <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-200 overflow-hidden">
@@ -24,7 +25,7 @@ export default function ImpactAnalysis({ analysis }: ImpactAnalysisProps) {
           </div>
         ) : (
           <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-            {analysis}
+            {text || '暂无影响分析'}
           </p>
         )}
       </div>

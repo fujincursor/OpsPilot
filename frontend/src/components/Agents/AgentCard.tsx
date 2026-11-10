@@ -47,10 +47,39 @@ const agentTypeConfig = {
     borderColor: 'border-purple-300',
     iconBg: 'bg-purple-500',
   },
+  codegen: {
+    icon: '💻',
+    label: 'CodeGen Agent',
+    description: '代码生成',
+    bgColor: 'bg-sky-50',
+    borderColor: 'border-sky-300',
+    iconBg: 'bg-sky-500',
+  },
+  test: {
+    icon: '🧪',
+    label: 'Test Agent',
+    description: '测试执行',
+    bgColor: 'bg-teal-50',
+    borderColor: 'border-teal-300',
+    iconBg: 'bg-teal-500',
+  },
+}
+
+const fallbackAgentType = {
+  icon: '🤖',
+  label: 'Agent',
+  description: '未识别的 Agent 类型',
+  bgColor: 'bg-gray-50',
+  borderColor: 'border-gray-300',
+  iconBg: 'bg-gray-500',
 }
 
 export default function AgentCard({ agent, onToggle, onConfigure }: AgentCardProps) {
-  const config = agentTypeConfig[agent.agent_type]
+  const config = agentTypeConfig[agent.agent_type] ?? {
+    ...fallbackAgentType,
+    label: agent.agent_type || fallbackAgentType.label,
+  }
+  const skills = agent.skills ?? []
 
   return (
     <div
@@ -103,15 +132,15 @@ export default function AgentCard({ agent, onToggle, onConfigure }: AgentCardPro
         </div>
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-500">Max Tokens</span>
-          <span className="font-medium text-gray-700">{agent.max_tokens.toLocaleString()}</span>
+          <span className="font-medium text-gray-700">{(agent.max_tokens ?? 0).toLocaleString()}</span>
         </div>
       </div>
 
-      {agent.skills.length > 0 && (
+      {skills.length > 0 && (
         <div className="mb-4">
           <span className="text-xs text-gray-500 mb-2 block">技能</span>
           <div className="flex flex-wrap gap-1.5">
-            {agent.skills.slice(0, 3).map((skill) => (
+            {skills.slice(0, 3).map((skill) => (
               <span
                 key={skill}
                 className="px-2 py-0.5 bg-white/60 rounded text-xs text-gray-600"
@@ -119,9 +148,9 @@ export default function AgentCard({ agent, onToggle, onConfigure }: AgentCardPro
                 {skill}
               </span>
             ))}
-            {agent.skills.length > 3 && (
+            {skills.length > 3 && (
               <span className="px-2 py-0.5 bg-white/60 rounded text-xs text-gray-500">
-                +{agent.skills.length - 3}
+                +{skills.length - 3}
               </span>
             )}
           </div>

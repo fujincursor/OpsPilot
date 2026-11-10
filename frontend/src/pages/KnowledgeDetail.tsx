@@ -4,77 +4,6 @@ import { DocumentList, UploadArea, SearchTest } from '../components/Knowledge'
 import type { KnowledgeBase, Document, SearchResult } from '../types'
 import { knowledgeService } from '../services'
 
-const mockKnowledgeBase: KnowledgeBase = {
-  id: '1',
-  project_id: '1',
-  name: '运维手册',
-  description: '系统运维操作手册，包含常见故障处理流程和最佳实践',
-  type: 'doc',
-  status: 'ready',
-  document_count: 45,
-  created_at: '2024-01-20T08:00:00Z',
-}
-
-const mockDocuments: Document[] = [
-  {
-    id: '1',
-    knowledge_base_id: '1',
-    title: '系统部署指南',
-    content: '本文档详细介绍了系统的部署流程...',
-    file_path: '/docs/deployment-guide.md',
-    file_type: 'md',
-    embedding_status: 'ready',
-    created_at: '2024-01-20T08:30:00Z',
-  },
-  {
-    id: '2',
-    knowledge_base_id: '1',
-    title: '故障排查手册',
-    content: '常见故障及解决方案...',
-    file_path: '/docs/troubleshooting.pdf',
-    file_type: 'pdf',
-    embedding_status: 'ready',
-    created_at: '2024-01-21T10:00:00Z',
-  },
-  {
-    id: '3',
-    knowledge_base_id: '1',
-    title: '数据库维护手册',
-    content: '数据库日常维护和优化...',
-    file_path: '/docs/database-maintenance.docx',
-    file_type: 'docx',
-    embedding_status: 'indexing',
-    created_at: '2024-02-01T14:00:00Z',
-  },
-  {
-    id: '4',
-    knowledge_base_id: '1',
-    title: 'API 接口文档',
-    content: 'RESTful API 接口规范...',
-    file_path: '/docs/api-reference.json',
-    file_type: 'json',
-    embedding_status: 'pending',
-    created_at: '2024-02-15T09:00:00Z',
-  },
-]
-
-const mockSearchResults: SearchResult[] = [
-  {
-    document_id: '1',
-    title: '系统部署指南',
-    content: '系统部署需要先准备好 Docker 环境，然后执行 docker-compose up -d 命令启动所有服务...',
-    score: 0.92,
-    knowledge_base_name: '运维手册',
-  },
-  {
-    document_id: '2',
-    title: '故障排查手册',
-    content: '如果服务无法启动，请检查端口占用情况，使用 netstat -tlnp 命令查看...',
-    score: 0.78,
-    knowledge_base_name: '运维手册',
-  },
-]
-
 const typeConfig = {
   doc: { icon: '📄', label: '文档' },
   code: { icon: '💻', label: '代码' },
@@ -111,6 +40,11 @@ export default function KnowledgeDetail() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isDocumentsLoading, setIsDocumentsLoading] = useState(true)
+  const [showSettings, setShowSettings] = useState(false)
+  const [indexPaths, setIndexPaths] = useState('src')
+  const [indexTrigger, setIndexTrigger] = useState('manual')
+  const [updatePolicy, setUpdatePolicy] = useState('incremental')
+  const [settingsMessage, setSettingsMessage] = useState('')
 
   useEffect(() => {
     if (kbId) {
@@ -128,10 +62,13 @@ export default function KnowledgeDetail() {
       ])
       setKnowledgeBase(kbData)
       setDocuments(docsData)
-    } catch {
-      console.log('Using mock data for development')
-      setKnowledgeBase(mockKnowledgeBase)
-      setDocuments(mockDocuments)
+      setIndexPaths((kbData.index_paths || ['src']).join('\n'))
+      setIndexTrigger(kbData.index_trigger || 'manual')
+      setUpdatePolicy(kbData.update_policy || 'incremental')
+    } catch (error) {
+      console.error(error)
+      setKnowledgeBase(null)
+      setDocuments([])
     } finally {
       setIsLoading(false)
       setIsDocumentsLoading(false)
@@ -149,39 +86,23 @@ export default function KnowledgeDetail() {
           document_count: knowledgeBase.document_count + 1,
         })
       }
-    } catch {
-      const mockNewDoc: Document = {
-        id: String(Date.now()),
-        knowledge_base_id: kbId,
-        title: file.name,
-        content: '',
-        file_path: `/uploads/${file.name}`,
-        file_type: file.name.split('.').pop() || 'unknown',
-        embedding_status: 'pending',
-        created_at: new Date().toISOString(),
-      }
-      setDocuments((prev) => [mockNewDoc, ...prev])
-      if (knowledgeBase) {
-        setKnowledgeBase({
-          ...knowledgeBase,
-          document_count: knowledgeBase.document_count + 1,
-        })
-      }
+    } catch (error) {
+      console.error(error)
     }
   }
 
   const handleDeleteDocument = async (docId: string) => {
     try {
       await knowledgeService.deleteDocument(docId)
-    } catch {
-      console.log('Mock delete for development')
-    }
-    setDocuments((prev) => prev.filter((d) => d.id !== docId))
-    if (knowledgeBase) {
-      setKnowledgeBase({
-        ...knowledgeBase,
-        document_count: Math.max(0, knowledgeBase.document_count - 1),
-      })
+      setDocuments((prev) => prev.filter((d) => d.id !== docId))
+      if (knowledgeBase) {
+        setKnowledgeBase({
+          ...knowledgeBase,
+          document_count: Math.max(0, knowledgeBase.document_count - 1),
+        })
+      }
+    } catch (error) {
+      console.error(error)
     }
   }
 
@@ -192,13 +113,9 @@ export default function KnowledgeDetail() {
         knowledgeBase.project_id,
         query
       )
-    } catch {
-      console.log('Using mock search results for development')
-      return mockSearchResults.filter(
-        (r) =>
-          r.content.toLowerCase().includes(query.toLowerCase()) ||
-          r.title.toLowerCase().includes(query.toLowerCase())
-      )
+    } catch (error) {
+      console.error(error)
+      return []
     }
   }
 
@@ -288,7 +205,11 @@ export default function KnowledgeDetail() {
                 </div>
               </div>
             </div>
-            <button className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+            <button
+              type="button"
+              onClick={() => setShowSettings(true)}
+              className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            >
               ⚙️ 设置
             </button>
           </div>
@@ -330,20 +251,20 @@ export default function KnowledgeDetail() {
               </h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">已索引文档</span>
+                  <span className="text-sm text-gray-600">已向量化</span>
                   <span className="text-sm font-medium text-green-600">
                     {
-                      documents.filter((d) => d.embedding_status === 'ready')
+                      documents.filter((d) => d.embedding_status === 'completed')
                         .length
                     }{' '}
                     篇
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">索引中</span>
+                  <span className="text-sm text-gray-600">向量化中</span>
                   <span className="text-sm font-medium text-blue-600">
                     {
-                      documents.filter((d) => d.embedding_status === 'indexing')
+                      documents.filter((d) => d.embedding_status === 'processing')
                         .length
                     }{' '}
                     篇
@@ -360,10 +281,10 @@ export default function KnowledgeDetail() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">索引失败</span>
+                  <span className="text-sm text-gray-600">向量化失败</span>
                   <span className="text-sm font-medium text-red-600">
                     {
-                      documents.filter((d) => d.embedding_status === 'error')
+                      documents.filter((d) => d.embedding_status === 'failed')
                         .length
                     }{' '}
                     篇
@@ -384,6 +305,72 @@ export default function KnowledgeDetail() {
           </div>
         </div>
       </div>
+      {showSettings && knowledgeBase && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5">
+            <h2 className="mb-3 text-lg font-semibold">知识库设置</h2>
+            <label className="mb-3 block text-sm text-gray-600">索引范围，一行一个
+              <textarea value={indexPaths} onChange={(event) => setIndexPaths(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2" rows={4} />
+            </label>
+            <label className="mb-3 block text-sm text-gray-600">触发方式
+              <select value={indexTrigger} onChange={(event) => setIndexTrigger(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2">
+                <option value="manual">手动</option>
+                <option value="commit">提交后</option>
+              </select>
+            </label>
+            <label className="mb-3 block text-sm text-gray-600">更新策略
+              <select value={updatePolicy} onChange={(event) => setUpdatePolicy(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2">
+                <option value="incremental">增量</option>
+                <option value="full">全量</option>
+              </select>
+            </label>
+            <div className="mb-3">
+              <div className="mb-2 text-sm font-medium text-gray-700">索引任务</div>
+              {(knowledgeBase.index_jobs || []).length === 0 ? (
+                <p className="text-sm text-gray-400">还没有索引任务</p>
+              ) : (
+                <div className="space-y-2">
+                  {(knowledgeBase.index_jobs || []).map((job) => (
+                    <div key={job.id} className="rounded-lg border border-gray-100 px-3 py-2 text-xs text-gray-600">
+                      {job.status} · {job.message}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {settingsMessage && <p className="mb-3 text-sm text-green-600">{settingsMessage}</p>}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  const updated = await knowledgeService.updateKnowledgeBase(knowledgeBase.id, {
+                    index_paths: indexPaths.split('\n').map((item) => item.trim()).filter(Boolean),
+                    index_trigger: indexTrigger,
+                    update_policy: updatePolicy,
+                  })
+                  setKnowledgeBase(updated)
+                  setSettingsMessage('设置已保存')
+                }}
+                className="rounded-lg bg-primary px-3 py-2 text-sm text-white"
+              >
+                保存
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const updated = await knowledgeService.startIndex(knowledgeBase.id)
+                  setKnowledgeBase(updated)
+                  setSettingsMessage('已触发索引')
+                }}
+                className="rounded-lg bg-gray-800 px-3 py-2 text-sm text-white"
+              >
+                立即索引
+              </button>
+              <button type="button" onClick={() => setShowSettings(false)} className="rounded-lg bg-gray-100 px-3 py-2 text-sm">关闭</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

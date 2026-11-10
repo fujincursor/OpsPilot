@@ -21,8 +21,16 @@ const typeConfig = {
   },
 }
 
+const fallbackType = {
+  icon: '📄',
+  label: '方案',
+  className: 'bg-gray-50 border-gray-200',
+  headerBg: 'bg-gray-100',
+}
+
 export default function SolutionCard({ solution }: SolutionCardProps) {
-  const config = typeConfig[solution.type]
+  const config = typeConfig[solution.type] || fallbackType
+  const affectedFiles = solution.affected_files || []
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('zh-CN', {
@@ -57,11 +65,11 @@ export default function SolutionCard({ solution }: SolutionCardProps) {
           </div>
           <span>{formatDate(solution.created_at)}</span>
         </div>
-        {solution.affected_files.length > 0 && (
+        {affectedFiles.length > 0 && (
           <div className="mt-3 pt-3 border-t border-current/10">
             <div className="flex items-center gap-1.5 text-xs text-gray-500">
               <span>📁</span>
-              <span>{solution.affected_files.length} 个受影响文件</span>
+              <span>{affectedFiles.length} 个受影响文件</span>
             </div>
           </div>
         )}

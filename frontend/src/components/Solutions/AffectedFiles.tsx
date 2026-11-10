@@ -30,7 +30,8 @@ const getFileIcon = (filePath: string): string => {
 }
 
 export default function AffectedFiles({ files }: AffectedFilesProps) {
-  if (files.length === 0) {
+  const items = files || []
+  if (items.length === 0) {
     return (
       <div className="p-4 bg-gray-50 rounded-lg text-center text-gray-500 text-sm">
         暂无受影响的文件
@@ -45,12 +46,12 @@ export default function AffectedFiles({ files }: AffectedFilesProps) {
           <span>📁</span>
           <span className="font-medium text-gray-800">受影响文件</span>
           <span className="px-2 py-0.5 bg-gray-200 rounded-full text-xs text-gray-600">
-            {files.length} 个文件
+            {items.length} 个文件
           </span>
         </div>
       </div>
       <div className="divide-y divide-gray-100">
-        {files.map((file, index) => (
+        {items.map((file, index) => (
           <div
             key={index}
             className="px-4 py-2.5 hover:bg-gray-50 transition-colors flex items-center gap-2"

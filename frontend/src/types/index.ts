@@ -1,9 +1,47 @@
+export interface ProjectSkill {
+  key: string
+  name: string
+  description: string
+  enabled: boolean
+  usage_count?: number
+}
+
+export interface ProjectProfile {
+  overview: string
+  architecture: string
+  directory_layout: string
+  key_modules: string
+  config_notes: string
+  runbook: string
+}
+
+export interface ProjectMember {
+  username: string
+  role: string
+}
+
+export interface SandboxSettings {
+  backend: string
+  memory_mb: number
+  cpu: number
+  timeout_seconds: number
+  network_policy: string
+  allowed_domains: string[]
+  run_as_non_root: boolean
+}
+
 export interface Project {
   id: string
   name: string
   description: string
   repo_url: string
   status: 'active' | 'inactive' | 'archived'
+  skills?: ProjectSkill[]
+  sandbox?: SandboxSettings
+  profile?: ProjectProfile
+  members?: ProjectMember[]
+  prompt_template?: string
+  toolchain?: string
   created_at: string
   updated_at: string
 }
@@ -11,7 +49,7 @@ export interface Project {
 export interface AgentConfig {
   id: string
   project_id: string
-  agent_type: 'lead' | 'bugfix' | 'feature' | 'doc' | 'review'
+  agent_type: 'lead' | 'bugfix' | 'feature' | 'doc' | 'review' | 'codegen' | 'test'
   name: string
   description: string
   model_name: string
@@ -25,7 +63,7 @@ export interface User {
   id: string
   username: string
   email: string
-  role: 'admin' | 'developer' | 'viewer'
+  role: 'admin' | 'developer' | 'operator' | 'reviewer' | 'viewer'
 }
 
 export interface CreateProjectRequest {
@@ -39,6 +77,12 @@ export interface UpdateProjectRequest {
   description?: string
   repo_url?: string
   status?: Project['status']
+  skills?: ProjectSkill[]
+  sandbox?: SandboxSettings
+  profile?: ProjectProfile
+  members?: ProjectMember[]
+  prompt_template?: string
+  toolchain?: string
 }
 
 export interface UpdateAgentConfigRequest {
@@ -63,6 +107,7 @@ export interface PaginatedResponse<T> {
 }
 
 export type KnowledgeStatus = 'pending' | 'indexing' | 'ready' | 'error'
+export type EmbeddingStatus = 'pending' | 'processing' | 'completed' | 'failed'
 export type KnowledgeType = 'doc' | 'code' | 'faq'
 
 export interface KnowledgeBase {
@@ -73,6 +118,10 @@ export interface KnowledgeBase {
   type: KnowledgeType
   status: KnowledgeStatus
   document_count: number
+  index_paths?: string[]
+  index_trigger?: string
+  update_policy?: string
+  index_jobs?: Array<{ id: string; status: string; message: string; created_at: string }>
   created_at: string
 }
 
@@ -83,7 +132,10 @@ export interface Document {
   content: string
   file_path: string
   file_type: string
-  embedding_status: KnowledgeStatus
+  embedding_status: EmbeddingStatus
+  embedding_model?: string
+  chunk_count?: number
+  error_message?: string
   created_at: string
 }
 
@@ -264,6 +316,8 @@ export interface ReviewItem {
   comments_count: number
   created_at: string
   due_at?: string
+  session_id?: string
+  requirement_id?: string
 }
 
 export interface ReviewComment {
@@ -299,6 +353,7 @@ export interface ReviewFilters {
   item_type?: ReviewItemType
   status?: ReviewStatus
   priority?: RequirementPriority
+  project_id?: string
 }
 
 // Code Generation Types
@@ -326,7 +381,7 @@ export interface LintMessage {
   rule?: string
 }
 
-export type CodeFileAction = 'create' | 'modify' | 'delete'
+export type CodeFileAction = 'create' | 'modify' | 'delete' | 'view'
 
 export interface CodeFile {
   path: string
@@ -336,6 +391,25 @@ export interface CodeFile {
   diff?: DiffLine[]
 }
 
+export type CodeGenStepStatus = 'pending' | 'running' | 'completed' | 'failed'
+
+export interface CodeLocation {
+  path: string
+  line: number
+  snippet: string
+  reason: string
+}
+
+export interface CodeGenStep {
+  index: number
+  title: string
+  status: CodeGenStepStatus
+  output: string
+  locations?: CodeLocation[]
+  files?: CodeFile[]
+  error_message?: string
+}
+
 export interface CodeGenTask {
   id: string
   solution_id: string
@@ -343,8 +417,12 @@ export interface CodeGenTask {
   status: CodeGenStatus
   language: string
   files: CodeFile[]
+  steps?: CodeGenStep[]
   lint_result?: LintResult
   error_message?: string
+  applied_at?: string
+  applied_paths?: string[]
+  sandbox_profile?: string
   created_at: string
   updated_at?: string
 }
@@ -356,7 +434,9 @@ export interface CreateCodeGenTaskRequest {
 export interface CodeGenTaskSummary {
   id: string
   status: CodeGenStatus
-  files_count: number
+  files_count?: number
+  files?: CodeFile[]
+  steps?: CodeGenStep[]
   created_at: string
 }
 
@@ -379,7 +459,22 @@ export interface TestResult {
   status: TestResultStatus
   actual_result: string
   error_message?: string
-  duration: number
+  duration?: number
+  duration_ms?: number
+}
+
+export interface CIStage {
+  name: string
+  status: string
+  detail?: string
+}
+
+export interface CIPipeline {
+  pipeline_id: string
+  status: string
+  triggered_at: string
+  completed_at?: string | null
+  stages: CIStage[]
 }
 
 export interface TestReport {
@@ -389,7 +484,8 @@ export interface TestReport {
   failed: number
   skipped: number
   coverage_percent: number
-  duration: number
+  duration?: number
+  duration_ms?: number
 }
 
 export interface TestTask {
@@ -400,6 +496,7 @@ export interface TestTask {
   test_cases: TestCase[]
   results: TestResult[]
   coverage: number
+  sandbox_profile?: string
   created_at: string
 }
 
@@ -432,7 +529,7 @@ export interface TrendData {
 }
 
 export interface AgentPerformance {
-  agent_type: 'lead' | 'bugfix' | 'feature' | 'doc' | 'review'
+  agent_type: 'lead' | 'bugfix' | 'feature' | 'doc' | 'review' | 'codegen' | 'test'
   tasks_completed: number
   success_rate: number
   avg_time: number

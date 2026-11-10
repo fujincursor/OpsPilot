@@ -4,49 +4,6 @@ import { KnowledgeCard, CreateKnowledgeModal } from '../components/Knowledge'
 import type { KnowledgeBase, CreateKnowledgeBaseRequest, Project } from '../types'
 import { knowledgeService, projectService } from '../services'
 
-const mockKnowledgeBases: KnowledgeBase[] = [
-  {
-    id: '1',
-    project_id: '1',
-    name: '运维手册',
-    description: '系统运维操作手册，包含常见故障处理流程和最佳实践',
-    type: 'doc',
-    status: 'ready',
-    document_count: 45,
-    created_at: '2024-01-20T08:00:00Z',
-  },
-  {
-    id: '2',
-    project_id: '1',
-    name: '代码仓库索引',
-    description: '项目代码库的向量索引，支持代码语义搜索',
-    type: 'code',
-    status: 'indexing',
-    document_count: 1234,
-    created_at: '2024-02-01T10:00:00Z',
-  },
-  {
-    id: '3',
-    project_id: '1',
-    name: '常见问题',
-    description: '用户和运维人员常见问题解答',
-    type: 'faq',
-    status: 'ready',
-    document_count: 89,
-    created_at: '2024-02-15T14:00:00Z',
-  },
-  {
-    id: '4',
-    project_id: '1',
-    name: 'API 文档',
-    description: '接口文档和使用示例',
-    type: 'doc',
-    status: 'pending',
-    document_count: 0,
-    created_at: '2024-03-01T09:00:00Z',
-  },
-]
-
 const statusSummaryConfig = {
   pending: { label: '待处理', color: 'gray' },
   indexing: { label: '索引中', color: 'blue' },
@@ -78,18 +35,10 @@ export default function Knowledge() {
       ])
       setProject(projectData)
       setKnowledgeBases(kbData)
-    } catch {
-      console.log('Using mock data for development')
-      setProject({
-        id: projectId,
-        name: '用户服务系统',
-        description: '核心用户认证与授权服务',
-        repo_url: 'https://github.com/company/user-service',
-        status: 'active',
-        created_at: '2024-01-15T08:00:00Z',
-        updated_at: '2024-03-10T14:30:00Z',
-      })
-      setKnowledgeBases(mockKnowledgeBases)
+    } catch (error) {
+      console.error(error)
+      setProject(null)
+      setKnowledgeBases([])
     } finally {
       setIsLoading(false)
     }
@@ -100,18 +49,8 @@ export default function Knowledge() {
     try {
       const newKb = await knowledgeService.createKnowledgeBase(projectId, data)
       setKnowledgeBases((prev) => [newKb, ...prev])
-    } catch {
-      const mockNewKb: KnowledgeBase = {
-        id: String(Date.now()),
-        project_id: projectId,
-        name: data.name,
-        description: data.description,
-        type: data.type,
-        status: 'pending',
-        document_count: 0,
-        created_at: new Date().toISOString(),
-      }
-      setKnowledgeBases((prev) => [mockNewKb, ...prev])
+    } catch (error) {
+      console.error(error)
     }
   }
 
@@ -191,6 +130,15 @@ export default function Knowledge() {
               </div>
             )
           )}
+        </div>
+
+        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-gray-800 mb-2">代码索引</h2>
+          <p className="text-sm text-gray-500">
+            {knowledgeBases.filter((item) => item.type === 'code').length} 个代码库，
+            {knowledgeBases.filter((item) => (item.index_jobs || []).length > 0).length} 个已有索引任务。
+            打开知识库后可设置范围、触发方式和更新策略。
+          </p>
         </div>
 
         <div className="flex items-center gap-2 mb-4">

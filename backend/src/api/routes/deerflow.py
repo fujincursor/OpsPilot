@@ -7,12 +7,25 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
+from uuid import UUID, uuid4
 import json
+import logging
 
+from ...models.chat import ChatSessionListResponse
+from ...models.requirement import (
+    RequirementCreate,
+    RequirementPriority,
+    RequirementSource,
+    RequirementType,
+)
+from ...services.chat_service import chat_service
 from ...services.deerflow_service import deerflow_service
+from ...services.requirement_service import requirement_service
+from ...services.workflow_service import workflow_service
 
 
 router = APIRouter(prefix="/deerflow", tags=["DeerFlow Agent"])
+logger = logging.getLogger(__name__)
 
 
 # ========== 请求模型 ==========
@@ -21,6 +34,8 @@ class ChatRequest(BaseModel):
     """聊天请求"""
     message: str = Field(..., description="用户消息")
     thread_id: Optional[str] = Field(None, description="会话 ID")
+    project_id: Optional[str] = Field(None, description="对话所属项目 ID")
+    sender: Optional[str] = Field(None, description="发送人")
     context: Optional[Dict[str, Any]] = Field(None, description="额外上下文")
 
 
@@ -78,6 +93,13 @@ class AgentResponseModel(BaseModel):
 
 # ========== API 端点 ==========
 
+@router.get("/sessions", response_model=ChatSessionListResponse)
+async def list_saved_sessions():
+    """列出数据库中已保存的对话会话。"""
+    items = chat_service.list_all_sessions()
+    return ChatSessionListResponse(items=items, total=len(items))
+
+
 @router.get("/status", response_model=AgentStatus)
 async def get_agent_status():
     """获取 DeerFlow Agent 状态
@@ -97,17 +119,109 @@ async def chat(request: ChatRequest):
     
     发送消息给 Agent，获取响应。
     """
+    project_id = request.project_id
+    thread_id = request.thread_id
+    if thread_id:
+        try:
+            existing = chat_service.get_session(UUID(thread_id))
+        except ValueError:
+            existing = None
+        if existing is not None:
+            project_id = str(existing.project_id)
+            thread_id = str(existing.id)
+    elif project_id:
+        thread_id = str(uuid4())
+
+    if project_id:
+        try:
+            blocked = workflow_service.knowledge_block(UUID(project_id))
+        except ValueError:
+            blocked = None
+        if blocked is not None:
+            message = f"知识库未就绪：{blocked.message}。请先补齐项目知识库后再提交需求。"
+            saved_id = thread_id
+            if thread_id:
+                try:
+                    saved = chat_service.append_exchange(
+                        session_id=UUID(thread_id),
+                        project_id=UUID(project_id),
+                        user_content=request.message,
+                        user_sender=request.sender or "我",
+                        agent_content=message,
+                        agent_status="error",
+                        knowledge_results=[],
+                        knowledge_blocked=True,
+                    )
+                    saved_id = str(saved.id)
+                except ValueError:
+                    saved_id = thread_id
+            return AgentResponseModel(
+                success=False,
+                message=message,
+                data={"knowledge_ready": False, "project_id": project_id},
+                thread_id=saved_id,
+            )
+
     response = deerflow_service.chat(
         message=request.message,
-        thread_id=request.thread_id,
+        thread_id=thread_id,
+        project_id=project_id,
         context=request.context
     )
-    
+
+    classification = response.data.get("classification")
+    if isinstance(classification, dict) and project_id and classification.get("type") in {"bug", "feature"}:
+        try:
+            title = str(classification.get("title") or "").strip() or request.message.strip()[:40]
+            priority = str(classification.get("priority") or "medium")
+            requirement = requirement_service.create(
+                UUID(project_id),
+                RequirementCreate(
+                    title=title[:200],
+                    description=request.message.strip()[:5000],
+                    source=RequirementSource.WEB,
+                    type=RequirementType(classification["type"]),
+                    priority=RequirementPriority(priority),
+                ),
+                created_by=request.sender,
+            )
+            classification["ticket_id"] = f"REQ-{str(requirement.id).split('-')[0].upper()}"
+            created_requirement = requirement
+        except (ValueError, KeyError):
+            created_requirement = None
+    else:
+        created_requirement = None
+
+    if project_id and thread_id:
+        try:
+            saved = chat_service.append_exchange(
+                session_id=UUID(thread_id),
+                project_id=UUID(project_id),
+                user_content=request.message,
+                user_sender=request.sender or "我",
+                agent_content=response.message,
+                agent_status="complete" if response.success else "error",
+                knowledge_results=response.data.get("knowledge_results") or [],
+                classification=classification if isinstance(classification, dict) else None,
+            )
+            thread_id = str(saved.id)
+        except ValueError:
+            saved = None
+
+    if created_requirement is not None and thread_id:
+        try:
+            requirement_service.bind_session(created_requirement.id, UUID(thread_id))
+            created_requirement = requirement_service.get(created_requirement.id)
+            if created_requirement is not None:
+                await workflow_service.open_solution_review(created_requirement)
+        except Exception:
+            logger.exception("启动方案审批失败")
+
     return AgentResponseModel(
         success=response.success,
         message=response.message,
         data=response.data,
-        thread_id=response.thread_id
+        thread_id=thread_id
     )
 
 
@@ -121,6 +235,7 @@ async def chat_stream(request: ChatRequest):
         for event in deerflow_service.stream(
             message=request.message,
             thread_id=request.thread_id,
+            project_id=request.project_id,
             context=request.context
         ):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"

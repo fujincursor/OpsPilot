@@ -106,6 +106,7 @@ class TestTask(BaseModel):
     coverage: Optional[CoverageInfo] = Field(None, description="覆盖率信息")
     error_message: Optional[str] = Field(None, description="错误信息")
     sandbox_id: Optional[str] = Field(None, description="沙箱 ID")
+    sandbox_profile: Optional[str] = Field(None, description="执行时使用的沙箱配置摘要")
     ci_pipeline_id: Optional[str] = Field(None, description="CI 流水线 ID")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="创建时间")
     updated_at: datetime = Field(default_factory=datetime.utcnow, description="更新时间")

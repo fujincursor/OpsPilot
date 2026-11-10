@@ -18,6 +18,7 @@ from ...models.codegen import (
     CodeReviewSubmitRequest,
     CodeGenFilters,
 )
+from ...models.solution import SolutionStatus
 from ...services.codegen_service import codegen_service
 from ...services.solution_service import solution_service
 
@@ -46,6 +47,8 @@ async def create_codegen_task(
     solution = solution_service.get_solution(solution_id)
     if not solution:
         raise HTTPException(status_code=404, detail="Solution not found")
+    if solution.status != SolutionStatus.APPROVED:
+        raise HTTPException(status_code=400, detail="方案尚未审批通过，不能生成代码")
 
     language = data.language if data else "python"
     additional_context = data.additional_context if data and hasattr(data, 'additional_context') else None
@@ -96,7 +99,7 @@ async def get_codegen_task(
     task = codegen_service.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Code generation task not found")
-    return task
+    return codegen_service.for_display(task)
 
 
 @router.get(
@@ -278,6 +281,26 @@ async def submit_for_review(
         raise HTTPException(status_code=500, detail="Failed to submit for review")
 
     return result
+
+
+@router.post(
+    "/codegen/{task_id}/apply",
+    response_model=CodeGenTask,
+)
+async def apply_generated_code(task_id: UUID) -> CodeGenTask:
+    """把任务中保存的代码文件写回项目目录。"""
+    task = codegen_service.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Code generation task not found")
+    if task.status != CodeGenStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="代码还没有生成完成")
+    try:
+        updated = codegen_service.apply_to_project(task_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not updated:
+        raise HTTPException(status_code=500, detail="写回项目失败")
+    return codegen_service.for_display(updated)
 
 
 @router.post(

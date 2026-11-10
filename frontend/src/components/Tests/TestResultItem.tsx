@@ -61,7 +61,7 @@ export default function TestResultItem({ testCase, result }: TestResultItemProps
 
         <div className="flex items-center gap-4">
           {result && (
-            <span className="text-sm text-gray-500">{formatDuration(result.duration)}</span>
+            <span className="text-sm text-gray-500">{formatDuration(result.duration_ms ?? result.duration ?? 0)}</span>
           )}
           <TestStatusBadge status={status} size="sm" />
           <span

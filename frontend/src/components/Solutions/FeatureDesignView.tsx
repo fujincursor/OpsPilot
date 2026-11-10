@@ -12,9 +12,48 @@ const methodColors: Record<string, string> = {
   DELETE: 'bg-red-100 text-red-700',
 }
 
+function confirmedSteps(solution: FeatureDesignSolution): string[] {
+  const steps = ['定位相关代码位置']
+  const components = solution.architecture?.components || []
+  if (components.length > 0) {
+    steps.push(`按确认方案实现架构组件：${components.map((item) => item.name).join('、')}`)
+  }
+  if (solution.api_design.length > 0) {
+    steps.push(`按确认方案实现接口：${solution.api_design.map((item) => `${item.method} ${item.endpoint}`).join('、')}`)
+  }
+  if (solution.database_changes.length > 0) {
+    steps.push(`按确认方案完成数据库变更：${solution.database_changes.map((item) => item.table_name).join('、')}`)
+  }
+  steps.push('按确认方案编写完整代码文件')
+  return steps
+}
+
 export default function FeatureDesignView({ solution }: FeatureDesignViewProps) {
+  const steps = confirmedSteps(solution)
   return (
     <div className="space-y-6">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+          <div className="flex items-center gap-2">
+            <span>🔧</span>
+            <span className="font-semibold text-gray-800">实现步骤</span>
+            <span className="px-2 py-0.5 bg-gray-200 rounded-full text-xs text-gray-600">
+              {steps.length} 步
+            </span>
+          </div>
+        </div>
+        <div className="divide-y divide-gray-100">
+          {steps.map((step, index) => (
+            <div key={step} className="flex items-start gap-3 p-4">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-light">
+                <span className="text-xs font-bold text-primary">{index + 1}</span>
+              </div>
+              <p className="text-sm text-gray-700">{step}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl border border-purple-200 overflow-hidden">
         <div className="px-4 py-3 bg-purple-100/50 border-b border-purple-200">
           <div className="flex items-center gap-2">

@@ -3,7 +3,10 @@
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from ...api.deps import require_role
+from ...models.user import User, UserRole
 
 from ...models.review import (
     ReviewItem,
@@ -25,6 +28,7 @@ from ...models.review import (
 )
 from ...services.hitl_service import hitl_service
 from ...services.notification_service import notification_service
+from ...services.workflow_service import workflow_service
 
 router = APIRouter()
 
@@ -186,26 +190,19 @@ async def create_review(data: ReviewItemCreate) -> ReviewItem:
 async def approve_review(
     review_id: UUID,
     data: ReviewApproveRequest,
-    reviewer: str = Query(..., description="审核人"),
+    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.REVIEWER])),
 ) -> ReviewItem:
-    """
-    通过审核
-
-    将审核项状态更新为已通过，并记录审核人和理由。
-
-    - **review_id**: 审核项 ID
-    - **reviewer**: 审核人
-    - **reason**: 通过理由（可选）
-    """
+    """通过审核，并按主流程进入代码生成或测试。"""
     review = hitl_service.approve(
         review_id=review_id,
-        reviewer=reviewer,
+        reviewer=current_user.username,
         reason=data.reason,
     )
 
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
 
+    await workflow_service.on_approved(review)
     return review
 
 
@@ -216,26 +213,19 @@ async def approve_review(
 async def reject_review(
     review_id: UUID,
     data: ReviewRejectRequest,
-    reviewer: str = Query(..., description="审核人"),
+    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.REVIEWER])),
 ) -> ReviewItem:
-    """
-    拒绝审核
-
-    将审核项状态更新为已拒绝，需提供拒绝理由。
-
-    - **review_id**: 审核项 ID
-    - **reviewer**: 审核人
-    - **reason**: 拒绝理由
-    """
+    """拒绝审核并关闭需求。"""
     review = hitl_service.reject(
         review_id=review_id,
-        reviewer=reviewer,
+        reviewer=current_user.username,
         reason=data.reason,
     )
 
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
 
+    await workflow_service.on_rejected(review, data.reason)
     return review
 
 
@@ -243,29 +233,26 @@ async def reject_review(
     "/reviews/{review_id}/revision",
     response_model=ReviewItem,
 )
+@router.post(
+    "/reviews/{review_id}/request-revision",
+    response_model=ReviewItem,
+)
 async def request_revision(
     review_id: UUID,
     data: ReviewRevisionRequest,
-    reviewer: str = Query(..., description="审核人"),
+    current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.REVIEWER])),
 ) -> ReviewItem:
-    """
-    要求修改
-
-    将审核项状态更新为需要修改，并记录修改意见。
-
-    - **review_id**: 审核项 ID
-    - **reviewer**: 审核人
-    - **comments**: 修改意见
-    """
+    """要求修改，并带着意见回到方案或代码生成。"""
     review = hitl_service.request_revision(
         review_id=review_id,
-        reviewer=reviewer,
+        reviewer=current_user.username,
         comments=data.comments,
     )
 
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
 
+    await workflow_service.on_revision(review, data.comments)
     return review
 
 

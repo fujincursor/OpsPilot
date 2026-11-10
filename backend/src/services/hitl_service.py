@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, TYPE_CHECKING
 from uuid import UUID, uuid4
 
+from ..db import DocumentDict
 from ..models.review import (
     ReviewItem,
     ReviewItemCreate,
@@ -25,14 +26,24 @@ class HITLService:
     """HITL 审核中间件服务
 
     负责管理审核项的创建、提交、审批、拒绝和修改请求等操作。
-    当前使用内存存储，后续可替换为数据库实现。
+    审核数据保存在数据库中。
     """
 
     def __init__(self):
-        self._review_items: Dict[UUID, ReviewItem] = {}
+        self._review_items: Dict[UUID, ReviewItem] = DocumentDict(
+            "review_items",
+            model=ReviewItem,
+        )
         self._project_reviews: Dict[UUID, List[UUID]] = {}
         self._item_reviews: Dict[str, UUID] = {}
-        self._history: Dict[UUID, List[ReviewHistoryEntry]] = {}
+        for item in self._review_items.values():
+            self._project_reviews.setdefault(item.project_id, []).append(item.id)
+            item_type = item.item_type.value if hasattr(item.item_type, "value") else item.item_type
+            self._item_reviews[f"{item_type}:{item.item_id}"] = item.id
+        self._history: Dict[UUID, List[ReviewHistoryEntry]] = DocumentDict(
+            "review_history",
+            loader=lambda payload: [ReviewHistoryEntry.model_validate(item) for item in payload],
+        )
         self._notification_service: Optional["NotificationService"] = None
         self._default_timeout_hours: int = 24
         self._warning_threshold_hours: int = 4
@@ -75,6 +86,8 @@ class HITLService:
             item_type=item_type,
             item_id=item_id,
             project_id=data.project_id,
+            requirement_id=data.requirement_id,
+            session_id=data.session_id,
             title=data.title,
             description=data.description,
             status=ReviewStatus.PENDING,
@@ -361,6 +374,13 @@ class HITLService:
         """
         return self._review_items.get(review_id)
 
+    def find_by_item(self, item_type: ReviewItemType, item_id: UUID) -> Optional[ReviewItem]:
+        """按关联对象查找最近一次审核。"""
+        review_id = self._item_reviews.get(f"{item_type.value}:{item_id}")
+        if not review_id:
+            return None
+        return self._review_items.get(review_id)
+
     def get_pending_reviews(
         self,
         project_id: Optional[UUID] = None,
@@ -370,19 +390,8 @@ class HITLService:
         page: int = 1,
         page_size: int = 20,
     ) -> List[ReviewItem]:
-        """获取待审列表
-
-        Args:
-            project_id: 项目 ID（可选）
-            item_type: 审核项类型（可选）
-            reviewer: 审核人（可选）
-            filters: 过滤条件（可选）
-            page: 页码
-            page_size: 每页数量
-
-        Returns:
-            审核项列表
-        """
+        """获取待审列表。列出前先处理已经到期的审核。"""
+        self.check_timeout_escalation()
         if project_id:
             review_ids = self._project_reviews.get(project_id, [])
             reviews = [
@@ -522,6 +531,8 @@ class HITLService:
                         )
 
                         escalation_items.append(review_item)
+                        if self._notification_service:
+                            self._notification_service.notify_timeout_escalation(review_item)
 
                 elif review_item.due_at <= warning_threshold:
                     if self._notification_service:
@@ -605,9 +616,6 @@ class HITLService:
         details: str = "",
     ):
         """添加历史记录"""
-        if review_id not in self._history:
-            self._history[review_id] = []
-
         entry = ReviewHistoryEntry(
             id=uuid4(),
             action=action,
@@ -615,8 +623,9 @@ class HITLService:
             details=details,
             created_at=datetime.utcnow(),
         )
-
-        self._history[review_id].append(entry)
+        entries = list(self._history.get(review_id, []))
+        entries.append(entry)
+        self._history[review_id] = entries
 
     def get_review_statistics(
         self,

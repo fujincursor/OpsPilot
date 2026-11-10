@@ -13,15 +13,19 @@
 
 ### 1.2 模块定位
 
+```mermaid
+flowchart TD
+    plan[方案生成] --> planReview[方案审批]
+    code[代码生成] --> codeReview[代码审批]
+    planReview -->|通过| code
+    planReview -->|要求修改| plan
+    codeReview -->|通过| testRun[测试并按质量门禁判断]
+    codeReview -->|要求修改| code
+    planReview -->|拒绝| closed[关闭需求]
+    codeReview -->|拒绝| closed
 ```
-AI 生成方案 → 人工 Review 工作台 → 审核决策
-                    │
-                    ├─ 通过 → 继续执行
-                    │
-                    ├─ 修改 → 返回修改
-                    │
-                    └─ 拒绝 → 终止流程
-```
+
+对话流里的审批卡片和 Review 工作台操作的是同一条审核记录。通过后由流程推进服务进入下一阶段。测试结果默认不进入人工审批，未过门禁时回到代码生成。
 
 ## 2. HITL 机制
 
@@ -37,41 +41,25 @@ AI 生成方案 → 人工 Review 工作台 → 审核决策
 
 ### 2.2 审核触发条件
 
+方案和代码是两道必经审批，不按风险跳过。测试使用失败数和覆盖率门禁，不默认创建人工审核。
+
 ```yaml
 review_triggers:
-  # 方案类型
-  solution_types:
-    - feature_design    # 功能设计方案
-    - bugfix_high_risk  # 高风险 Bug 修复
-  
-  # 风险级别
-  risk_levels:
-    - high
-    - critical
-  
-  # 变更范围
-  change_scope:
-    - core_module       # 核心模块变更
-    - database_change   # 数据库变更
-    - api_change        # API 变更
+  required:
+    - solution   # Bug 修复方案与新需求设计方案
+    - code       # 语法检查之后的代码变更
+  quality_gate:
+    - test       # 失败数必须为 0；已统计覆盖率时不低于 80%
 ```
 
 ### 2.3 审核流程
 
-```
-┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-│ 方案生成 │───▶│ 创建审核 │───▶│ 等待审核 │───▶│ 审核决策 │
-└──────────┘    └──────────┘    └──────────┘    └────┬─────┘
-                                                     │
-                    ┌────────────────────────────────┼────────────────────────┐
-                    │                                │                        │
-                    ▼                                ▼                        ▼
-             ┌──────────┐                     ┌──────────┐              ┌──────────┐
-             │   通过   │                     │   修改   │              │   拒绝   │
-             └────┬─────┘                     └────┬─────┘              └────┬─────┘
-                  │                                │                        │
-                  ▼                                ▼                        ▼
-             继续执行                          返回修改                   终止流程
+```mermaid
+flowchart LR
+    generated[生成方案或代码] --> waiting[等待审核]
+    waiting --> approved[通过并进入下一阶段]
+    waiting --> revision[要求修改并回到上一阶段]
+    waiting --> rejected[拒绝并关闭需求]
 ```
 
 ## 3. 审核数据模型

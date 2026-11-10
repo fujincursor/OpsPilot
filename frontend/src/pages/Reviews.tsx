@@ -7,90 +7,10 @@ import type {
   RequirementPriority,
   ReviewFilters,
 } from '../types'
-import { reviewService } from '../services'
+import { projectService, reviewService } from '../services'
+import type { Project } from '../types'
 import { ReviewCard } from '../components/Reviews'
 import { PriorityBadge } from '../components/Requirements'
-
-const mockReviews: ReviewItem[] = [
-  {
-    id: '1',
-    item_type: 'solution',
-    item_id: 'sol-1',
-    project_id: '1',
-    title: '用户登录超时问题修复方案',
-    description: '针对用户登录后10分钟被强制登出的问题，分析原因并提供修复方案。涉及 Session 管理和 Token 刷新机制的改进。',
-    status: 'pending',
-    priority: 'high',
-    reviewer: '张三',
-    comments_count: 3,
-    created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
-    due_at: new Date(Date.now() + 4 * 3600000).toISOString(),
-  },
-  {
-    id: '2',
-    item_type: 'code',
-    item_id: 'code-1',
-    project_id: '1',
-    title: 'PR #123: 修复数据库连接池问题',
-    description: '优化数据库连接池配置，增加最大连接数，添加连接超时重试逻辑。包含单元测试和集成测试。',
-    status: 'in_review',
-    priority: 'critical',
-    comments_count: 5,
-    created_at: new Date(Date.now() - 5 * 3600000).toISOString(),
-    due_at: new Date(Date.now() - 1 * 3600000).toISOString(),
-  },
-  {
-    id: '3',
-    item_type: 'test',
-    item_id: 'test-1',
-    project_id: '1',
-    title: 'API 响应优化测试报告',
-    description: '对 API 响应时间优化后的压力测试结果，包含性能对比和回归测试覆盖率报告。',
-    status: 'approved',
-    priority: 'medium',
-    reviewer: '李四',
-    comments_count: 2,
-    created_at: new Date(Date.now() - 24 * 3600000).toISOString(),
-  },
-  {
-    id: '4',
-    item_type: 'solution',
-    item_id: 'sol-2',
-    project_id: '1',
-    title: '多语言支持功能设计',
-    description: '实现中英日三种语言界面切换的技术方案，包括 i18n 框架选型、资源文件组织结构和运行时切换机制。',
-    status: 'revision_requested',
-    priority: 'medium',
-    reviewer: '王五',
-    comments_count: 8,
-    created_at: new Date(Date.now() - 48 * 3600000).toISOString(),
-  },
-  {
-    id: '5',
-    item_type: 'code',
-    item_id: 'code-2',
-    project_id: '1',
-    title: 'PR #125: 用户权限模块重构',
-    description: '基于 RBAC 模型重构用户权限模块，支持更细粒度的权限控制和动态权限配置。',
-    status: 'rejected',
-    priority: 'high',
-    comments_count: 12,
-    created_at: new Date(Date.now() - 72 * 3600000).toISOString(),
-  },
-  {
-    id: '6',
-    item_type: 'test',
-    item_id: 'test-2',
-    project_id: '1',
-    title: '登录模块自动化测试',
-    description: '新增登录模块的端到端自动化测试用例，覆盖正常登录、异常处理、会话管理等场景。',
-    status: 'pending',
-    priority: 'low',
-    comments_count: 0,
-    created_at: new Date(Date.now() - 6 * 3600000).toISOString(),
-    due_at: new Date(Date.now() + 48 * 3600000).toISOString(),
-  },
-]
 
 const itemTypes: { value: ReviewItemType; label: string; icon: string }[] = [
   { value: 'solution', label: '方案', icon: '📋' },
@@ -112,9 +32,11 @@ export default function Reviews() {
     priority: (searchParams.get('priority') as RequirementPriority) || undefined,
   })
   const [sortBy, setSortBy] = useState<'priority' | 'created_at'>('priority')
+  const [projects, setProjects] = useState<Project[]>([])
 
   useEffect(() => {
     loadReviews()
+    projectService.getProjects().then(setProjects).catch(() => setProjects([]))
   }, [])
 
   useEffect(() => {
@@ -129,10 +51,13 @@ export default function Reviews() {
     if (filters.priority) {
       result = result.filter((r) => r.priority === filters.priority)
     }
+    if (filters.project_id) {
+      result = result.filter((r) => r.project_id === filters.project_id)
+    }
 
     const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 }
     if (sortBy === 'priority') {
-      result.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
+      result.sort((a, b) => (priorityOrder[a.priority] ?? 9) - (priorityOrder[b.priority] ?? 9))
     } else {
       result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     }
@@ -143,12 +68,11 @@ export default function Reviews() {
   const loadReviews = async () => {
     setIsLoading(true)
     try {
-      const projectId = searchParams.get('project') || undefined
-      const data = await reviewService.getPendingReviews(projectId)
+      const data = await reviewService.getPendingReviews()
       setReviews(data)
-    } catch {
-      console.log('Using mock data')
-      setReviews(mockReviews)
+    } catch (error) {
+      console.error(error)
+      setReviews([])
     } finally {
       setIsLoading(false)
     }
@@ -210,6 +134,19 @@ export default function Reviews() {
 
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
           <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">项目:</span>
+              <select
+                value={filters.project_id || ''}
+                onChange={(event) => handleFilterChange('project_id', event.target.value || undefined)}
+                className="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-white"
+              >
+                <option value="">全部项目</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>{project.name}</option>
+                ))}
+              </select>
+            </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-500">类型:</span>
               <div className="flex gap-1">

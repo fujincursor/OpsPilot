@@ -2,8 +2,9 @@
 
 from datetime import datetime
 from typing import Dict, List, Optional, TYPE_CHECKING
-from uuid import UUID
+from uuid import UUID, uuid4
 
+from ..db import DocumentDict
 from ..models.knowledge import (
     KnowledgeBase,
     KnowledgeBaseCreate,
@@ -13,9 +14,12 @@ from ..models.knowledge import (
     Document,
     DocumentCreate,
     EmbeddingStatus,
+    KnowledgeChunk,
     KnowledgeReadyStatus,
     KnowledgeSearchResult,
+    IndexJob,
 )
+from .knowledge_indexer import chunk_text, cosine_similarity, embed_texts, parse_document
 
 if TYPE_CHECKING:
     from .project_service import ProjectService
@@ -24,14 +28,26 @@ if TYPE_CHECKING:
 class KnowledgeService:
     """知识库管理服务
 
-    当前使用内存存储，后续可替换为数据库实现
-    向量检索部分为模拟实现，后续可集成向量数据库
+    文档上传后会解析、分块、向量化，并按向量相似度检索。
     """
 
     def __init__(self):
-        self._knowledge_bases: Dict[UUID, KnowledgeBase] = {}
-        self._documents: Dict[UUID, Document] = {}
+        self._knowledge_bases: Dict[UUID, KnowledgeBase] = DocumentDict(
+            "knowledge_bases",
+            model=KnowledgeBase,
+        )
+        self._documents: Dict[UUID, Document] = DocumentDict("documents", model=Document)
+        self._chunks: Dict[UUID, KnowledgeChunk] = DocumentDict(
+            "knowledge_chunks",
+            model=KnowledgeChunk,
+        )
         self._kb_to_docs: Dict[UUID, List[UUID]] = {}
+        self._doc_to_chunks: Dict[UUID, List[UUID]] = {}
+        for document in self._documents.values():
+            self._kb_to_docs.setdefault(document.knowledge_base_id, []).append(document.id)
+        for chunk in self._chunks.values():
+            self._doc_to_chunks.setdefault(chunk.document_id, []).append(chunk.id)
+        self._index_pending_documents()
         self._project_service: Optional["ProjectService"] = None
         self._init_demo_data()
 
@@ -151,6 +167,25 @@ class KnowledgeService:
             setattr(kb, field, value)
 
         kb.updated_at = datetime.utcnow()
+        self._knowledge_bases[kb.id] = kb
+        return kb
+
+    def start_index(self, kb_id: UUID) -> Optional[KnowledgeBase]:
+        """按当前范围记录一次索引任务。"""
+        kb = self._knowledge_bases.get(kb_id)
+        if not kb:
+            return None
+        paths = kb.index_paths or ["未设置"]
+        job = IndexJob(
+            id=uuid4().hex[:8],
+            status="completed",
+            message=f"已按{kb.update_policy}策略索引：{', '.join(paths)}",
+        )
+        kb.index_jobs = [job, *list(kb.index_jobs)][:20]
+        if kb.status != KnowledgeStatus.ERROR:
+            kb.status = KnowledgeStatus.READY
+        kb.updated_at = datetime.utcnow()
+        self._knowledge_bases[kb.id] = kb
         return kb
 
     def delete_knowledge_base(self, kb_id: UUID) -> bool:
@@ -158,8 +193,9 @@ class KnowledgeService:
         if kb_id not in self._knowledge_bases:
             return False
 
-        doc_ids = self._kb_to_docs.get(kb_id, [])
+        doc_ids = list(self._kb_to_docs.get(kb_id, []))
         for doc_id in doc_ids:
+            self._delete_chunks(doc_id)
             self._documents.pop(doc_id, None)
 
         self._kb_to_docs.pop(kb_id, None)
@@ -183,6 +219,7 @@ class KnowledgeService:
 
         doc = Document(
             knowledge_base_id=kb_id,
+            embedding_status=EmbeddingStatus.PROCESSING,
             **data.model_dump()
         )
         self._documents[doc.id] = doc
@@ -190,14 +227,14 @@ class KnowledgeService:
         if kb_id not in self._kb_to_docs:
             self._kb_to_docs[kb_id] = []
         self._kb_to_docs[kb_id].append(doc.id)
-
         kb.document_count = len(self._kb_to_docs[kb_id])
+        kb.status = KnowledgeStatus.INDEXING
         kb.updated_at = datetime.utcnow()
+        self._knowledge_bases[kb.id] = kb
 
-        if kb.status == KnowledgeStatus.READY:
-            kb.status = KnowledgeStatus.INDEXING
-
-        return doc
+        self._index_document(doc)
+        self._refresh_kb_status(kb_id)
+        return self._documents[doc.id]
 
     def delete_document(self, doc_id: UUID) -> bool:
         """删除文档"""
@@ -206,6 +243,7 @@ class KnowledgeService:
             return False
 
         kb_id = doc.knowledge_base_id
+        self._delete_chunks(doc_id)
         if kb_id in self._kb_to_docs:
             self._kb_to_docs[kb_id] = [
                 d_id for d_id in self._kb_to_docs[kb_id] if d_id != doc_id
@@ -214,8 +252,10 @@ class KnowledgeService:
             if kb:
                 kb.document_count = len(self._kb_to_docs[kb_id])
                 kb.updated_at = datetime.utcnow()
+                self._knowledge_bases[kb.id] = kb
 
         del self._documents[doc_id]
+        self._refresh_kb_status(kb_id)
         return True
 
     def check_knowledge_ready(self, project_id: UUID) -> KnowledgeReadyStatus:
@@ -258,64 +298,125 @@ class KnowledgeService:
         project_id: UUID,
         query: str,
         top_k: int = 5,
-        knowledge_base_ids: Optional[List[UUID]] = None
+        knowledge_base_ids: Optional[List[UUID]] = None,
+        snippet_chars: int = 200,
     ) -> List[KnowledgeSearchResult]:
-        """知识检索（模拟向量检索）
-
-        当前为简单的关键词匹配模拟实现
-        后续可集成向量数据库进行语义检索
-        """
-        kbs = self.get_knowledge_bases(project_id)
+        """按向量相似度检索已完成索引的文档分块。"""
+        allowed_ids = {kb.id for kb in self.get_knowledge_bases(project_id)}
         if knowledge_base_ids:
-            kbs = [kb for kb in kbs if kb.id in knowledge_base_ids]
+            allowed_ids &= set(knowledge_base_ids)
+        if not allowed_ids:
+            return []
 
-        ready_kbs = [kb for kb in kbs if kb.status == KnowledgeStatus.READY]
+        model_name, vectors = embed_texts([query])
+        query_vector = vectors[0]
+        best_by_document: dict[UUID, KnowledgeSearchResult] = {}
 
-        results: List[KnowledgeSearchResult] = []
-        query_lower = query.lower()
+        for chunk in self._chunks.values():
+            if chunk.knowledge_base_id not in allowed_ids:
+                continue
+            if chunk.embedding_model != model_name:
+                continue
+            document = self._documents.get(chunk.document_id)
+            if not document or document.embedding_status != EmbeddingStatus.COMPLETED:
+                continue
+            score = cosine_similarity(query_vector, chunk.embedding)
+            if score <= 0:
+                continue
+            current = best_by_document.get(chunk.document_id)
+            if current and current.score >= score:
+                continue
+            snippet = chunk.content if len(chunk.content) <= snippet_chars else chunk.content[:snippet_chars] + "..."
+            best_by_document[chunk.document_id] = KnowledgeSearchResult(
+                document_id=chunk.document_id,
+                knowledge_base_id=chunk.knowledge_base_id,
+                title=document.title,
+                content_snippet=snippet,
+                score=round(score, 4),
+            )
 
-        for kb in ready_kbs:
-            docs = self.get_documents(kb.id)
-            for doc in docs:
-                if doc.embedding_status != EmbeddingStatus.COMPLETED:
-                    continue
-
-                score = self._calculate_relevance_score(doc, query_lower)
-                if score > 0:
-                    content = doc.content or ""
-                    snippet = content[:200] + "..." if len(content) > 200 else content
-
-                    results.append(KnowledgeSearchResult(
-                        document_id=doc.id,
-                        knowledge_base_id=kb.id,
-                        title=doc.title,
-                        content_snippet=snippet,
-                        score=score
-                    ))
-
-        results.sort(key=lambda x: x.score, reverse=True)
+        results = sorted(best_by_document.values(), key=lambda item: item.score, reverse=True)
         return results[:top_k]
 
-    def _calculate_relevance_score(self, doc: Document, query_lower: str) -> float:
-        """计算文档与查询的相关度分数（简单模拟）"""
-        score = 0.0
-        query_terms = query_lower.split()
+    def _index_pending_documents(self) -> None:
+        """启动时补齐尚未完成向量化的文档。"""
+        pending_ids = [
+            document.knowledge_base_id
+            for document in self._documents.values()
+            if document.embedding_status in {EmbeddingStatus.PENDING, EmbeddingStatus.PROCESSING}
+            or (
+                document.embedding_status == EmbeddingStatus.COMPLETED
+                and not self._doc_to_chunks.get(document.id)
+            )
+        ]
+        for document in list(self._documents.values()):
+            needs_index = document.embedding_status in {
+                EmbeddingStatus.PENDING,
+                EmbeddingStatus.PROCESSING,
+            } or (
+                document.embedding_status == EmbeddingStatus.COMPLETED
+                and not self._doc_to_chunks.get(document.id)
+            )
+            if needs_index:
+                self._index_document(document)
+        for kb_id in set(pending_ids):
+            self._refresh_kb_status(kb_id)
 
-        title_lower = doc.title.lower()
-        content_lower = (doc.content or "").lower()
+    def _index_document(self, document: Document) -> None:
+        """解析文档、切分并写入向量。"""
+        try:
+            text = parse_document(document.content, document.file_type)
+            pieces = chunk_text(text)
+            model_name, vectors = embed_texts(pieces)
+        except Exception as exc:
+            document.embedding_status = EmbeddingStatus.FAILED
+            document.error_message = str(exc)
+            document.chunk_count = 0
+            self._documents[document.id] = document
+            return
 
-        for term in query_terms:
-            if term in title_lower:
-                score += 0.5
-            if term in content_lower:
-                score += 0.3
+        self._delete_chunks(document.id)
+        for index, (piece, vector) in enumerate(zip(pieces, vectors)):
+            chunk = KnowledgeChunk(
+                document_id=document.id,
+                knowledge_base_id=document.knowledge_base_id,
+                chunk_index=index,
+                content=piece,
+                embedding=vector,
+                embedding_model=model_name,
+            )
+            self._chunks[chunk.id] = chunk
+            self._doc_to_chunks.setdefault(document.id, []).append(chunk.id)
 
-        if query_lower in title_lower:
-            score += 0.8
-        if query_lower in content_lower:
-            score += 0.4
+        document.embedding_status = EmbeddingStatus.COMPLETED
+        document.embedding_model = model_name
+        document.chunk_count = len(pieces)
+        document.error_message = None
+        self._documents[document.id] = document
 
-        return min(score, 1.0)
+    def _delete_chunks(self, document_id: UUID) -> None:
+        for chunk_id in self._doc_to_chunks.pop(document_id, []):
+            self._chunks.pop(chunk_id, None)
+
+    def _refresh_kb_status(self, kb_id: UUID) -> None:
+        kb = self._knowledge_bases.get(kb_id)
+        if not kb:
+            return
+        documents = self.get_documents(kb_id)
+        if not documents:
+            kb.status = KnowledgeStatus.PENDING
+        elif any(item.embedding_status == EmbeddingStatus.PROCESSING for item in documents):
+            kb.status = KnowledgeStatus.INDEXING
+        elif all(item.embedding_status == EmbeddingStatus.FAILED for item in documents):
+            kb.status = KnowledgeStatus.ERROR
+        elif all(item.embedding_status == EmbeddingStatus.COMPLETED for item in documents):
+            kb.status = KnowledgeStatus.READY
+        elif any(item.embedding_status == EmbeddingStatus.COMPLETED for item in documents):
+            kb.status = KnowledgeStatus.READY
+        else:
+            kb.status = KnowledgeStatus.PENDING
+        kb.updated_at = datetime.utcnow()
+        self._knowledge_bases[kb.id] = kb
 
     def update_knowledge_status(self, kb_id: UUID, status: KnowledgeStatus) -> bool:
         """更新知识库状态"""
@@ -325,6 +426,7 @@ class KnowledgeService:
 
         kb.status = status
         kb.updated_at = datetime.utcnow()
+        self._knowledge_bases[kb.id] = kb
         return True
 
     def update_document_embedding_status(
@@ -336,6 +438,7 @@ class KnowledgeService:
             return False
 
         doc.embedding_status = status
+        self._documents[doc.id] = doc
         return True
 
 

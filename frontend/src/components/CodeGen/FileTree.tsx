@@ -20,6 +20,7 @@ const actionConfig: Record<CodeFileAction, { icon: string; color: string; label:
   create: { icon: '+', color: 'text-green-500', label: '新建' },
   modify: { icon: '~', color: 'text-amber-500', label: '修改' },
   delete: { icon: '-', color: 'text-red-500', label: '删除' },
+  view: { icon: '·', color: 'text-slate-500', label: '现有' },
 }
 
 const languageIcons: Record<string, string> = {
@@ -156,7 +157,7 @@ export default function FileTree({ files, selectedFile, onSelectFile }: FileTree
       <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
         <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
           <span>📂</span>
-          生成的文件 ({files.length})
+          代码文件 ({files.length})
         </h3>
       </div>
       <div className="p-2 max-h-[500px] overflow-y-auto">

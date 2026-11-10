@@ -51,10 +51,25 @@ class Document(DocumentBase):
     embedding_status: EmbeddingStatus = Field(
         default=EmbeddingStatus.PENDING, description="向量化状态"
     )
+    embedding_model: Optional[str] = Field(None, description="向量模型")
+    chunk_count: int = Field(default=0, description="分块数量")
+    error_message: Optional[str] = Field(None, description="处理失败原因")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="创建时间")
 
     class Config:
         from_attributes = True
+
+
+class KnowledgeChunk(BaseModel):
+    """文档分块及其向量"""
+    id: UUID = Field(default_factory=uuid4, description="分块 ID")
+    document_id: UUID = Field(..., description="文档 ID")
+    knowledge_base_id: UUID = Field(..., description="知识库 ID")
+    chunk_index: int = Field(..., ge=0, description="分块序号")
+    content: str = Field(..., description="分块文本")
+    embedding: List[float] = Field(default_factory=list, description="向量")
+    embedding_model: str = Field(..., description="向量模型")
+    created_at: datetime = Field(default_factory=datetime.utcnow, description="创建时间")
 
 
 class DocumentResponse(BaseModel):
@@ -75,11 +90,22 @@ class KnowledgeBaseCreate(KnowledgeBaseBase):
     pass
 
 
+class IndexJob(BaseModel):
+    """一次代码或文档索引任务。"""
+    id: str
+    status: str
+    message: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class KnowledgeBaseUpdate(BaseModel):
     """更新知识库请求模型"""
     name: Optional[str] = Field(None, min_length=1, max_length=100, description="知识库名称")
     description: Optional[str] = Field(None, max_length=500, description="知识库描述")
     type: Optional[KnowledgeType] = Field(None, description="知识库类型")
+    index_paths: Optional[List[str]] = Field(None, description="索引范围")
+    index_trigger: Optional[str] = Field(None, description="触发方式")
+    update_policy: Optional[str] = Field(None, description="更新策略")
 
 
 class KnowledgeBase(KnowledgeBaseBase):
@@ -88,6 +114,10 @@ class KnowledgeBase(KnowledgeBaseBase):
     project_id: UUID = Field(..., description="所属项目 ID")
     status: KnowledgeStatus = Field(default=KnowledgeStatus.PENDING, description="知识库状态")
     document_count: int = Field(default=0, description="文档数量")
+    index_paths: List[str] = Field(default_factory=lambda: ["src"], description="索引范围")
+    index_trigger: str = Field(default="manual", description="触发方式")
+    update_policy: str = Field(default="incremental", description="更新策略")
+    index_jobs: List[IndexJob] = Field(default_factory=list, description="索引任务")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="创建时间")
     updated_at: datetime = Field(default_factory=datetime.utcnow, description="更新时间")
 

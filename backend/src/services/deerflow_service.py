@@ -8,30 +8,44 @@ import os
 import sys
 import json
 import logging
-from typing import Any, Dict, List, Optional, Generator
+import re
+from typing import Any, Dict, List, Optional, Generator, Tuple
 from pathlib import Path
 from dataclasses import dataclass, field
+from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
-# 设置 DeerFlow 环境变量和路径
-PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.parent
-DEERFLOW_PATH = PROJECT_ROOT / "deerflow" / "backend" / "packages" / "harness"
+OPSPILOT_ROOT = Path(__file__).resolve().parents[3]
+WORKSPACE_ROOT = OPSPILOT_ROOT.parent
+HARNESS_CANDIDATES = [
+    WORKSPACE_ROOT / "deerflow" / "backend" / "packages" / "harness",
+    OPSPILOT_ROOT / "deerflow" / "backend" / "packages" / "harness",
+    WORKSPACE_ROOT / "deer-flow-study" / "backend" / "packages" / "harness",
+]
+CONFIG_CANDIDATES = [
+    WORKSPACE_ROOT / "config.yaml",
+    OPSPILOT_ROOT / "deerflow" / "config.yaml",
+    WORKSPACE_ROOT / "deer-flow-study" / "config.yaml",
+]
 
-if DEERFLOW_PATH.exists():
-    sys.path.insert(0, str(DEERFLOW_PATH))
+for harness_path in HARNESS_CANDIDATES:
+    if harness_path.exists():
+        candidate = str(harness_path)
+        if candidate not in sys.path:
+            sys.path.insert(0, candidate)
+        break
 
-# 设置 DeerFlow 配置路径
-config_path = PROJECT_ROOT / "config.yaml"
-if config_path.exists():
-    os.environ.setdefault("DEER_FLOW_CONFIG_PATH", str(config_path))
+resolved_config = next((path for path in CONFIG_CANDIDATES if path.exists()), None)
+if resolved_config is not None:
+    os.environ.setdefault("DEER_FLOW_CONFIG_PATH", str(resolved_config))
 
-skills_path = PROJECT_ROOT / "skills"
-if skills_path.exists():
-    os.environ.setdefault("DEER_FLOW_SKILLS_PATH", str(skills_path))
+for skills_path in (WORKSPACE_ROOT / "skills", OPSPILOT_ROOT / "skills"):
+    if skills_path.exists():
+        os.environ.setdefault("DEER_FLOW_SKILLS_PATH", str(skills_path))
+        break
 
-opspilot_home = PROJECT_ROOT / ".opspilot"
-os.environ.setdefault("DEER_FLOW_HOME", str(opspilot_home))
+os.environ.setdefault("DEER_FLOW_HOME", str(OPSPILOT_ROOT / ".opspilot"))
 
 
 @dataclass
@@ -64,17 +78,26 @@ class DeerFlowService:
             self._try_initialize()
             DeerFlowService._initialized = True
     
+    def _resolve_config_path(self) -> Optional[Path]:
+        """选择一份 DeerFlow 能加载的配置。"""
+        for config_path in CONFIG_CANDIDATES:
+            if config_path.exists():
+                return config_path
+        return None
+
     def _try_initialize(self):
         """尝试初始化 DeerFlow Client"""
         try:
             from deerflow.client import DeerFlowClient
-            
+
+            config_path = self._resolve_config_path()
+            if config_path is not None:
+                os.environ["DEER_FLOW_CONFIG_PATH"] = str(config_path)
             self._client = DeerFlowClient()
-            logger.info("DeerFlow Client 初始化成功")
-            
+            logger.info("DeerFlow Client 初始化成功，配置: %s", config_path)
         except ImportError as e:
             logger.warning(f"DeerFlow 未安装或导入失败: {e}")
-            logger.info("将使用模拟模式运行")
+            logger.info("DeerFlow 不可用，对话接口将返回失败")
             self._client = None
         except Exception as e:
             logger.error(f"DeerFlow Client 初始化失败: {e}")
@@ -86,11 +109,137 @@ class DeerFlowService:
         """检查 DeerFlow 是否可用"""
         return self._client is not None
     
+    def _retrieve_project_knowledge(
+        self,
+        message: str,
+        project_id: Optional[str],
+    ) -> Tuple[str, List[Dict[str, Any]]]:
+        """按对话所属项目做语义检索，并把结果写进发给模型的问题。"""
+        if not project_id:
+            return message, []
+        try:
+            parsed_project_id = UUID(str(project_id))
+        except ValueError:
+            return message, []
+
+        from .knowledge_service import knowledge_service
+
+        hits = knowledge_service.search_knowledge(
+            parsed_project_id,
+            message,
+            top_k=5,
+            snippet_chars=1000,
+        )
+        sources: List[Dict[str, Any]] = []
+        sections: List[str] = []
+        for index, hit in enumerate(hits, start=1):
+            knowledge_base = knowledge_service.get_knowledge_base(hit.knowledge_base_id)
+            knowledge_base_name = knowledge_base.name if knowledge_base else ""
+            preview = hit.content_snippet if len(hit.content_snippet) <= 200 else hit.content_snippet[:200] + "..."
+            sources.append({
+                "title": hit.title,
+                "snippet": preview,
+                "score": hit.score,
+                "knowledge_base_name": knowledge_base_name,
+                "document_id": str(hit.document_id),
+            })
+            location = f"（知识库：{knowledge_base_name}）" if knowledge_base_name else ""
+            sections.append(f"{index}. 文档《{hit.title}》{location}\n{hit.content_snippet}")
+
+        if not sections:
+            return message, []
+
+        grounded = (
+            "请作为该项目的运维助手回答。优先使用下面从该项目知识库检索到的内容；"
+            "这些内容与问题相关时，回答必须依据它们。"
+            "如果检索结果不能回答问题，请明确说明知识库中没有对应资料，不要编造文档中不存在的事实。\n\n"
+            "## 项目知识库检索结果\n"
+            + "\n\n".join(sections)
+            + "\n\n## 用户问题\n"
+            + message
+        )
+        return grounded, sources
+
+    def _with_classification_instruction(self, message: str) -> str:
+        """要求模型先按语义判断问题类型，再回答。"""
+        return (
+            "请先判断用户这句话属于哪一类，并且第一个输出必须是 json 代码块，代码块前不要写任何文字。"
+            "格式固定为："
+            '{"type":"bug","priority":"medium","title":"一句话标题"}。'
+            "type 只能是 bug、feature、question："
+            "bug 表示现有功能出错、异常、失败或不可用；"
+            "feature 表示希望新增或改进功能；"
+            "question 表示咨询用法、原因或已有说明。"
+            "priority 只能是 high、medium、low。"
+            "即使开头有「我遇到了一个 Bug」或「我有一个新需求」这类前缀，也要以后面的具体描述为准。"
+            "输出代码块后，再用 Markdown 回答。\n\n"
+            + message
+        )
+
+    def _extract_classification(self, text: str) -> Tuple[str, Optional[Dict[str, str]]]:
+        """从回复里取出分类，并从展示文本中去掉这段 JSON。"""
+        patterns = (
+            r"```json\s*(\{.*?\})\s*```",
+            r"```\s*(\{.*?\})\s*```",
+        )
+        for pattern in patterns:
+            match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+            if not match:
+                continue
+            parsed = self._parse_classification(match.group(1))
+            if not parsed:
+                continue
+            visible = (text[:match.start()] + text[match.end():]).strip()
+            return visible, parsed
+
+        stripped = text.lstrip()
+        if stripped.startswith("{"):
+            end = stripped.find("}")
+            if end != -1:
+                parsed = self._parse_classification(stripped[:end + 1])
+                if parsed:
+                    return stripped[end + 1:].strip(), parsed
+        return text, None
+
+    def _parse_classification(self, raw: str) -> Optional[Dict[str, str]]:
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(data, dict):
+            return None
+        kind = str(data.get("type") or "").lower()
+        if kind not in {"bug", "feature", "question"}:
+            return None
+        priority = str(data.get("priority") or "medium").lower()
+        if priority == "critical":
+            priority = "high"
+        if priority not in {"high", "medium", "low"}:
+            priority = "medium"
+        title = " ".join(str(data.get("title") or "").split())
+        return {"type": kind, "priority": priority, "title": title[:80]}
+
+    def _fallback_classification(self, message: str) -> Dict[str, str]:
+        from .lead_agent_service import lead_agent_service
+
+        analysis = lead_agent_service.analyze_requirement(message)
+        priority = analysis.priority.value
+        if priority == "critical":
+            priority = "high"
+        if priority not in {"high", "medium", "low"}:
+            priority = "medium"
+        return {
+            "type": analysis.type.value,
+            "priority": priority,
+            "title": "",
+        }
+
     def chat(
         self,
         message: str,
         thread_id: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
+        project_id: Optional[str] = None,
     ) -> AgentResponse:
         """发送消息给 Agent
         
@@ -103,20 +252,34 @@ class DeerFlowService:
             AgentResponse: Agent 响应
         """
         if not self.is_available:
-            return self._mock_chat(message, thread_id)
+            return AgentResponse(
+                success=False,
+                message="DeerFlow 未安装，当前无法生成回复",
+                thread_id=thread_id,
+            )
         
         try:
+            grounded_message, sources = self._retrieve_project_knowledge(message, project_id)
             response = self._client.chat(
-                message,
+                self._with_classification_instruction(grounded_message),
                 thread_id=thread_id,
-                context=context or {}
             )
+            visible, classification = self._extract_classification(response)
+            if classification is None:
+                classification = self._fallback_classification(message)
+            if not classification.get("title"):
+                classification["title"] = " ".join(message.split())[:40]
             
             return AgentResponse(
                 success=True,
-                message=response,
+                message=visible or response,
                 thread_id=thread_id,
-                data={"raw_response": response}
+                data={
+                    "raw_response": response,
+                    "project_id": project_id,
+                    "knowledge_results": sources,
+                    "classification": classification,
+                }
             )
             
         except Exception as e:
@@ -126,12 +289,40 @@ class DeerFlowService:
                 message=f"Agent 调用失败: {str(e)}",
                 thread_id=thread_id
             )
+
+    def complete(
+        self,
+        message: str,
+        thread_id: Optional[str] = None,
+    ) -> AgentResponse:
+        """直接让模型完成一项任务，不附加对话分类。"""
+        if not self.is_available:
+            return AgentResponse(
+                success=False,
+                message="DeerFlow 未安装，当前无法生成代码",
+                thread_id=thread_id,
+            )
+        try:
+            response = self._client.chat(message, thread_id=thread_id)
+            return AgentResponse(
+                success=True,
+                message=response or "",
+                thread_id=thread_id,
+            )
+        except Exception as e:
+            logger.error(f"DeerFlow 任务执行失败: {e}")
+            return AgentResponse(
+                success=False,
+                message=f"Agent 调用失败: {str(e)}",
+                thread_id=thread_id,
+            )
     
     def stream(
         self,
         message: str,
         thread_id: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
+        project_id: Optional[str] = None,
     ) -> Generator[Dict[str, Any], None, None]:
         """流式发送消息给 Agent
         
@@ -144,11 +335,17 @@ class DeerFlowService:
             Dict: 流式事件
         """
         if not self.is_available:
-            yield from self._mock_stream(message, thread_id)
+            yield {
+                "type": "error",
+                "data": {"error": "DeerFlow 未安装，当前无法生成回复"},
+            }
             return
         
         try:
-            for event in self._client.stream(message, thread_id=thread_id, context=context or {}):
+            grounded_message, sources = self._retrieve_project_knowledge(message, project_id)
+            if sources:
+                yield {"type": "knowledge", "data": {"results": sources, "project_id": project_id}}
+            for event in self._client.stream(grounded_message, thread_id=thread_id):
                 yield {
                     "type": event.type,
                     "data": event.data
@@ -422,218 +619,6 @@ class DeerFlowService:
                 "skill": "knowledge-retrieval"
             }
         )
-    
-    # ========== 模拟模式实现 ==========
-    
-    def _mock_chat(self, message: str, thread_id: Optional[str]) -> AgentResponse:
-        """模拟 chat 响应"""
-        logger.info(f"[模拟模式] 处理消息: {message[:100]}...")
-        
-        # 简单的关键词响应
-        if "分析" in message or "需求" in message:
-            response = self._mock_requirement_analysis(message)
-        elif "修复" in message or "bug" in message.lower():
-            response = self._mock_bugfix_solution(message)
-        elif "设计" in message or "功能" in message:
-            response = self._mock_feature_design(message)
-        elif "代码" in message or "生成" in message:
-            response = self._mock_code_generation(message)
-        elif "测试" in message:
-            response = self._mock_test_execution(message)
-        else:
-            response = f"[模拟响应] 已收到您的消息。当前处于模拟模式，请配置 DeerFlow 以获得完整功能。\n\n原始消息: {message[:200]}..."
-        
-        return AgentResponse(
-            success=True,
-            message=response,
-            thread_id=thread_id,
-            data={"mode": "mock"}
-        )
-    
-    def _mock_stream(self, message: str, thread_id: Optional[str]):
-        """模拟 stream 响应"""
-        response = self._mock_chat(message, thread_id)
-        
-        # 模拟流式输出
-        words = response.message.split()
-        for i, word in enumerate(words):
-            yield {
-                "type": "messages-tuple",
-                "data": {
-                    "type": "ai",
-                    "content": word + " ",
-                    "id": f"mock-{i}"
-                }
-            }
-        
-        yield {
-            "type": "end",
-            "data": {}
-        }
-    
-    def _mock_requirement_analysis(self, message: str) -> str:
-        """模拟需求分析"""
-        return """## 需求分析结果
-
-**类型**: Bug（基于关键词检测）
-**优先级**: P2 - 中
-**置信度**: 0.75
-
-### 影响评估
-- 影响范围: 部分用户
-- 业务影响: 一般业务功能
-
-### 复杂度评估
-- 技术复杂度: 中等
-- 预估工作量: 2-3 天
-
-### 建议行动
-1. 分配给 BugFix Agent 处理
-2. 需要人工确认优先级
-
----
-*[模拟模式] 请配置 DeerFlow 获得真正的 AI 分析能力*
-"""
-    
-    def _mock_bugfix_solution(self, message: str) -> str:
-        """模拟 Bug 修复方案"""
-        return """## Bug 修复方案
-
-### 根因分析
-基于描述，问题可能出在参数验证逻辑。
-
-### 修复策略
-采用常规修复策略，风险可控。
-
-### 代码变更建议
-```python
-# 建议添加参数验证
-def validate_input(data):
-    if not data:
-        raise ValueError("参数不能为空")
-    return data
-```
-
-### 测试计划
-1. 单元测试：验证参数校验逻辑
-2. 集成测试：验证完整业务流程
-
-### 回滚方案
-如需回滚，执行 `git revert <commit-hash>`
-
----
-*[模拟模式] 请配置 DeerFlow 获得真正的 AI 分析能力*
-"""
-    
-    def _mock_feature_design(self, message: str) -> str:
-        """模拟功能设计"""
-        return """## 功能设计方案
-
-### 功能概述
-根据需求描述，设计新功能模块。
-
-### 技术架构
-- 前端: React + TypeScript
-- 后端: FastAPI + Python
-- 数据库: PostgreSQL
-
-### API 设计
-```
-POST /api/v1/resource
-GET /api/v1/resource/{id}
-PUT /api/v1/resource/{id}
-DELETE /api/v1/resource/{id}
-```
-
-### 实施计划
-1. 阶段一：数据模型设计（1天）
-2. 阶段二：API 实现（2天）
-3. 阶段三：前端页面（2天）
-4. 阶段四：测试和文档（1天）
-
----
-*[模拟模式] 请配置 DeerFlow 获得真正的 AI 分析能力*
-"""
-    
-    def _mock_code_generation(self, message: str) -> str:
-        """模拟代码生成"""
-        return """## 代码生成结果
-
-### 生成的文件
-
-**1. src/api/resource.py**
-```python
-from fastapi import APIRouter, HTTPException
-from typing import List
-
-router = APIRouter()
-
-@router.get("/resource")
-async def list_resources():
-    return {"items": []}
-
-@router.post("/resource")
-async def create_resource(data: dict):
-    return {"id": "new-id", **data}
-```
-
-**2. tests/test_resource.py**
-```python
-import pytest
-
-def test_list_resources():
-    # Test implementation
-    assert True
-
-def test_create_resource():
-    # Test implementation
-    assert True
-```
-
-### 质量检查
-- ✅ Lint 通过
-- ✅ 类型检查通过
-- ⚠️ 测试覆盖率: 60%（建议提升）
-
----
-*[模拟模式] 请配置 DeerFlow 获得真正的 AI 分析能力*
-"""
-    
-    def _mock_test_execution(self, message: str) -> str:
-        """模拟测试执行"""
-        return """## 测试执行结果
-
-### 汇总
-- 总计: 50
-- 通过: 48
-- 失败: 1
-- 跳过: 1
-- 耗时: 12.3s
-
-### 覆盖率
-- 行覆盖: 82.5%
-- 分支覆盖: 75.0%
-
-### 失败用例
-```
-FAILED tests/test_api.py::test_edge_case
-  AssertionError: expected 200, got 400
-```
-
-### 建议
-1. 修复 test_edge_case 中的断言问题
-2. 补充边界条件测试
-
-### 质量门禁
-- ✅ 覆盖率 > 80%
-- ❌ 无失败用例
-- ✅ 执行时间 < 5min
-
-**结论**: 需要修复失败用例后才能合并
-
----
-*[模拟模式] 请配置 DeerFlow 获得真正的 AI 分析能力*
-"""
 
 
 # 单例实例

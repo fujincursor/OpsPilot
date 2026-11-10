@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import type { ReviewItem, ReviewComment, ReviewDecision, ReviewItemType } from '../types'
-import { reviewService } from '../services'
+import type { BugFixSolution, CodeGenTask, FeatureDesignSolution, ReviewItem, ReviewComment, ReviewDecision, ReviewItemType, TestTask } from '../types'
+import { codegenService, reviewService, solutionService, testService } from '../services'
 import {
   ReviewStatusBadge,
   ReviewActions,
@@ -16,67 +16,6 @@ const typeConfig: Record<ReviewItemType, { icon: string; label: string }> = {
   code: { icon: '💻', label: '代码审核' },
   test: { icon: '🧪', label: '测试审核' },
 }
-
-const mockReview: ReviewItem = {
-  id: '1',
-  item_type: 'solution',
-  item_id: 'sol-1',
-  project_id: '1',
-  title: '用户登录超时问题修复方案',
-  description: `## 问题描述
-用户反馈登录后约10分钟就会被强制登出，需要重新登录。
-
-## 原因分析
-1. Session 超时时间设置过短（默认 10 分钟）
-2. Token 刷新机制存在问题，前端未正确处理 refresh token
-
-## 修复方案
-1. 将 Session 超时时间延长至 30 分钟
-2. 实现自动 Token 刷新机制
-3. 添加用户活动检测，有活动时自动延长会话
-
-## 影响范围
-- 用户服务模块
-- 认证中间件
-- 前端 axios 拦截器
-
-## 测试计划
-1. 单元测试：Token 刷新逻辑
-2. 集成测试：完整登录流程
-3. 压力测试：并发场景下的会话管理`,
-  status: 'pending',
-  priority: 'high',
-  reviewer: '张三',
-  comments_count: 3,
-  created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
-  due_at: new Date(Date.now() + 4 * 3600000).toISOString(),
-}
-
-const mockComments: ReviewComment[] = [
-  {
-    id: '1',
-    review_item_id: '1',
-    author: '李四',
-    content: '方案整体思路清晰，但建议补充一下并发情况下的处理逻辑。',
-    created_at: new Date(Date.now() - 1 * 3600000).toISOString(),
-  },
-  {
-    id: '2',
-    review_item_id: '1',
-    author: '王五',
-    content: 'Token 刷新机制需要考虑网络延迟的情况，建议增加重试机制。',
-    created_at: new Date(Date.now() - 30 * 60000).toISOString(),
-  },
-  {
-    id: '3',
-    review_item_id: '1',
-    author: '张三',
-    content: '已补充并发处理和网络重试的说明，请查看更新版本。',
-    created_at: new Date(Date.now() - 15 * 60000).toISOString(),
-  },
-]
-
-const mockDecisions: ReviewDecision[] = []
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString('zh-CN', {
@@ -103,12 +42,29 @@ export default function ReviewDetail() {
   const [isCommentsLoading, setIsCommentsLoading] = useState(true)
   const [modalType, setModalType] = useState<'approve' | 'reject' | 'revision' | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [solutionBody, setSolutionBody] = useState<BugFixSolution | FeatureDesignSolution | null>(null)
+  const [codeBody, setCodeBody] = useState<CodeGenTask | null>(null)
+  const [testBody, setTestBody] = useState<TestTask | null>(null)
 
   useEffect(() => {
     if (reviewId) {
       loadReviewDetail(reviewId)
     }
   }, [reviewId])
+
+  useEffect(() => {
+    if (!review) return
+    setSolutionBody(null)
+    setCodeBody(null)
+    setTestBody(null)
+    if (review.item_type === 'solution') {
+      solutionService.getSolution(review.item_id).then(setSolutionBody).catch(() => setSolutionBody(null))
+    } else if (review.item_type === 'code') {
+      codegenService.getTaskStatus(review.item_id).then(setCodeBody).catch(() => setCodeBody(null))
+    } else {
+      testService.getTestTask(review.item_id).then(setTestBody).catch(() => setTestBody(null))
+    }
+  }, [review])
 
   const loadReviewDetail = async (id: string) => {
     setIsLoading(true)
@@ -122,11 +78,11 @@ export default function ReviewDetail() {
       setReview(reviewData)
       setComments(commentsData)
       setDecisions(decisionsData)
-    } catch {
-      console.log('Using mock data')
-      setReview(mockReview)
-      setComments(mockComments)
-      setDecisions(mockDecisions)
+    } catch (error) {
+      console.error(error)
+      setReview(null)
+      setComments([])
+      setDecisions([])
     } finally {
       setIsLoading(false)
       setIsCommentsLoading(false)
@@ -138,15 +94,8 @@ export default function ReviewDetail() {
     try {
       const newComment = await reviewService.addComment(reviewId, content)
       setComments((prev) => [...prev, newComment])
-    } catch {
-      const mockComment: ReviewComment = {
-        id: String(Date.now()),
-        review_item_id: reviewId,
-        author: '当前用户',
-        content,
-        created_at: new Date().toISOString(),
-      }
-      setComments((prev) => [...prev, mockComment])
+    } catch (error) {
+      console.error(error)
     }
   }
 
@@ -171,23 +120,8 @@ export default function ReviewDetail() {
         revision: 'revision_requested',
       } as const
       setReview((prev) => prev ? { ...prev, status: statusMap[modalType] } : null)
-    } catch {
-      const mockDecision: ReviewDecision = {
-        id: String(Date.now()),
-        review_item_id: reviewId,
-        decision: modalType === 'approve' ? 'approved' : modalType === 'reject' ? 'rejected' : 'revision_requested',
-        reviewer: '当前用户',
-        reason,
-        created_at: new Date().toISOString(),
-      }
-      setDecisions((prev) => [mockDecision, ...prev])
-
-      const statusMap = {
-        approve: 'approved',
-        reject: 'rejected',
-        revision: 'revision_requested',
-      } as const
-      setReview((prev) => prev ? { ...prev, status: statusMap[modalType] } : null)
+    } catch (error) {
+      console.error(error)
     } finally {
       setIsSubmitting(false)
       setModalType(null)
@@ -265,6 +199,15 @@ export default function ReviewDetail() {
                   </span>
                 )}
                 {review.reviewer && <span>审核人: {review.reviewer}</span>}
+                {review.session_id && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/chat/${review.session_id}`)}
+                    className="text-primary hover:underline"
+                  >
+                    回到对话
+                  </button>
+                )}
               </div>
 
               <div className="prose prose-sm max-w-none">
@@ -272,6 +215,39 @@ export default function ReviewDetail() {
                   {review.description}
                 </div>
               </div>
+
+              {review.item_type === 'solution' && solutionBody && (
+                <div className="mt-4 rounded-lg border border-gray-200 p-4 text-sm">
+                  {'root_cause' in solutionBody && solutionBody.root_cause && (
+                    <p className="mb-2 text-gray-700">根因：{solutionBody.root_cause}</p>
+                  )}
+                  <p className="mb-2 text-gray-500">涉及文件</p>
+                  <ul className="space-y-1 font-mono text-xs text-gray-700">
+                    {(solutionBody.affected_files || []).map((file) => <li key={file}>{file}</li>)}
+                    {(solutionBody.affected_files || []).length === 0 && <li>没有记录文件</li>}
+                  </ul>
+                </div>
+              )}
+              {review.item_type === 'code' && codeBody && (
+                <div className="mt-4 rounded-lg border border-gray-200 p-4 text-sm">
+                  <p className="mb-2">语法检查：{codeBody.lint_result ? (codeBody.lint_result.passed ? '通过' : '未通过') : '尚未检查'}</p>
+                  <ul className="space-y-1 font-mono text-xs text-gray-700">
+                    {codeBody.files.map((file) => <li key={file.path}>{file.action} {file.path}</li>)}
+                  </ul>
+                  {(codeBody.lint_result?.errors || []).map((error) => (
+                    <p key={`${error.file}-${error.line}`} className="mt-2 text-xs text-red-600">{error.file}:{error.line} {error.message}</p>
+                  ))}
+                </div>
+              )}
+              {review.item_type === 'test' && testBody && (
+                <div className="mt-4 rounded-lg border border-gray-200 p-4 text-sm">
+                  <p className="mb-2 text-gray-600">测试结果按质量门禁展示，不额外等待人工审批。</p>
+                  <p>通过 {testBody.results.filter((item) => item.status === 'passed').length} / {testBody.results.length || testBody.test_cases.length}，覆盖率 {testBody.coverage}%</p>
+                  {testBody.results.filter((item) => item.status === 'failed').map((item) => (
+                    <p key={item.test_case_id} className="mt-2 text-xs text-red-600">{item.test_case_id} {item.error_message || '失败'}</p>
+                  ))}
+                </div>
+              )}
 
               {canReview && (
                 <div className="mt-6 pt-6 border-t border-gray-100">

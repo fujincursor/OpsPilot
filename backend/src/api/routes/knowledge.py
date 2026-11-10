@@ -95,6 +95,19 @@ async def update_knowledge_base(
     return kb
 
 
+@router.post(
+    "/knowledge/{kb_id}/index",
+    response_model=KnowledgeBase,
+    summary="触发索引",
+)
+async def start_knowledge_index(kb_id: UUID) -> KnowledgeBase:
+    """按知识库上的范围和策略记录一次索引任务。"""
+    kb = knowledge_service.start_index(kb_id)
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    return kb
+
+
 @router.delete(
     "/knowledge/{kb_id}",
     status_code=204,

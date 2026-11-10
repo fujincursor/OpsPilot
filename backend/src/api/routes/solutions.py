@@ -179,21 +179,9 @@ async def update_solution_status(
     solution_id: UUID,
     data: SolutionStatusUpdate,
 ) -> Union[Solution, BugFixSolution, FeatureDesignSolution]:
-    """
-    更新方案状态
-
-    状态流转：
-    - draft -> pending_review: 提交审核
-    - pending_review -> approved: 审核通过
-    - pending_review -> rejected: 审核拒绝
-    - approved -> implemented: 已实施
-
-    审核操作可附带审核意见。
-
-    - **solution_id**: 方案 ID
-    - **status**: 新状态
-    - **review_comment**: 审核意见（可选）
-    """
+    """方案通过、拒绝和完成只能由审核决定推进。"""
+    if data.status in {SolutionStatus.APPROVED, SolutionStatus.REJECTED, SolutionStatus.IMPLEMENTED}:
+        raise HTTPException(status_code=409, detail="方案状态只能通过审核决定变更")
     solution = solution_service.update_solution_status(
         solution_id=solution_id,
         status=data.status,

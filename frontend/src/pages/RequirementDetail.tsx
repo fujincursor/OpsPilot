@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import type { Requirement, RequirementStatus, StatusHistoryItem, Solution } from '../types'
-import { requirementService, solutionService } from '../services'
+import { requirementService, solutionService, authService } from '../services'
 import {
   TypeIcon,
   PriorityBadge,
@@ -11,75 +11,7 @@ import {
   statusConfig,
 } from '../components/Requirements'
 import { SolutionCard, GenerateButton } from '../components/Solutions'
-
-const mockRequirement: Requirement = {
-  id: '1',
-  project_id: '1',
-  title: '用户登录超时问题',
-  description: '用户反馈登录后10分钟就会被强制登出，需要重新登录。\n\n问题描述：\n1. 用户正常登录后，大约10分钟内会被强制登出\n2. 此时 Token 应该还在有效期内（设置为30分钟）\n3. 问题在高并发时更容易出现\n\n预期效果：\n用户登录后应保持30分钟的会话有效期，除非手动登出。',
-  source: 'BUG-2024-001',
-  type: 'bug',
-  priority: 'high',
-  status: 'coding',
-  assignee: '张三',
-  created_by: 'admin',
-  analysis_result: {
-    type: 'bug',
-    priority: 'high',
-    keywords: ['登录', '超时', '登出', 'Token', '会话'],
-    confidence: 0.92,
-  },
-  created_at: '2024-03-15T10:30:00Z',
-  updated_at: '2024-03-16T14:20:00Z',
-}
-
-const mockHistory: StatusHistoryItem[] = [
-  {
-    status: 'pending',
-    changed_at: '2024-03-15T10:30:00Z',
-    changed_by: 'admin',
-    comment: '需求已创建',
-  },
-  {
-    status: 'analyzing',
-    changed_at: '2024-03-15T11:00:00Z',
-    changed_by: 'system',
-    comment: 'AI 分析完成，识别为高优先级 Bug',
-  },
-  {
-    status: 'reviewing',
-    changed_at: '2024-03-15T14:30:00Z',
-    changed_by: 'pm',
-    comment: '分析结果已确认，待分配开发人员',
-  },
-  {
-    status: 'coding',
-    changed_at: '2024-03-16T09:00:00Z',
-    changed_by: '张三',
-    comment: '已开始修复，预计今天完成',
-  },
-]
-
-const mockTeamMembers = ['张三', '李四', '王五', '赵六', '孙七']
-
-const mockSolutions: Solution[] = [
-  {
-    id: 'sol-1',
-    requirement_id: '1',
-    type: 'bug_fix',
-    title: '修复用户登录超时问题',
-    content: '通过优化 Token 刷新机制和会话管理来解决用户登录后过早被登出的问题。',
-    impact_analysis: '本次修复主要影响认证模块和会话管理模块。',
-    affected_files: [
-      'src/services/authService.ts',
-      'src/utils/tokenManager.ts',
-      'src/middleware/authMiddleware.ts',
-    ],
-    status: 'pending_review',
-    created_by_agent: 'BugFix Agent',
-    created_at: '2024-03-16T15:30:00Z',
-  },
-]
+import FlowStateBanner from '../components/FlowStateBanner'
 
 export default function RequirementDetail() {
   const { reqId } = useParams<{ reqId: string }>()
@@ -91,8 +23,17 @@ export default function RequirementDetail() {
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [showStatusModal, setShowStatusModal] = useState(false)
   const [solutions, setSolutions] = useState<Solution[]>([])
+  const [teamMembers, setTeamMembers] = useState<string[]>([])
   const [isGeneratingSolution, setIsGeneratingSolution] = useState(false)
   const [isLoadingSolutions, setIsLoadingSolutions] = useState(false)
+  const [solutionError, setSolutionError] = useState<string | null>(null)
+  const [generateError, setGenerateError] = useState('')
+
+  useEffect(() => {
+    authService.listUsers()
+      .then((users) => setTeamMembers(users.map((user) => user.username)))
+      .catch(() => setTeamMembers([]))
+  }, [])
 
   useEffect(() => {
     if (reqId) {
@@ -103,16 +44,19 @@ export default function RequirementDetail() {
   const loadRequirement = async (id: string) => {
     setIsLoading(true)
     try {
-      const [req, hist] = await Promise.all([
-        requirementService.getRequirement(id),
-        requirementService.getStatusHistory(id),
-      ])
+      const req = await requirementService.getRequirement(id)
       setRequirement(req)
-      setHistory(hist)
-    } catch {
-      console.log('Using mock data')
-      setRequirement(mockRequirement)
-      setHistory(mockHistory)
+      setHistory([
+        {
+          status: req.status,
+          changed_at: req.updated_at || req.created_at,
+          changed_by: req.created_by || '',
+        },
+      ])
+    } catch (error) {
+      console.error(error)
+      setRequirement(null)
+      setHistory([])
     } finally {
       setIsLoading(false)
     }
@@ -121,12 +65,14 @@ export default function RequirementDetail() {
 
   const loadSolutions = async (id: string) => {
     setIsLoadingSolutions(true)
+    setSolutionError(null)
     try {
       const data = await solutionService.getSolutions(id)
       setSolutions(data)
-    } catch {
-      console.log('Using mock solutions')
-      setSolutions(mockSolutions)
+    } catch (error) {
+      console.error(error)
+      setSolutions([])
+      setSolutionError('会话记录/解决方案加载失败，请检查网络或稍后重试')
     } finally {
       setIsLoadingSolutions(false)
     }
@@ -135,54 +81,38 @@ export default function RequirementDetail() {
   const handleGenerateSolution = async () => {
     if (!reqId) return
     setIsGeneratingSolution(true)
+    setGenerateError('')
     try {
       const newSolution = await solutionService.generateSolution(reqId)
       setSolutions((prev) => [newSolution, ...prev])
-    } catch {
-      const mockNewSolution: Solution = {
-        id: `sol-${Date.now()}`,
-        requirement_id: reqId,
-        type: requirement?.type === 'bug' ? 'bug_fix' : 'feature_design',
-        title: `${requirement?.type === 'bug' ? '修复' : '实现'}：${requirement?.title}`,
-        content: '基于需求分析，AI 生成了以下解决方案...',
-        impact_analysis: '该方案将影响以下模块...',
-        affected_files: ['src/example.ts'],
-        status: 'draft',
-        created_by_agent: requirement?.type === 'bug' ? 'BugFix Agent' : 'Feature Agent',
-        created_at: new Date().toISOString(),
-      }
-      setSolutions((prev) => [mockNewSolution, ...prev])
+      setSolutionError(null)
+    } catch (error) {
+      console.error(error)
+      const detail = typeof error === 'object' && error && 'response' in error
+        ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
+        : ''
+      setGenerateError(detail || '方案生成失败，请查看原因后重试')
     } finally {
       setIsGeneratingSolution(false)
     }
   }
 
-  const handleUpdateStatus = async (newStatus: RequirementStatus, comment?: string) => {
+  const handleUpdateStatus = async (newStatus: RequirementStatus, _comment?: string) => {
     if (!reqId || !requirement) return
     setIsUpdatingStatus(true)
     try {
-      const updated = await requirementService.updateStatus(reqId, newStatus, comment)
+      const updated = await requirementService.updateStatus(reqId, newStatus)
       setRequirement(updated)
       setHistory((prev) => [
         ...prev,
         {
-          status: newStatus,
-          changed_at: new Date().toISOString(),
-          changed_by: 'current_user',
-          comment,
+          status: updated.status,
+          changed_at: updated.updated_at || new Date().toISOString(),
+          changed_by: updated.created_by || '',
         },
       ])
-    } catch {
-      setRequirement((prev) => prev ? { ...prev, status: newStatus } : null)
-      setHistory((prev) => [
-        ...prev,
-        {
-          status: newStatus,
-          changed_at: new Date().toISOString(),
-          changed_by: 'current_user',
-          comment,
-        },
-      ])
+    } catch (error) {
+      console.error(error)
     } finally {
       setIsUpdatingStatus(false)
       setShowStatusModal(false)
@@ -194,8 +124,8 @@ export default function RequirementDetail() {
     try {
       const updated = await requirementService.assignRequirement(reqId, assignee)
       setRequirement(updated)
-    } catch {
-      setRequirement((prev) => prev ? { ...prev, assignee } : null)
+    } catch (error) {
+      console.error(error)
     } finally {
       setShowAssignModal(false)
     }
@@ -319,13 +249,37 @@ export default function RequirementDetail() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {requirement.analysis_result && (
-            <div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <section className="bg-white rounded-xl border border-gray-200 p-4">
+            <h2 className="text-sm font-semibold text-gray-800 mb-2">基本信息</h2>
+            <p className="text-sm text-gray-600 whitespace-pre-wrap">{requirement.description}</p>
+          </section>
+          <section className="bg-white rounded-xl border border-gray-200 p-4">
+            <h2 className="text-sm font-semibold text-gray-800 mb-2">分析结果</h2>
+            {requirement.analysis_result ? (
               <AnalysisCard analysis={requirement.analysis_result} />
-            </div>
-          )}
+            ) : (
+              <p className="text-sm text-gray-400">还没有分析结果</p>
+            )}
+          </section>
+          <section className="bg-white rounded-xl border border-gray-200 p-4">
+            <h2 className="text-sm font-semibold text-gray-800 mb-2">下一步</h2>
+            <p className="text-sm text-gray-600">
+              {requirement.type === 'question' && '咨询只回答，不生成方案或代码。'}
+              {requirement.type !== 'question' && requirement.status === 'reviewing' && '方案或代码正在等待人工审批。'}
+              {requirement.type !== 'question' && (requirement.status === 'pending' || requirement.status === 'analyzing' || requirement.status === 'designing') && '生成方案后进入审批。'}
+              {requirement.type !== 'question' && requirement.status === 'coding' && '代码生成和语法检查进行中，随后进入代码审批。'}
+              {requirement.type !== 'question' && requirement.status === 'testing' && '测试作为质量门禁自动执行。'}
+              {requirement.status === 'completed' && '流程已完成。'}
+              {requirement.status === 'closed' && '需求已关闭。'}
+            </p>
+            {solutions[0] && (
+              <button type="button" onClick={() => navigate(`/solutions/${solutions[0].id}`)} className="mt-3 text-sm text-primary">查看方案</button>
+            )}
+          </section>
+        </div>
 
+        <div className="mb-6">
           <StatusTimeline history={history} currentStatus={requirement.status} />
         </div>
 
@@ -346,7 +300,25 @@ export default function RequirementDetail() {
             />
           </div>
 
-          {isLoadingSolutions ? (
+          {isGeneratingSolution && (
+            <FlowStateBanner mode="running" title="正在生成方案" detail="生成完成后会出现在下方，并进入审批。" />
+          )}
+          {generateError && (
+            <FlowStateBanner mode="failed" title="方案生成失败" detail={generateError} onRetry={handleGenerateSolution} />
+          )}
+          {solutionError ? (
+            <div className="bg-white rounded-xl border border-red-200 p-8 text-center">
+              <div className="text-4xl mb-3">⚠️</div>
+              <h3 className="text-gray-800 font-medium mb-2">加载失败</h3>
+              <p className="text-sm text-red-600 mb-4">{solutionError}</p>
+              <button
+                onClick={() => reqId && loadSolutions(reqId)}
+                className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                重试
+              </button>
+            </div>
+          ) : isLoadingSolutions ? (
             <div className="flex items-center justify-center py-12">
               <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
@@ -373,7 +345,7 @@ export default function RequirementDetail() {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">分配负责人</h3>
             <div className="space-y-2">
-              {mockTeamMembers.map((member) => (
+              {teamMembers.map((member) => (
                 <button
                   key={member}
                   onClick={() => handleAssign(member)}
@@ -413,15 +385,15 @@ export default function RequirementDetail() {
                 return (
                   <button
                     key={status}
-                    onClick={() => handleUpdateStatus(status)}
                     disabled={isUpdatingStatus}
+                    onClick={() => handleUpdateStatus(status)}
                     className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
                       requirement.status === status
                         ? 'bg-primary-light border-2 border-primary'
                         : 'bg-gray-50 hover:bg-gray-100'
-                    } disabled:opacity-50`}
+                    }`}
                   >
-                    <span className={`w-2 h-2 rounded-full ${config.dotColor}`} />
+                    <span className={`w-2.5 h-2.5 rounded-full ${config.dotColor}`}></span>
                     <span className="text-sm font-medium text-gray-800">{config.label}</span>
                     {requirement.status === status && (
                       <span className="ml-auto text-primary">✓</span>

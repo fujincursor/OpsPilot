@@ -27,7 +27,7 @@ export default function CodeGenProgress({ status, className = '' }: CodeGenProgr
   const getStageStatus = (stageKey: CodeGenStatus) => {
     const stageOrder = statusOrder[stageKey]
     if (isFailed) return 'error'
-    if (stageOrder < currentOrder) return 'completed'
+    if (stageOrder < currentOrder || (status === 'completed' && stageOrder === currentOrder)) return 'completed'
     if (stageOrder === currentOrder) return 'active'
     return 'pending'
   }

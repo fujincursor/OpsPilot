@@ -4,54 +4,6 @@ import { ProjectCard, CreateProjectModal } from '../components/Projects'
 import type { Project, CreateProjectRequest } from '../types'
 import { projectService } from '../services'
 
-const mockProjects: Project[] = [
-  {
-    id: '1',
-    name: '用户服务系统',
-    description: '核心用户认证与授权服务，支持 OAuth2.0 和 SSO 登录',
-    repo_url: 'https://github.com/company/user-service',
-    status: 'active',
-    created_at: '2024-01-15T08:00:00Z',
-    updated_at: '2024-03-10T14:30:00Z',
-  },
-  {
-    id: '2',
-    name: '订单处理平台',
-    description: '电商订单全生命周期管理，包含库存同步和物流追踪',
-    repo_url: 'https://github.com/company/order-platform',
-    status: 'active',
-    created_at: '2024-02-20T10:00:00Z',
-    updated_at: '2024-03-08T09:15:00Z',
-  },
-  {
-    id: '3',
-    name: '数据分析引擎',
-    description: '实时数据处理和可视化报表生成',
-    repo_url: 'https://github.com/company/data-analytics',
-    status: 'inactive',
-    created_at: '2023-11-05T12:00:00Z',
-    updated_at: '2024-02-28T16:45:00Z',
-  },
-  {
-    id: '4',
-    name: '消息推送服务',
-    description: '多渠道消息推送（短信、邮件、App Push）',
-    repo_url: 'https://github.com/company/notification-service',
-    status: 'active',
-    created_at: '2024-03-01T09:00:00Z',
-    updated_at: '2024-03-10T11:20:00Z',
-  },
-  {
-    id: '5',
-    name: '旧版 CRM 系统',
-    description: '客户关系管理系统（已迁移至新平台）',
-    repo_url: 'https://github.com/company/legacy-crm',
-    status: 'archived',
-    created_at: '2022-06-10T08:00:00Z',
-    updated_at: '2023-12-15T18:00:00Z',
-  },
-]
-
 export default function Projects() {
   const navigate = useNavigate()
   const [projects, setProjects] = useState<Project[]>([])
@@ -67,11 +19,11 @@ export default function Projects() {
   const loadProjects = async () => {
     setIsLoading(true)
     try {
-      const response = await projectService.getProjects()
-      setProjects(response.data)
-    } catch {
-      console.log('Using mock data for development')
-      setProjects(mockProjects)
+      const items = await projectService.getProjects()
+      setProjects(items)
+    } catch (error) {
+      console.error(error)
+      setProjects([])
     } finally {
       setIsLoading(false)
     }
@@ -81,15 +33,8 @@ export default function Projects() {
     try {
       const newProject = await projectService.createProject(data)
       setProjects((prev) => [newProject, ...prev])
-    } catch {
-      const newProject: Project = {
-        id: Date.now().toString(),
-        ...data,
-        status: 'active',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-      setProjects((prev) => [newProject, ...prev])
+    } catch (error) {
+      console.error(error)
     }
   }
 

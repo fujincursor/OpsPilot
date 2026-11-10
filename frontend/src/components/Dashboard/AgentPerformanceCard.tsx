@@ -20,7 +20,9 @@ export default function AgentPerformanceCard({ data, title }: AgentPerformanceCa
     <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
       <h3 className="text-base font-semibold text-gray-800 mb-4">{title}</h3>
       <div className="space-y-4">
-        {data.map((agent) => {
+        {data.length === 0 ? (
+          <p className="text-sm text-gray-400">暂无 Agent 数据</p>
+        ) : data.map((agent) => {
           const config = agentConfig[agent.agent_type] || { 
             icon: '🤖', 
             name: agent.agent_type, 

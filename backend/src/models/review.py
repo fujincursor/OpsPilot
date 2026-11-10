@@ -84,6 +84,8 @@ class ReviewItemCreate(ReviewItemBase):
     item_type: ReviewItemType = Field(..., description="审核项类型")
     item_id: UUID = Field(..., description="关联对象 ID")
     project_id: UUID = Field(..., description="项目 ID")
+    requirement_id: Optional[UUID] = Field(None, description="关联需求 ID")
+    session_id: Optional[UUID] = Field(None, description="关联对话会话 ID")
     priority: ReviewPriority = Field(default=ReviewPriority.MEDIUM, description="优先级")
     due_at: Optional[datetime] = Field(None, description="截止时间")
 
@@ -103,6 +105,8 @@ class ReviewItem(ReviewItemBase):
     item_type: ReviewItemType = Field(..., description="审核项类型")
     item_id: UUID = Field(..., description="关联对象 ID")
     project_id: UUID = Field(..., description="项目 ID")
+    requirement_id: Optional[UUID] = Field(None, description="关联需求 ID")
+    session_id: Optional[UUID] = Field(None, description="关联对话会话 ID")
     status: ReviewStatus = Field(default=ReviewStatus.PENDING, description="审核状态")
     priority: ReviewPriority = Field(default=ReviewPriority.MEDIUM, description="优先级")
     reviewer: Optional[str] = Field(None, description="审核人")

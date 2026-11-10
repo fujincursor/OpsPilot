@@ -13,6 +13,7 @@ from ..models.requirement import (
     RequirementPriority,
     RequirementFilters,
 )
+from ..db import DocumentDict
 from .lead_agent_service import lead_agent_service
 
 if TYPE_CHECKING:
@@ -23,11 +24,14 @@ class RequirementService:
     """需求管理服务
 
     负责需求的 CRUD 操作，并集成 Lead Agent 进行智能分析。
-    当前使用内存存储，后续可替换为数据库实现。
+    需求数据保存在数据库中。
     """
 
     def __init__(self):
-        self._requirements: Dict[UUID, Requirement] = {}
+        self._requirements: Dict[UUID, Requirement] = DocumentDict(
+            "requirements",
+            model=Requirement,
+        )
         self._project_service: Optional["ProjectService"] = None
         self._init_demo_data()
 
@@ -76,6 +80,26 @@ class RequirementService:
             analysis_confidence=analysis.confidence,
         )
 
+        self._requirements[requirement.id] = requirement
+        return requirement
+
+    def bind_session(self, requirement_id: UUID, session_id: UUID) -> Optional[Requirement]:
+        """把需求关联到产生它的对话。"""
+        requirement = self.get(requirement_id)
+        if not requirement:
+            return None
+        requirement.session_id = session_id
+        requirement.updated_at = datetime.utcnow()
+        self._requirements[requirement.id] = requirement
+        return requirement
+
+    def set_auto_advance(self, requirement_id: UUID, enabled: bool) -> Optional[Requirement]:
+        """暂停或恢复自动推进。"""
+        requirement = self.get(requirement_id)
+        if not requirement:
+            return None
+        requirement.auto_advance = enabled
+        requirement.updated_at = datetime.utcnow()
         self._requirements[requirement.id] = requirement
         return requirement
 
@@ -178,6 +202,7 @@ class RequirementService:
                 requirement.priority = analysis.priority
 
         requirement.updated_at = datetime.utcnow()
+        self._requirements[requirement.id] = requirement
         return requirement
 
     def update_status(
@@ -200,6 +225,7 @@ class RequirementService:
 
         requirement.status = status
         requirement.updated_at = datetime.utcnow()
+        self._requirements[requirement.id] = requirement
         return requirement
 
     def assign(
@@ -226,6 +252,7 @@ class RequirementService:
         if requirement.status == RequirementStatus.PENDING:
             requirement.status = RequirementStatus.ANALYZING
 
+        self._requirements[requirement.id] = requirement
         return requirement
 
     def delete(self, requirement_id: UUID) -> bool:

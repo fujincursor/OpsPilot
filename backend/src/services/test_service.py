@@ -7,6 +7,9 @@
 - 触发 CI 流水线
 """
 
+import asyncio
+import json
+import re
 from datetime import datetime
 from typing import Dict, List, Optional, TYPE_CHECKING
 from uuid import UUID, uuid4
@@ -24,13 +27,93 @@ from ..models.test import (
     TestFilters,
     CIPipelineInfo,
 )
-from ..models.codegen import CodeGenTask, CodeGenStatus
+from ..models.codegen import CodeFile, CodeGenTask, CodeGenStatus, FileAction
+from ..db import DocumentDict
 from .agents.test_agent import test_agent_service
 from .sandbox_service import sandbox_service
 
 if TYPE_CHECKING:
     from .codegen_service import CodeGenService
     from .requirement_service import RequirementService
+
+
+CHECK_SCRIPT = r'''# -*- coding: utf-8 -*-
+import json
+import re
+import traceback
+from pathlib import Path
+
+FILES = __FILES__
+HEADER = __HEADER__
+APP = __APP__
+PYTHON_FILES = __PYTHON_FILES__
+RESULTS = []
+
+
+def run(name, fn):
+    try:
+        detail = fn()
+        RESULTS.append({"name": name, "status": "passed", "detail": detail or "通过"})
+    except Exception as exc:
+        RESULTS.append({
+            "name": name,
+            "status": "failed",
+            "detail": str(exc),
+            "trace": traceback.format_exc(),
+        })
+
+
+def test_sources_present():
+    missing = [rel for rel in FILES if not Path(rel).is_file() or Path(rel).stat().st_size == 0]
+    if missing:
+        raise AssertionError("沙箱里没有这些源码文件: " + ", ".join(missing))
+    return "沙箱中可以读到 %d 个源码文件" % len(FILES)
+
+
+def normalize(path):
+    path = path.split("?", 1)[0].strip()
+    if not path or path == "*":
+        return ""
+    if not path.startswith("/"):
+        path = "/" + path
+    return path.rstrip("/") or "/"
+
+
+def route_exists(link, routes):
+    for route in routes:
+        pattern = "^" + re.sub(r":[^/]+", "[^/]+", route) + "$"
+        if re.match(pattern, link):
+            return True
+    return False
+
+
+def test_routes():
+    header = Path(HEADER).read_text(encoding="utf-8")
+    app = Path(APP).read_text(encoding="utf-8")
+    links = [normalize(item) for item in re.findall(r"""\bto\s*=\s*["'](/[^"']+)["']""", header)]
+    links = [item for item in links if item]
+    routes = [normalize(item) for item in re.findall(r"""\bpath\s*=\s*["']([^"']+)["']""", app)]
+    routes = [item for item in routes if item]
+    missing = [link for link in links if not route_exists(link, routes)]
+    if missing:
+        raise AssertionError("导航没有对应页面路由: " + ", ".join(missing))
+    return "全部 %d 个导航都有对应路由" % len(links)
+
+
+def test_python_syntax():
+    import py_compile
+    for rel in PYTHON_FILES:
+        py_compile.compile(rel, doraise=True)
+    return "已检查 %d 个 Python 文件" % len(PYTHON_FILES)
+
+
+run("源码已复制到沙箱", test_sources_present)
+if HEADER and APP:
+    run("导航目标都已注册路由", test_routes)
+if PYTHON_FILES:
+    run("生成的 Python 文件可通过语法检查", test_python_syntax)
+print(json.dumps(RESULTS, ensure_ascii=False))
+'''
 
 
 class TestService:
@@ -45,10 +128,15 @@ class TestService:
     """
 
     def __init__(self):
-        self._tasks: Dict[UUID, TestTask] = {}
+        self._tasks: Dict[UUID, TestTask] = DocumentDict("test_tasks", model=TestTask)
         self._codegen_to_tests: Dict[UUID, List[UUID]] = {}
-        self._reports: Dict[UUID, TestReport] = {}
-        self._ci_pipelines: Dict[UUID, CIPipelineInfo] = {}
+        for task in self._tasks.values():
+            self._codegen_to_tests.setdefault(task.codegen_task_id, []).append(task.id)
+        self._reports: Dict[UUID, TestReport] = DocumentDict("test_reports", model=TestReport)
+        self._ci_pipelines: Dict[UUID, CIPipelineInfo] = DocumentDict(
+            "ci_pipelines",
+            model=CIPipelineInfo,
+        )
         self._codegen_service: Optional["CodeGenService"] = None
         self._requirement_service: Optional["RequirementService"] = None
 
@@ -212,30 +300,93 @@ class TestService:
             return task
 
         task.status = TestStatus.GENERATING
-        task.updated_at = datetime.utcnow()
+        self._save_task(task)
 
         try:
-            test_cases = test_agent_service.generate_test_cases(
-                code_files=codegen_task.files,
-                test_types=test_types or [TestCaseType.UNIT],
-            )
+            files = self._files_under_test(codegen_task)
+            test_cases = self._build_sandbox_cases(files)
             task.test_cases = test_cases
-
-        except Exception as e:
+            self._save_task(task)
+        except Exception as exc:
             task.status = TestStatus.FAILED
-            task.error_message = f"Test generation failed: {str(e)}"
-            task.updated_at = datetime.utcnow()
-            return task
+            task.error_message = f"Test generation failed: {exc}"
+            return self._save_task(task)
 
         if not test_cases:
-            task.status = TestStatus.COMPLETED
-            task.coverage = CoverageInfo()
-            task.updated_at = datetime.utcnow()
-            task.completed_at = datetime.utcnow()
-            return task
+            task.status = TestStatus.FAILED
+            task.error_message = "没有可执行的源码文件，无法运行测试"
+            return self._save_task(task)
 
-        task.status = TestStatus.RUNNING
+        return await self._run_cases_in_sandbox(task, files, test_cases)
+
+    def _save_task(self, task: TestTask) -> TestTask:
         task.updated_at = datetime.utcnow()
+        self._tasks[task.id] = task
+        return task
+
+    def _files_under_test(self, codegen_task: CodeGenTask) -> List[CodeFile]:
+        shown = self._codegen_service.for_display(codegen_task)
+        files = [item for item in shown.files if item.content.strip() and item.action != FileAction.DELETE]
+        if files:
+            return files
+        return [item for item in codegen_task.files if item.content.strip()]
+
+    def _build_sandbox_cases(self, files: List[CodeFile]) -> List[TestCase]:
+        header = next((item.path for item in files if item.path.endswith("Header.tsx")), "")
+        app = next((item.path for item in files if item.path.endswith("App.tsx")), "")
+        script = self._check_script(files, header, app)
+        cases = [
+            TestCase(
+                name="源码已复制到沙箱",
+                description="把被测源码写入临时沙箱，并确认文件可以读取",
+                type=TestCaseType.UNIT,
+                code=script,
+                expected_result="沙箱中能读到全部被测源码",
+                file_path="tests/run_checks.py",
+            )
+        ]
+        if header and app:
+            cases.append(TestCase(
+                name="导航目标都已注册路由",
+                description=f"检查 {header} 里的导航地址在 {app} 中都有对应路由",
+                type=TestCaseType.UNIT,
+                code="读取导航组件中的 to 地址，并与路由表中的 path 逐个对照。",
+                expected_result="每个导航地址都有已注册的页面路由",
+                file_path="tests/run_checks.py",
+            ))
+        python_files = [
+            item.path for item in files
+            if item.language == "python" and item.action in {FileAction.CREATE, FileAction.MODIFY}
+        ]
+        if python_files:
+            cases.append(TestCase(
+                name="生成的 Python 文件可通过语法检查",
+                description="使用当前 Python 解释器编译生成的 Python 文件",
+                type=TestCaseType.UNIT,
+                code="py_compile.compile(path, doraise=True)",
+                expected_result="生成的 Python 文件没有语法错误",
+                file_path="tests/run_checks.py",
+            ))
+        return cases
+
+    def _check_script(self, files: List[CodeFile], header: str, app: str) -> str:
+        python_files = [
+            item.path for item in files
+            if item.language == "python" and item.action in {FileAction.CREATE, FileAction.MODIFY}
+        ]
+        return CHECK_SCRIPT.replace("__FILES__", json.dumps([item.path for item in files], ensure_ascii=False)) \
+            .replace("__HEADER__", json.dumps(header, ensure_ascii=False)) \
+            .replace("__APP__", json.dumps(app, ensure_ascii=False)) \
+            .replace("__PYTHON_FILES__", json.dumps(python_files, ensure_ascii=False))
+
+    async def _run_cases_in_sandbox(
+        self,
+        task: TestTask,
+        files: List[CodeFile],
+        test_cases: List[TestCase],
+    ) -> TestTask:
+        task.status = TestStatus.RUNNING
+        self._save_task(task)
 
         project_id = task.requirement_id
         if self._requirement_service:
@@ -245,42 +396,99 @@ class TestService:
 
         sandbox = sandbox_service.create_sandbox(project_id)
         task.sandbox_id = sandbox.sandbox_id
+        self._save_task(task)
 
-        try:
-            for file in codegen_task.files:
-                sandbox_service.write_file(
-                    sandbox_id=sandbox.sandbox_id,
-                    path=file.path,
-                    content=file.content,
-                )
+        for item in files:
+            ok, message = sandbox_service.write_file(sandbox.sandbox_id, item.path, item.content)
+            if not ok:
+                task.status = TestStatus.FAILED
+                task.error_message = f"写入沙箱失败: {message}"
+                return self._save_task(task)
 
-            results, coverage = test_agent_service.execute_tests(
-                test_cases=test_cases,
-                sandbox_id=sandbox.sandbox_id,
-                sandbox_service=sandbox_service,
-            )
-            task.results = results
-            task.coverage = coverage
-
-            report = test_agent_service.generate_test_report(
-                task_id=task.id,
-                test_cases=test_cases,
-                results=results,
-                coverage=coverage,
-            )
-            self._reports[task.id] = report
-
-            task.status = TestStatus.COMPLETED
-            task.completed_at = datetime.utcnow()
-            task.updated_at = datetime.utcnow()
-
-            return task
-
-        except Exception as e:
+        script = test_cases[0].code
+        ok, message = sandbox_service.write_file(sandbox.sandbox_id, "tests/run_checks.py", script)
+        if not ok:
             task.status = TestStatus.FAILED
-            task.error_message = f"Test execution failed: {str(e)}"
-            task.updated_at = datetime.utcnow()
-            return task
+            task.error_message = f"写入测试脚本失败: {message}"
+            return self._save_task(task)
+
+        started = datetime.utcnow()
+        execution = await asyncio.to_thread(
+            sandbox_service.execute_command,
+            sandbox.sandbox_id,
+            [sandbox_service.python_executable(), "tests/run_checks.py"],
+            60,
+        )
+        duration_ms = max(execution.duration_ms, int((datetime.utcnow() - started).total_seconds() * 1000))
+        parsed = self._parse_check_output(execution.stdout)
+        if not parsed:
+            task.results = [
+                TestResult(
+                    test_case_id=case.id,
+                    status=TestResultStatus.FAILED,
+                    actual_result=(execution.stdout or "")[:1000],
+                    error_message=(execution.stderr or "沙箱没有返回测试结果")[:1000],
+                    stack_trace=execution.stderr or None,
+                    duration_ms=duration_ms,
+                )
+                for case in test_cases
+            ]
+        else:
+            by_name = {item.get("name"): item for item in parsed}
+            share = max(duration_ms // max(len(test_cases), 1), 1)
+            task.results = []
+            for case in test_cases:
+                item = by_name.get(case.name)
+                if item is None:
+                    task.results.append(TestResult(
+                        test_case_id=case.id,
+                        status=TestResultStatus.FAILED,
+                        error_message="沙箱结果中没有这条用例",
+                        duration_ms=share,
+                    ))
+                    continue
+                status = TestResultStatus.PASSED if item.get("status") == "passed" else TestResultStatus.FAILED
+                task.results.append(TestResult(
+                    test_case_id=case.id,
+                    status=status,
+                    actual_result=str(item.get("detail") or "")[:1000],
+                    error_message=None if status == TestResultStatus.PASSED else str(item.get("detail") or "测试失败")[:1000],
+                    stack_trace=item.get("trace"),
+                    duration_ms=share,
+                ))
+
+        passed = sum(1 for item in task.results if item.status == TestResultStatus.PASSED)
+        total_lines = sum(len(item.content.splitlines()) for item in files)
+        covered = int(total_lines * passed / len(task.results)) if task.results else 0
+        task.coverage = CoverageInfo(
+            lines_total=total_lines,
+            lines_covered=covered,
+            lines_percent=(covered / total_lines * 100) if total_lines else 0,
+            functions_total=len(test_cases),
+            functions_covered=passed,
+            functions_percent=(passed / len(test_cases) * 100) if test_cases else 0,
+        )
+        report = test_agent_service.generate_test_report(
+            task_id=task.id,
+            test_cases=test_cases,
+            results=task.results,
+            coverage=task.coverage,
+        )
+        self._reports[task.id] = report
+        task.status = TestStatus.COMPLETED
+        task.completed_at = datetime.utcnow()
+        task.error_message = None
+        return self._save_task(task)
+
+    def _parse_check_output(self, stdout: str) -> List[dict]:
+        match = re.search(r"(\[\s*\{.*\}\s*\])\s*$", stdout or "", re.DOTALL)
+        if not match:
+            return []
+        try:
+            data = json.loads(match.group(1))
+        except json.JSONDecodeError:
+            return []
+        return data if isinstance(data, list) else []
 
     def get_test_cases(self, task_id: UUID) -> Optional[List[TestCase]]:
         """获取测试用例列表
@@ -369,54 +577,10 @@ class TestService:
         if not tests_to_run:
             return task
 
-        task.status = TestStatus.RUNNING
-        task.updated_at = datetime.utcnow()
-
-        if not task.sandbox_id:
-            project_id = task.requirement_id
-            if self._requirement_service:
-                requirement = self._requirement_service.get(task.requirement_id)
-                if requirement:
-                    project_id = requirement.project_id
-            sandbox = sandbox_service.create_sandbox(project_id)
-            task.sandbox_id = sandbox.sandbox_id
-
-        try:
-            results, coverage = test_agent_service.execute_tests(
-                test_cases=tests_to_run,
-                sandbox_id=task.sandbox_id,
-                sandbox_service=sandbox_service,
-            )
-
-            if test_case_ids:
-                existing_results = {r.test_case_id: r for r in task.results}
-                for result in results:
-                    existing_results[result.test_case_id] = result
-                task.results = list(existing_results.values())
-            else:
-                task.results = results
-
-            task.coverage = coverage
-
-            report = test_agent_service.generate_test_report(
-                task_id=task.id,
-                test_cases=task.test_cases,
-                results=task.results,
-                coverage=task.coverage,
-            )
-            self._reports[task.id] = report
-
-            task.status = TestStatus.COMPLETED
-            task.completed_at = datetime.utcnow()
-            task.updated_at = datetime.utcnow()
-
-            return task
-
-        except Exception as e:
-            task.status = TestStatus.FAILED
-            task.error_message = f"Test rerun failed: {str(e)}"
-            task.updated_at = datetime.utcnow()
-            return task
+        codegen_task = self._codegen_service.get_task(task.codegen_task_id) if self._codegen_service else None
+        files = self._files_under_test(codegen_task) if codegen_task else []
+        cases = tests_to_run if test_case_ids else task.test_cases
+        return await self._run_cases_in_sandbox(task, files, cases)
 
     def submit_test_review(
         self,
@@ -445,28 +609,44 @@ class TestService:
         if report and report.failed > 0 and not approve_with_failures:
             return None
 
-        task.updated_at = datetime.utcnow()
-
+        task = self._save_task(task)
+        self._create_review_item(task, report, reviewer_notes)
         return task
 
-    def trigger_ci_pipeline(
+    def _create_review_item(self, task: TestTask, report: Optional[TestReport], notes: Optional[str]) -> None:
+        from .hitl_service import hitl_service
+        from ..models.review import ReviewItemCreate, ReviewItemType, ReviewPriority
+
+        requirement = self._requirement_service.get(task.requirement_id) if self._requirement_service else None
+        if not requirement:
+            return
+
+        summary = ""
+        if report:
+            summary = f"通过 {report.passed} 个，失败 {report.failed} 个，覆盖率 {report.coverage_percent:.1f}%。"
+        description = "\n".join(part for part in (summary, notes or "测试已完成，等待审核。") if part)
+        hitl_service.create_review_item(
+            item_type=ReviewItemType.TEST,
+            item_id=task.id,
+            data=ReviewItemCreate(
+                title=f"测试审核：{requirement.title}"[:200],
+                description=description[:5000],
+                item_type=ReviewItemType.TEST,
+                item_id=task.id,
+                project_id=requirement.project_id,
+                priority=ReviewPriority.MEDIUM,
+            ),
+        )
+
+    async def trigger_ci_pipeline(
         self,
         task_id: UUID,
         target_branch: str = "main",
         run_full_suite: bool = False,
         extra_args: Optional[Dict[str, str]] = None,
     ) -> Optional[CIPipelineInfo]:
-        """触发 CI 流水线
-
-        Args:
-            task_id: 测试任务 ID
-            target_branch: 目标分支
-            run_full_suite: 是否运行完整测试套件
-            extra_args: 额外参数
-
-        Returns:
-            CIPipelineInfo: CI 流水线信息
-        """
+        """在沙箱中重新运行检查，并把结果记成一条流水线。"""
+        del target_branch, run_full_suite, extra_args
         task = self._tasks.get(task_id)
         if not task:
             return None
@@ -474,25 +654,68 @@ class TestService:
         if task.status != TestStatus.COMPLETED:
             return None
 
-        pipeline_id = f"pipeline-{uuid4().hex[:8]}"
-
-        pipeline_info = CIPipelineInfo(
-            pipeline_id=pipeline_id,
-            status="pending",
-            url=f"https://ci.example.com/pipelines/{pipeline_id}",
+        pipeline = CIPipelineInfo(
+            pipeline_id=f"pipeline-{uuid4().hex[:8]}",
+            status="running",
             stages=[
-                {"name": "build", "status": "pending"},
-                {"name": "test", "status": "pending"},
-                {"name": "deploy", "status": "pending"},
+                {"name": "准备源码", "status": "running", "detail": "正在把源码写入沙箱"},
+                {"name": "运行检查", "status": "pending", "detail": "等待源码准备完成"},
             ],
         )
+        task.ci_pipeline_id = pipeline.pipeline_id
+        self._save_task(task)
+        self._ci_pipelines[task.id] = pipeline
 
-        task.ci_pipeline_id = pipeline_id
-        task.updated_at = datetime.utcnow()
+        codegen_task = self._codegen_service.get_task(task.codegen_task_id) if self._codegen_service else None
+        files = self._files_under_test(codegen_task) if codegen_task else []
+        try:
+            task = await self._run_cases_in_sandbox(task, files, task.test_cases)
+        except Exception as exc:
+            pipeline.status = "failed"
+            pipeline.completed_at = datetime.utcnow()
+            pipeline.stages = [
+                {"name": "准备源码", "status": "failed", "detail": str(exc)},
+                {"name": "运行检查", "status": "skipped", "detail": "检查没有开始"},
+            ]
+            self._ci_pipelines[task.id] = pipeline
+            return pipeline
 
-        self._ci_pipelines[task.id] = pipeline_info
+        pipeline.stages = self._ci_stages(task)
+        pipeline.status = "passed" if all(stage["status"] == "passed" for stage in pipeline.stages) else "failed"
+        pipeline.completed_at = datetime.utcnow()
+        self._ci_pipelines[task.id] = pipeline
+        return pipeline
 
-        return pipeline_info
+    def _ci_stages(self, task: TestTask) -> List[dict]:
+        by_case = {item.test_case_id: item for item in task.results}
+        source_cases = [case for case in task.test_cases if case.name == "源码已复制到沙箱"]
+        check_cases = [case for case in task.test_cases if case.name != "源码已复制到沙箱"]
+
+        def describe(cases: List[TestCase]) -> tuple[str, str]:
+            if not cases:
+                return "failed", task.error_message or "没有可执行的检查"
+            messages = []
+            failed = False
+            for case in cases:
+                result = by_case.get(case.id)
+                if result is None or result.status != TestResultStatus.PASSED:
+                    failed = True
+                    messages.append(result.error_message or result.actual_result or case.name if result else case.name)
+                elif result.actual_result:
+                    messages.append(result.actual_result)
+            return ("failed" if failed else "passed"), "；".join(message for message in messages if message)
+
+        source_status, source_detail = describe(source_cases)
+        if source_status != "passed":
+            return [
+                {"name": "准备源码", "status": source_status, "detail": source_detail},
+                {"name": "运行检查", "status": "skipped", "detail": "源码没有准备好，检查未执行"},
+            ]
+        check_status, check_detail = describe(check_cases)
+        return [
+            {"name": "准备源码", "status": source_status, "detail": source_detail},
+            {"name": "运行检查", "status": check_status, "detail": check_detail},
+        ]
 
     def get_ci_pipeline_status(self, task_id: UUID) -> Optional[CIPipelineInfo]:
         """获取 CI 流水线状态

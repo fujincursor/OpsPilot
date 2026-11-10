@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import type { TestTask, TestReport, TestStatus } from '../types'
+import type { CIPipeline, TestTask, TestReport, TestStatus } from '../types'
 import { testService } from '../services'
 import {
   TestStatusBadge,
@@ -8,130 +8,7 @@ import {
   TestReportCard,
   TestCaseList,
 } from '../components/Tests'
-
-const mockTestTask: TestTask = {
-  id: 'test-1',
-  codegen_task_id: 'cg-1',
-  requirement_id: 'req-1',
-  status: 'completed',
-  test_cases: [
-    {
-      id: 'tc-1',
-      name: 'refreshToken should return new token',
-      description: '测试 refreshToken 函数能正确刷新并返回新的 token',
-      type: 'unit',
-      code: `describe('refreshToken', () => {
-  it('should return new token when refresh succeeds', async () => {
-    fetchMock.mockResponseOnce(JSON.stringify({ token: 'new-token' }));
-    const result = await refreshToken();
-    expect(result).toBe('new-token');
-  });
-});`,
-      expected_result: 'new-token',
-    },
-    {
-      id: 'tc-2',
-      name: 'refreshToken should handle concurrent requests',
-      description: '测试并发请求时只发送一次刷新请求',
-      type: 'unit',
-      code: `describe('refreshToken concurrent', () => {
-  it('should only make one request for concurrent calls', async () => {
-    fetchMock.mockResponseOnce(JSON.stringify({ token: 'token' }));
-    const results = await Promise.all([refreshToken(), refreshToken()]);
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(results).toEqual(['token', 'token']);
-  });
-});`,
-      expected_result: '只调用一次 fetch',
-    },
-    {
-      id: 'tc-3',
-      name: 'isTokenExpiring should detect expiring token',
-      description: '测试 isTokenExpiring 能正确检测即将过期的 token',
-      type: 'unit',
-      code: `describe('isTokenExpiring', () => {
-  it('should return true for token expiring in 3 minutes', () => {
-    const exp = Math.floor(Date.now() / 1000) + 180;
-    const token = btoa(JSON.stringify({ exp }));
-    expect(isTokenExpiring(\`header.\${token}.sig\`)).toBe(true);
-  });
-});`,
-      expected_result: 'true',
-    },
-    {
-      id: 'tc-4',
-      name: 'handleAuthError should retry on TOKEN_EXPIRED',
-      description: '测试 handleAuthError 在 token 过期时能重试请求',
-      type: 'integration',
-      code: `describe('handleAuthError', () => {
-  it('should retry request with new token on TOKEN_EXPIRED', async () => {
-    const error = { code: 'TOKEN_EXPIRED', config: { url: '/api/data' } };
-    const response = await handleAuthError(error);
-    expect(response.ok).toBe(true);
-  });
-});`,
-      expected_result: 'response.ok === true',
-    },
-    {
-      id: 'tc-5',
-      name: 'useAuth should initialize auth state',
-      description: '测试 useAuth hook 能正确初始化认证状态',
-      type: 'integration',
-      code: `describe('useAuth', () => {
-  it('should initialize with loading state', () => {
-    const { result } = renderHook(() => useAuth());
-    expect(result.current.isLoading).toBe(true);
-  });
-});`,
-      expected_result: 'isLoading === true',
-    },
-  ],
-  results: [
-    {
-      test_case_id: 'tc-1',
-      status: 'passed',
-      actual_result: 'new-token',
-      duration: 45,
-    },
-    {
-      test_case_id: 'tc-2',
-      status: 'passed',
-      actual_result: '只调用一次 fetch',
-      duration: 52,
-    },
-    {
-      test_case_id: 'tc-3',
-      status: 'failed',
-      actual_result: 'false',
-      error_message: 'AssertionError: expected false to be true\n    at Context.<anonymous> (test/tokenManager.test.ts:45:28)',
-      duration: 38,
-    },
-    {
-      test_case_id: 'tc-4',
-      status: 'passed',
-      actual_result: 'response.ok === true',
-      duration: 125,
-    },
-    {
-      test_case_id: 'tc-5',
-      status: 'skipped',
-      actual_result: 'Skipped due to dependency failure',
-      duration: 0,
-    },
-  ],
-  coverage: 78.5,
-  created_at: '2024-03-16T16:30:00Z',
-}
-
-const mockTestReport: TestReport = {
-  task_id: 'test-1',
-  total: 5,
-  passed: 3,
-  failed: 1,
-  skipped: 1,
-  coverage_percent: 78.5,
-  duration: 260,
-}
+import FlowStateBanner from '../components/FlowStateBanner'
 
 export default function TestDetail() {
   const { testTaskId } = useParams<{ testTaskId: string }>()
@@ -141,23 +18,31 @@ export default function TestDetail() {
   const [isLoading, setIsLoading] = useState(true)
   const [isRerunning, setIsRerunning] = useState(false)
   const [isTriggeringCI, setIsTriggeringCI] = useState(false)
+  const [pipeline, setPipeline] = useState<CIPipeline | null>(null)
+  const [ciError, setCiError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const loadTask = useCallback(async (id: string) => {
-    setIsLoading(true)
+  const loadTask = useCallback(async (id: string, silent = false) => {
+    if (!silent) setIsLoading(true)
     try {
-      const [taskData, reportData] = await Promise.all([
-        testService.getTestTask(id),
-        testService.getTestReport(id),
-      ])
+      const taskData = await testService.getTestTask(id)
       setTask(taskData)
-      setReport(reportData)
-    } catch {
-      console.log('Using mock data')
-      setTask(mockTestTask)
-      setReport(mockTestReport)
+      if (taskData.status === 'completed') {
+        try {
+          setReport(await testService.getTestReport(id))
+        } catch {
+          setReport(null)
+        }
+        setPipeline(await testService.getCI(id))
+      }
+    } catch (error) {
+      console.error(error)
+      if (!silent) {
+        setTask(null)
+        setReport(null)
+      }
     } finally {
-      setIsLoading(false)
+      if (!silent) setIsLoading(false)
     }
   }, [])
 
@@ -171,7 +56,7 @@ export default function TestDetail() {
     if (!task || task.status === 'completed' || task.status === 'failed') return
 
     const pollInterval = setInterval(() => {
-      if (testTaskId) loadTask(testTaskId)
+      if (testTaskId) loadTask(testTaskId, true)
     }, 3000)
 
     return () => clearInterval(pollInterval)
@@ -184,7 +69,7 @@ export default function TestDetail() {
       const newTask = await testService.rerunTests(testTaskId)
       setTask(newTask)
     } catch {
-      console.log('Rerun failed')
+      setTask((current) => current ? { ...current, status: 'failed' } : current)
     } finally {
       setIsRerunning(false)
     }
@@ -193,11 +78,14 @@ export default function TestDetail() {
   const handleTriggerCI = async () => {
     if (!testTaskId) return
     setIsTriggeringCI(true)
+    setCiError('')
     try {
-      const { ci_url } = await testService.triggerCI(testTaskId)
-      window.open(ci_url, '_blank')
+      const nextPipeline = await testService.triggerCI(testTaskId)
+      setPipeline(nextPipeline)
+      await loadTask(testTaskId, true)
+      setPipeline(nextPipeline)
     } catch {
-      console.log('Trigger CI failed')
+      setCiError('流水线没有跑起来，请再试一次')
     } finally {
       setIsTriggeringCI(false)
     }
@@ -275,6 +163,19 @@ export default function TestDetail() {
           返回代码生成
         </button>
 
+        {(task.status === 'pending' || task.status === 'generating' || task.status === 'running' || isRerunning) && (
+          <FlowStateBanner mode="running" title={task.status === 'running' ? '正在执行测试' : '正在生成测试'} detail="失败用例会留在这一页，通过质量门禁后流程继续。" />
+        )}
+        {task.status === 'failed' && (
+          <FlowStateBanner
+            mode="failed"
+            title="测试未通过"
+            detail={task.results.filter((item) => item.status === 'failed').map((item) => `${item.test_case_id} ${item.error_message || item.actual_result || '失败'}`).join('\n') || '没有记录失败用例'}
+            onRetry={handleRerun}
+            retryLabel="重新运行"
+          />
+        )}
+
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -347,8 +248,48 @@ export default function TestDetail() {
               <span>🧪</span>
               {task.test_cases.length} 个用例
             </span>
+            {task.sandbox_profile && (
+              <span className="flex items-center gap-1.5">
+                <span>📦</span>
+                {task.sandbox_profile}
+              </span>
+            )}
           </div>
         </div>
+
+        {(pipeline || ciError || isTriggeringCI) && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">CI 流水线</h3>
+              {pipeline && (
+                <span className="text-sm text-gray-500">{pipeline.pipeline_id}</span>
+              )}
+            </div>
+            {ciError && <p className="text-sm text-red-600">{ciError}</p>}
+            {isTriggeringCI && !pipeline && (
+              <p className="text-sm text-gray-500">正在沙箱里重新运行检查...</p>
+            )}
+            {pipeline && (
+              <div className="space-y-3">
+                {pipeline.stages.map((stage) => (
+                  <div key={stage.name} className="flex items-start justify-between gap-4 rounded-lg border border-gray-100 px-4 py-3">
+                    <div>
+                      <div className="font-medium text-gray-800">{stage.name}</div>
+                      {stage.detail && <p className="mt-1 text-sm text-gray-500">{stage.detail}</p>}
+                    </div>
+                    <span className={`text-sm font-medium ${stage.status === 'passed' ? 'text-green-600' : stage.status === 'failed' ? 'text-red-600' : 'text-gray-500'}`}>
+                      {stage.status === 'passed' && '通过'}
+                      {stage.status === 'failed' && '失败'}
+                      {stage.status === 'running' && '运行中'}
+                      {stage.status === 'pending' && '等待'}
+                      {stage.status === 'skipped' && '跳过'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <TestProgress status={task.status} className="mb-6" />
 

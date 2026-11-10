@@ -25,8 +25,9 @@ async def login(request: LoginRequest) -> Token:
 
     默认测试账户:
     - admin / admin123 (管理员)
-    - operator / operator123 (运维人员)
-    - viewer / viewer123 (只读用户)
+    - reviewer / reviewer123 (审核者)
+    - operator / operator123 (开发者)
+    - viewer / viewer123 (需求方，只读)
     """
     user = UserService.authenticate(request.username, request.password)
     if not user:
@@ -92,6 +93,24 @@ async def refresh_token(request: RefreshTokenRequest) -> Token:
         token_type="bearer",
         expires_in=settings.jwt_access_token_expire_minutes * 60,
     )
+
+
+@router.get("/users", response_model=list[UserResponse])
+async def list_users() -> list[UserResponse]:
+    """获取用户列表，供分配负责人等场景使用。"""
+    return [
+        UserResponse(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            role=user.role,
+            is_active=user.is_active,
+            created_at=user.created_at,
+            updated_at=user.updated_at,
+        )
+        for user in UserService.list_all()
+        if user.is_active
+    ]
 
 
 @router.get("/me", response_model=UserResponse)

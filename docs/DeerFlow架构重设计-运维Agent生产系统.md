@@ -121,55 +121,56 @@ flowchart TB
 
 ### 3.2 数据流与工作流
 
+本节与第 5.3 节是同一条主流程。知识库未就绪时不得建单。咨询只回答、不进入编码。Bug 与新需求必须经过方案审批和代码审批；语法检查失败先自愈，测试失败回到代码生成，通过后写入知识库。测试结果用质量门禁判断，不默认再加一道人工审批。驳回修订回到上一阶段，拒绝则关闭需求。
+
 ```mermaid
 sequenceDiagram
-    participant User as 用户/IM
+    participant User as 用户
     participant GW as Gateway
     participant LA as Lead Agent
     participant MW as Middleware
     participant SA as Sub-Agents
-    participant SK as Skills
     participant SB as Sandbox
     participant KB as 知识库
 
-    User->>GW: 提交需求/Bug
-    GW->>GW: 项目权限校验
-    GW->>LA: 创建任务会话
-    
-    LA->>KB: RAG 检索项目上下文
-    KB-->>LA: 返回相关知识
-    
-    LA->>LA: 需求理解与分类
-    
-    alt Bug 修复流程
-        LA->>SA: 委派 Bug 修复 Agent
-        SA->>SK: 调用知识检索 Skill
-        SA->>SA: 生成修复方案
-        SA->>MW: 进入 Review 中间件
-        MW->>User: 等待人工 Review
-        User->>MW: 通过/驳回
-        MW-->>SA: 继续/回退
-    else 新需求流程
-        LA->>SA: 委派新需求 Agent
-        SA->>SK: 调用设计 Skill
-        SA->>SA: 生成设计方案
-        SA->>MW: 进入 Review 中间件
-        MW->>User: 等待人工 Review
-        User->>MW: 通过/驳回
-        MW-->>SA: 继续/回退
+    User->>GW: 提交需求
+    GW->>GW: 权限校验与知识就绪检查
+    alt 知识库未就绪
+        GW-->>User: 返回缺失项，不建单
+    else 已就绪
+        GW->>LA: 创建任务会话
+        LA->>KB: 检索项目上下文
+        LA->>LA: 分类
+        alt 咨询
+            LA->>KB: 检索并回答
+            LA-->>User: 结束，不进入编码
+        else Bug 或新需求
+            LA->>SA: 生成方案
+            SA->>MW: 方案审批
+            alt 驳回修订
+                MW-->>SA: 带意见重新生成方案
+            else 拒绝
+                MW-->>User: 关闭需求
+            else 通过
+                SA->>SB: 生成代码并做语法检查
+                alt 语法失败
+                    SB-->>SA: 修复后再次检查
+                end
+                SA->>MW: 代码审批
+                alt 代码驳回
+                    MW-->>SA: 重新生成代码
+                else 通过
+                    SA->>SB: 执行测试
+                    alt 测试未过门禁
+                        SB-->>SA: 带着失败摘要回到代码生成
+                    else 通过
+                        LA->>KB: 写入知识
+                        LA-->>User: 完成
+                    end
+                end
+            end
+        end
     end
-    
-    SA->>SA: 委派代码生成 Agent
-    SA->>SB: 在 Sandbox 中生成代码
-    SA->>SK: 调用语法检查 Skill
-    
-    SA->>SA: 委派测试 Agent
-    SA->>SB: 在 Sandbox 中执行测试
-    SA-->>LA: 返回执行结果
-    
-    LA->>KB: 写入知识库(反馈)
-    LA-->>GW: 返回最终结果
-    GW-->>User: 推送结果
 ```
 
 ---
@@ -1332,29 +1333,35 @@ flowchart TB
     DemandInput --> DemandAnalysis
     DemandAnalysis --> DemandRoute
     
+    DemandRoute -->|咨询| KBSearch
     DemandRoute -->|Bug| BugLocate
     DemandRoute -->|新需求| FeatureAnalysis
     
-    BugLocate --> BugRoot --> BugFix --> BugPatch
+    BugLocate --> BugRoot --> BugFix
     FeatureAnalysis --> TechDesign --> APIDesign & ModuleDesign
     
-    BugPatch --> ReviewList
+    BugFix --> ReviewList
     TechDesign --> ReviewList
     
     ReviewList --> ReviewAction
-    ReviewAction -->|通过| CodeGen
-    ReviewAction -->|驳回| BugFix & TechDesign
+    ReviewAction -->|方案通过| CodeGen
+    ReviewAction -->|驳回修订| BugFix & TechDesign
+    ReviewAction -->|拒绝| DemandInput
     
-    CodeGen --> CodeLint --> CodeFormat
-    CodeLint -->|通过| TestGen
+    CodeGen --> CodeLint
+    CodeLint -->|失败| CodeGen
+    CodeLint -->|通过| ReviewList
+    ReviewAction -->|代码通过| TestGen
+    ReviewAction -->|代码驳回| CodeGen
     
     TestGen --> TestRun --> TestReport
     TestReport --> TestCoverage
+    TestRun -->|未过门禁| CodeGen
+    TestReport -->|通过| KBFeedback
     
     BugLocate & FeatureAnalysis --> KBSearch
-    TestReport --> KBFeedback
     
-    CodeGen --> GitIntegration
+    KBFeedback --> GitIntegration
     TestRun --> CICDIntegration
     ReviewAction --> IMNotify
 ```

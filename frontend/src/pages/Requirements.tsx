@@ -17,72 +17,6 @@ import {
   PriorityBadge,
 } from '../components/Requirements'
 
-const mockRequirements: Requirement[] = [
-  {
-    id: '1',
-    project_id: '1',
-    title: '用户登录超时问题',
-    description: '用户反馈登录后10分钟就会被强制登出，需要重新登录',
-    source: 'BUG-2024-001',
-    type: 'bug',
-    priority: 'high',
-    status: 'coding',
-    assignee: '张三',
-    created_by: 'admin',
-    analysis_result: {
-      type: 'bug',
-      priority: 'high',
-      keywords: ['登录', '超时', '登出'],
-      confidence: 0.92,
-    },
-    created_at: '2024-03-15T10:30:00Z',
-  },
-  {
-    id: '2',
-    project_id: '1',
-    title: '添加多语言支持',
-    description: '需要支持中文、英文、日文三种语言的界面切换',
-    source: 'FEAT-2024-003',
-    type: 'feature',
-    priority: 'medium',
-    status: 'designing',
-    assignee: '李四',
-    created_by: 'pm',
-    analysis_result: {
-      type: 'feature',
-      priority: 'medium',
-      keywords: ['多语言', '国际化', 'i18n'],
-      confidence: 0.88,
-    },
-    created_at: '2024-03-14T14:20:00Z',
-  },
-  {
-    id: '3',
-    project_id: '1',
-    title: 'API 响应格式如何定义？',
-    description: '新入职员工咨询 API 返回数据的标准格式应该怎么定义',
-    source: '内部咨询',
-    type: 'question',
-    priority: 'low',
-    status: 'completed',
-    created_by: 'dev',
-    created_at: '2024-03-13T09:15:00Z',
-  },
-  {
-    id: '4',
-    project_id: '1',
-    title: '数据库连接池优化',
-    description: '高并发时数据库连接池耗尽导致请求失败',
-    source: 'BUG-2024-002',
-    type: 'bug',
-    priority: 'critical',
-    status: 'testing',
-    assignee: '王五',
-    created_by: 'admin',
-    created_at: '2024-03-12T16:45:00Z',
-  },
-]
-
 export default function Requirements() {
   const { id: projectId } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -122,18 +56,10 @@ export default function Requirements() {
       ])
       setProject(projectData)
       setRequirements(reqs)
-    } catch {
-      console.log('Using mock data')
-      setProject({
-        id: projectId,
-        name: '用户服务系统',
-        description: '核心用户服务',
-        repo_url: 'https://github.com/company/user-service',
-        status: 'active',
-        created_at: '2024-01-15T08:00:00Z',
-        updated_at: '2024-03-10T14:30:00Z',
-      })
-      setRequirements(mockRequirements)
+    } catch (error) {
+      console.error(error)
+      setProject(null)
+      setRequirements([])
     } finally {
       setIsLoading(false)
     }
@@ -144,20 +70,8 @@ export default function Requirements() {
     try {
       const newReq = await requirementService.createRequirement(projectId, data)
       setRequirements((prev) => [newReq, ...prev])
-    } catch {
-      const mockReq: Requirement = {
-        id: String(Date.now()),
-        project_id: projectId,
-        title: data.title,
-        description: data.description,
-        source: data.source || '',
-        type: data.type || 'feature',
-        priority: data.priority || 'medium',
-        status: 'pending',
-        created_by: 'current_user',
-        created_at: new Date().toISOString(),
-      }
-      setRequirements((prev) => [mockReq, ...prev])
+    } catch (error) {
+      console.error(error)
     }
   }
 

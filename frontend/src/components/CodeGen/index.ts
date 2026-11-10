@@ -1,5 +1,6 @@
 export { default as CodeGenStatusBadge, statusConfig } from './CodeGenStatusBadge'
 export { default as CodeGenProgress } from './CodeGenProgress'
+export { default as SolutionSteps } from './SolutionSteps'
 export { default as FileTree } from './FileTree'
 export { default as CodeViewer } from './CodeViewer'
 export { default as DiffViewer } from './DiffViewer'

@@ -4,15 +4,46 @@ interface MessageInputProps {
   onSend: (message: string) => void
   disabled?: boolean
   placeholder?: string
+  prefillText?: string
+  prefillToken?: number
 }
+
+const INCOMPLETE_PROMPTS = new Set([
+  '我遇到了一个 Bug：',
+  '我有一个新需求：',
+  '我想咨询一个问题：',
+])
 
 export default function MessageInput({
   onSend,
   disabled = false,
   placeholder = '请描述您遇到的问题或需求...',
+  prefillText = '',
+  prefillToken = 0,
 }: MessageInputProps) {
   const [message, setMessage] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const imageRef = useRef<HTMLInputElement>(null)
+
+  const appendFiles = (files: FileList | null) => {
+    if (!files?.length) return
+    const names = Array.from(files).map((file) => `【附件:${file.name}】`).join('\n')
+    setMessage((current) => (current ? `${current}\n${names}` : names))
+  }
+
+  useEffect(() => {
+    if (!prefillToken) return
+    setMessage(prefillText)
+    const timer = window.setTimeout(() => {
+      const input = textareaRef.current
+      if (!input) return
+      input.focus()
+      const end = input.value.length
+      input.setSelectionRange(end, end)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [prefillText, prefillToken])
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -21,8 +52,10 @@ export default function MessageInput({
     }
   }, [message])
 
+  const needsDetail = INCOMPLETE_PROMPTS.has(message.trim())
+
   const handleSend = () => {
-    if (message.trim() && !disabled) {
+    if (message.trim() && !needsDetail && !disabled) {
       onSend(message.trim())
       setMessage('')
       if (textareaRef.current) {
@@ -48,13 +81,19 @@ export default function MessageInput({
         >
           {/* Action Buttons */}
           <div className="flex gap-1">
+            <input ref={fileRef} type="file" className="hidden" multiple onChange={(event) => { appendFiles(event.target.files); event.target.value = '' }} />
+            <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={(event) => { appendFiles(event.target.files); event.target.value = '' }} />
             <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
               className="w-8 h-8 rounded-md flex items-center justify-center text-gray-400 hover:text-primary hover:bg-primary-light transition-colors"
               title="上传附件"
             >
               📎
             </button>
             <button
+              type="button"
+              onClick={() => imageRef.current?.click()}
               className="w-8 h-8 rounded-md flex items-center justify-center text-gray-400 hover:text-primary hover:bg-primary-light transition-colors"
               title="上传截图"
             >
@@ -77,7 +116,7 @@ export default function MessageInput({
           {/* Send Button */}
           <button
             onClick={handleSend}
-            disabled={disabled || !message.trim()}
+            disabled={disabled || !message.trim() || needsDetail}
             className="px-5 py-2 bg-primary hover:bg-primary-hover disabled:bg-gray-200 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium flex items-center gap-1.5 transition-colors"
           >
             发送 ➤
@@ -85,7 +124,7 @@ export default function MessageInput({
         </div>
 
         <div className="text-center text-xs text-gray-400 mt-2">
-          💡 按 Enter 发送，Shift+Enter 换行
+          {needsDetail ? '请在提示后补充具体描述，再发送' : '按 Enter 发送，Shift+Enter 换行'}
         </div>
       </div>
     </div>

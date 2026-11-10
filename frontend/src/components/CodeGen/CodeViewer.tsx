@@ -9,6 +9,7 @@ const actionLabels: Record<CodeFileAction, { text: string; bgColor: string }> = 
   create: { text: '新建文件', bgColor: 'bg-green-500' },
   modify: { text: '修改文件', bgColor: 'bg-amber-500' },
   delete: { text: '删除文件', bgColor: 'bg-red-500' },
+  view: { text: '现有代码', bgColor: 'bg-slate-500' },
 }
 
 const languageNames: Record<string, string> = {
@@ -43,7 +44,7 @@ export default function CodeViewer({ file, className = '' }: CodeViewerProps) {
   }
 
   const lines = file.content.split('\n')
-  const actionConfig = actionLabels[file.action]
+  const actionConfig = actionLabels[file.action] || { text: '文件', bgColor: 'bg-slate-500' }
   const languageName = languageNames[file.language] || file.language
 
   const handleCopy = async () => {

@@ -12,16 +12,16 @@ const statusConfig = {
     label: '待处理',
     className: 'bg-gray-100 text-gray-600',
   },
-  indexing: {
-    label: '索引中',
+  processing: {
+    label: '向量化中',
     className: 'bg-blue-100 text-blue-600',
   },
-  ready: {
-    label: '已索引',
+  completed: {
+    label: '已向量化',
     className: 'bg-green-100 text-green-600',
   },
-  error: {
-    label: '索引失败',
+  failed: {
+    label: '向量化失败',
     className: 'bg-red-100 text-red-600',
   },
 }
@@ -114,9 +114,9 @@ export default function DocumentList({
         </thead>
         <tbody className="divide-y divide-gray-200">
           {documents.map((doc) => {
-            const status = statusConfig[doc.embedding_status]
+            const status = statusConfig[doc.embedding_status] || statusConfig.pending
             const createdDate = new Date(doc.created_at).toLocaleString('zh-CN')
-            const fileIcon = getFileIcon(doc.file_type)
+            const fileIcon = getFileIcon(doc.file_type || '')
 
             return (
               <tr
@@ -145,7 +145,7 @@ export default function DocumentList({
                   <span
                     className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.className}`}
                   >
-                    {doc.embedding_status === 'indexing' && (
+                    {doc.embedding_status === 'processing' && (
                       <span className="w-2 h-2 mr-1.5 rounded-full bg-blue-500 animate-pulse" />
                     )}
                     {status.label}

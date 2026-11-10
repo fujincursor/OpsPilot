@@ -22,6 +22,7 @@ from ...models.requirement import (
 from ...services.requirement_service import requirement_service
 from ...services.lead_agent_service import lead_agent_service
 from ...services.project_service import project_service
+from ...services.workflow_service import workflow_service
 
 router = APIRouter()
 
@@ -47,7 +48,25 @@ async def create_requirement(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    return requirement_service.create(project_id, data)
+    blocked = workflow_service.knowledge_block(project_id)
+    if blocked:
+        raise HTTPException(
+            status_code=428,
+            detail={
+                "message": blocked.message,
+                "project_id": str(project_id),
+            },
+        )
+
+    requirement = requirement_service.create(project_id, data)
+    if requirement.type != RequirementType.QUESTION:
+        try:
+            await workflow_service.open_solution_review(requirement)
+        except Exception:
+            requirement = requirement_service.get(requirement.id) or requirement
+        else:
+            requirement = requirement_service.get(requirement.id) or requirement
+    return requirement
 
 
 @router.get("/projects/{project_id}/requirements", response_model=RequirementResponse)
@@ -142,6 +161,16 @@ async def update_requirement_status(
 
     状态流转：pending -> analyzing -> designing -> reviewing -> coding -> testing -> completed -> closed
     """
+    current = requirement_service.get(requirement_id)
+    if not current:
+        raise HTTPException(status_code=404, detail="Requirement not found")
+    if current.type == RequirementType.QUESTION and data.status in {
+        RequirementStatus.DESIGNING,
+        RequirementStatus.REVIEWING,
+        RequirementStatus.CODING,
+        RequirementStatus.TESTING,
+    }:
+        raise HTTPException(status_code=400, detail="咨询类需求不进入方案、编码或测试")
     requirement = requirement_service.update_status(requirement_id, data.status)
     if not requirement:
         raise HTTPException(status_code=404, detail="Requirement not found")

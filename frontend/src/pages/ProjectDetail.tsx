@@ -1,81 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { AgentCard, AgentConfigModal } from '../components/Agents'
-import type { Project, AgentConfig, UpdateAgentConfigRequest } from '../types'
-import { projectService, agentService } from '../services'
-
-const mockProject: Project = {
-  id: '1',
-  name: '用户服务系统',
-  description: '核心用户认证与授权服务，支持 OAuth2.0 和 SSO 登录',
-  repo_url: 'https://github.com/company/user-service',
-  status: 'active',
-  created_at: '2024-01-15T08:00:00Z',
-  updated_at: '2024-03-10T14:30:00Z',
-}
-
-const mockAgents: AgentConfig[] = [
-  {
-    id: '1',
-    project_id: '1',
-    agent_type: 'lead',
-    name: 'Lead Agent',
-    description: '负责任务分类和调度协调',
-    model_name: 'gpt-4o',
-    temperature: 0.3,
-    max_tokens: 8192,
-    skills: ['knowledge_query', 'web_search'],
-    enabled: true,
-  },
-  {
-    id: '2',
-    project_id: '1',
-    agent_type: 'bugfix',
-    name: 'Bug Fix Agent',
-    description: '分析和修复代码缺陷',
-    model_name: 'gpt-4o',
-    temperature: 0.2,
-    max_tokens: 16384,
-    skills: ['code_search', 'code_edit', 'terminal_execute', 'git_operations'],
-    enabled: true,
-  },
-  {
-    id: '3',
-    project_id: '1',
-    agent_type: 'feature',
-    name: 'Feature Agent',
-    description: '实现新功能需求',
-    model_name: 'gpt-4o',
-    temperature: 0.5,
-    max_tokens: 16384,
-    skills: ['code_search', 'code_edit', 'file_read', 'file_write', 'terminal_execute'],
-    enabled: true,
-  },
-  {
-    id: '4',
-    project_id: '1',
-    agent_type: 'doc',
-    name: 'Doc Agent',
-    description: '生成和更新文档',
-    model_name: 'gpt-4o-mini',
-    temperature: 0.7,
-    max_tokens: 8192,
-    skills: ['code_search', 'file_read', 'file_write'],
-    enabled: false,
-  },
-  {
-    id: '5',
-    project_id: '1',
-    agent_type: 'review',
-    name: 'Review Agent',
-    description: '代码审查和质量检测',
-    model_name: 'gpt-4o',
-    temperature: 0.1,
-    max_tokens: 16384,
-    skills: ['code_search', 'lint_check', 'test_runner'],
-    enabled: true,
-  },
-]
+import type { Project, AgentConfig, KnowledgeBase, UpdateAgentConfigRequest, ProjectSkill, SandboxSettings } from '../types'
+import { projectService, agentService, knowledgeService, requirementService } from '../services'
+import type { RequirementStatistics } from '../services/requirementService'
 
 const statusConfig = {
   active: { label: '运行中', className: 'bg-green-100 text-green-600' },
@@ -91,6 +19,11 @@ export default function ProjectDetail() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedAgent, setSelectedAgent] = useState<AgentConfig | null>(null)
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
+  const [statistics, setStatistics] = useState<RequirementStatistics | null>(null)
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([])
+  const [skills, setSkills] = useState<ProjectSkill[]>([])
+  const [sandbox, setSandbox] = useState<SandboxSettings | null>(null)
+  const [configMessage, setConfigMessage] = useState('')
 
   useEffect(() => {
     if (id) {
@@ -101,16 +34,24 @@ export default function ProjectDetail() {
   const loadProjectData = async (projectId: string) => {
     setIsLoading(true)
     try {
-      const [projectData, agentsData] = await Promise.all([
+      const [projectData, agentsData, statisticsData, knowledgeData] = await Promise.all([
         projectService.getProject(projectId),
         agentService.getAgentConfigs(projectId),
+        requirementService.getStatistics(projectId).catch(() => null),
+        knowledgeService.getKnowledgeBases(projectId).catch(() => []),
       ])
       setProject(projectData)
       setAgents(agentsData)
-    } catch {
-      console.log('Using mock data for development')
-      setProject(mockProject)
-      setAgents(mockAgents)
+      setStatistics(statisticsData)
+      setKnowledgeBases(knowledgeData)
+      setSkills(projectData.skills || [])
+      setSandbox(projectData.sandbox || null)
+    } catch (error) {
+      console.error(error)
+      setProject(null)
+      setAgents([])
+      setStatistics(null)
+      setKnowledgeBases([])
     } finally {
       setIsLoading(false)
     }
@@ -126,12 +67,8 @@ export default function ProjectDetail() {
       setAgents((prev) =>
         prev.map((a) => (a.id === updatedAgent.id ? updatedAgent : a))
       )
-    } catch {
-      setAgents((prev) =>
-        prev.map((a) =>
-          a.id === agent.id ? { ...a, enabled: !a.enabled } : a
-        )
-      )
+    } catch (error) {
+      console.error(error)
     }
   }
 
@@ -150,12 +87,22 @@ export default function ProjectDetail() {
       setAgents((prev) =>
         prev.map((a) => (a.id === updatedAgent.id ? updatedAgent : a))
       )
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  const handleSaveRuntime = async () => {
+    if (!id || !sandbox) return
+    setConfigMessage('')
+    try {
+      const updated = await projectService.updateProject(id, { skills, sandbox })
+      setProject(updated)
+      setSkills(updated.skills || skills)
+      setSandbox(updated.sandbox || sandbox)
+      setConfigMessage('运行配置已保存')
     } catch {
-      setAgents((prev) =>
-        prev.map((a) =>
-          a.id === agentId ? { ...a, ...data } : a
-        )
-      )
+      setConfigMessage('保存失败')
     }
   }
 
@@ -190,6 +137,22 @@ export default function ProjectDetail() {
 
   const status = statusConfig[project.status]
   const enabledAgentCount = agents.filter((a) => a.enabled).length
+  const completedCount = statistics?.by_status.completed ?? 0
+  const inProgressCount = ['analyzing', 'designing', 'reviewing', 'coding', 'testing'].reduce(
+    (sum, key) => sum + (statistics?.by_status[key] ?? 0),
+    0
+  )
+  const requirementRows = [
+    { key: 'bug', icon: '🐛', label: 'Bug' },
+    { key: 'feature', icon: '✨', label: 'Feature' },
+    { key: 'question', icon: '❓', label: 'Question' },
+  ]
+  const knowledgeStatusColor = {
+    pending: 'bg-gray-400',
+    indexing: 'bg-amber-500',
+    ready: 'bg-green-500',
+    error: 'bg-red-500',
+  }
 
   return (
     <div className="p-6 bg-gray-50 min-h-full">
@@ -240,10 +203,39 @@ export default function ProjectDetail() {
                 </div>
               </div>
             </div>
-            <button className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
-              ⚙️ 项目设置
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => navigate(`/projects/${project.id}/profile`)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                项目信息
+              </button>
+              <button
+                onClick={() => navigate(`/projects/${project.id}/settings`)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                ⚙️ 项目设置
+              </button>
+            </div>
           </div>
+        </div>
+
+        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-800">成员</h2>
+            <button type="button" onClick={() => navigate(`/projects/${project.id}/settings`)} className="text-sm text-primary">管理成员</button>
+          </div>
+          {(project.members || []).length === 0 ? (
+            <p className="text-sm text-gray-400">还没有项目成员</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {(project.members || []).map((member) => (
+                <span key={member.username} className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700">
+                  {member.username} · {member.role}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="mb-6">
@@ -299,20 +291,20 @@ export default function ProjectDetail() {
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-gray-50 rounded-lg">
-                <div className="text-2xl font-semibold text-gray-800">128</div>
-                <div className="text-sm text-gray-500">总会话数</div>
+                <div className="text-2xl font-semibold text-gray-800">{statistics?.total ?? 0}</div>
+                <div className="text-sm text-gray-500">需求总数</div>
               </div>
               <div className="p-4 bg-gray-50 rounded-lg">
-                <div className="text-2xl font-semibold text-gray-800">45</div>
-                <div className="text-sm text-gray-500">Bug 已修复</div>
+                <div className="text-2xl font-semibold text-gray-800">{inProgressCount}</div>
+                <div className="text-sm text-gray-500">进行中</div>
               </div>
               <div className="p-4 bg-gray-50 rounded-lg">
-                <div className="text-2xl font-semibold text-gray-800">23</div>
-                <div className="text-sm text-gray-500">需求已实现</div>
+                <div className="text-2xl font-semibold text-gray-800">{completedCount}</div>
+                <div className="text-sm text-gray-500">已完成</div>
               </div>
               <div className="p-4 bg-gray-50 rounded-lg">
-                <div className="text-2xl font-semibold text-gray-800">92%</div>
-                <div className="text-sm text-gray-500">任务成功率</div>
+                <div className="text-2xl font-semibold text-gray-800">{knowledgeBases.length}</div>
+                <div className="text-sm text-gray-500">知识库</div>
               </div>
             </div>
           </div>
@@ -331,27 +323,15 @@ export default function ProjectDetail() {
               </button>
             </div>
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm">🐛</span>
-                  <span className="text-sm text-gray-700">Bug</span>
+              {requirementRows.map((row) => (
+                <div key={row.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm">{row.icon}</span>
+                    <span className="text-sm text-gray-700">{row.label}</span>
+                  </div>
+                  <span className="text-sm text-gray-500">{statistics?.by_type[row.key] ?? 0} 个</span>
                 </div>
-                <span className="text-sm text-gray-500">12 个待处理</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm">✨</span>
-                  <span className="text-sm text-gray-700">Feature</span>
-                </div>
-                <span className="text-sm text-gray-500">8 个进行中</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm">❓</span>
-                  <span className="text-sm text-gray-700">Question</span>
-                </div>
-                <span className="text-sm text-gray-500">3 个待回复</span>
-              </div>
+              ))}
             </div>
             <button
               onClick={() => navigate(`/projects/${id}/requirements`)}
@@ -375,27 +355,19 @@ export default function ProjectDetail() {
               </button>
             </div>
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                  <span className="text-sm text-gray-700">代码库索引</span>
-                </div>
-                <span className="text-sm text-gray-500">12,345 文件</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                  <span className="text-sm text-gray-700">文档库</span>
-                </div>
-                <span className="text-sm text-gray-500">89 文档</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
-                  <span className="text-sm text-gray-700">历史会话</span>
-                </div>
-                <span className="text-sm text-gray-500">同步中...</span>
-              </div>
+              {knowledgeBases.length === 0 ? (
+                <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-500">暂无知识库</div>
+              ) : (
+                knowledgeBases.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${knowledgeStatusColor[item.status]}`}></span>
+                      <span className="text-sm text-gray-700 truncate">{item.name}</span>
+                    </div>
+                    <span className="text-sm text-gray-500 flex-shrink-0">{item.document_count} 篇文档</span>
+                  </div>
+                ))
+              )}
             </div>
             <button
               onClick={() => navigate(`/projects/${id}/knowledge`)}
@@ -404,6 +376,120 @@ export default function ProjectDetail() {
               📚 进入知识库管理
             </button>
           </div>
+        </div>
+
+        <div className="mt-6 bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">运行配置</h2>
+              <p className="text-sm text-gray-500">技能开关和沙箱限制会随代码、测试任务一起展示。</p>
+            </div>
+            <button
+              onClick={handleSaveRuntime}
+              className="px-3 py-1.5 text-sm font-medium text-white bg-primary rounded-lg"
+            >
+              保存配置
+            </button>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              {skills.map((skill) => (
+                <label key={skill.key} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                  <input
+                    type="checkbox"
+                    checked={skill.enabled}
+                    onChange={(event) => {
+                      const enabled = event.target.checked
+                      setSkills((current) => current.map((item) => (
+                        item.key === skill.key ? { ...item, enabled } : item
+                      )))
+                    }}
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-gray-800">{skill.name}</span>
+                    <span className="block text-xs text-gray-500">{skill.description}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {sandbox && (
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <label className="col-span-2">
+                  <span className="block text-gray-500 mb-1">环境类型</span>
+                  <select
+                    value={sandbox.backend}
+                    onChange={(event) => setSandbox({ ...sandbox, backend: event.target.value })}
+                    className="w-full border border-gray-200 rounded-md px-2 py-1.5"
+                  >
+                    <option value="local">Local</option>
+                    <option value="docker">Docker</option>
+                    <option value="kubernetes">Kubernetes</option>
+                    <option value="e2b">E2B</option>
+                  </select>
+                </label>
+                <label>
+                  <span className="block text-gray-500 mb-1">内存 MB</span>
+                  <input
+                    type="number"
+                    value={sandbox.memory_mb}
+                    onChange={(event) => setSandbox({ ...sandbox, memory_mb: Number(event.target.value) })}
+                    className="w-full border border-gray-200 rounded-md px-2 py-1.5"
+                  />
+                </label>
+                <label>
+                  <span className="block text-gray-500 mb-1">CPU</span>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={sandbox.cpu}
+                    onChange={(event) => setSandbox({ ...sandbox, cpu: Number(event.target.value) })}
+                    className="w-full border border-gray-200 rounded-md px-2 py-1.5"
+                  />
+                </label>
+                <label>
+                  <span className="block text-gray-500 mb-1">超时秒</span>
+                  <input
+                    type="number"
+                    value={sandbox.timeout_seconds}
+                    onChange={(event) => setSandbox({ ...sandbox, timeout_seconds: Number(event.target.value) })}
+                    className="w-full border border-gray-200 rounded-md px-2 py-1.5"
+                  />
+                </label>
+                <label>
+                  <span className="block text-gray-500 mb-1">网络策略</span>
+                  <select
+                    value={sandbox.network_policy}
+                    onChange={(event) => setSandbox({ ...sandbox, network_policy: event.target.value })}
+                    className="w-full border border-gray-200 rounded-md px-2 py-1.5"
+                  >
+                    <option value="disabled">禁用网络</option>
+                    <option value="allowlist">白名单</option>
+                    <option value="open">允许所有</option>
+                  </select>
+                </label>
+                <label className="col-span-2">
+                  <span className="block text-gray-500 mb-1">域名白名单，用逗号分隔</span>
+                  <input
+                    value={sandbox.allowed_domains.join(',')}
+                    onChange={(event) => setSandbox({
+                      ...sandbox,
+                      allowed_domains: event.target.value.split(',').map((item) => item.trim()).filter(Boolean),
+                    })}
+                    className="w-full border border-gray-200 rounded-md px-2 py-1.5"
+                  />
+                </label>
+                <label className="col-span-2 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={sandbox.run_as_non_root}
+                    onChange={(event) => setSandbox({ ...sandbox, run_as_non_root: event.target.checked })}
+                  />
+                  非 root 运行
+                </label>
+              </div>
+            )}
+          </div>
+          {configMessage && <p className="mt-3 text-sm text-gray-500">{configMessage}</p>}
         </div>
       </div>
 

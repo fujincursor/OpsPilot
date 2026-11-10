@@ -10,6 +10,7 @@ import asyncio
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from datetime import datetime, timedelta
@@ -462,7 +463,7 @@ class SandboxService:
 
         try:
             result = subprocess.run(
-                ["python", "-m", "py_compile", file_path],
+                [self.python_executable(), "-m", "py_compile", file_path],
                 capture_output=True,
                 text=True,
                 timeout=10,
@@ -635,10 +636,73 @@ class SandboxService:
         env = os.environ.copy()
 
         env['SANDBOX'] = '1'
+        env['PYTHONIOENCODING'] = 'utf-8'
+        env['PYTHONUTF8'] = '1'
         env['LC_ALL'] = 'C.UTF-8'
         env['LANG'] = 'C.UTF-8'
 
         return env
+
+    def python_executable(self) -> str:
+        """沙箱里的 Python 使用当前服务的解释器，避免系统 PATH 里没有 python。"""
+        return sys.executable
+
+    def execute_command(
+        self,
+        sandbox_id: str,
+        args: List[str],
+        timeout: int = DEFAULT_TIMEOUT,
+    ) -> SandboxExecuteResult:
+        """在沙箱目录中执行参数列表，不经过 shell。"""
+        sandbox = self.get_sandbox(sandbox_id)
+        if not sandbox:
+            return SandboxExecuteResult(
+                success=False,
+                exit_code=-1,
+                stdout="",
+                stderr=f"Sandbox {sandbox_id} not found or expired",
+                duration_ms=0,
+            )
+
+        timeout = min(timeout, self.MAX_TIMEOUT)
+        start_time = time.time()
+        try:
+            result = subprocess.run(
+                args,
+                cwd=sandbox.working_directory,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env=self._get_sandbox_env(),
+                encoding="utf-8",
+                errors="replace",
+            )
+            duration_ms = int((time.time() - start_time) * 1000)
+            return SandboxExecuteResult(
+                success=result.returncode == 0,
+                exit_code=result.returncode,
+                stdout=(result.stdout or "")[:10000],
+                stderr=(result.stderr or "")[:10000],
+                duration_ms=duration_ms,
+            )
+        except subprocess.TimeoutExpired:
+            duration_ms = int((time.time() - start_time) * 1000)
+            return SandboxExecuteResult(
+                success=False,
+                exit_code=-1,
+                stdout="",
+                stderr=f"Command timed out after {timeout} seconds",
+                duration_ms=duration_ms,
+            )
+        except Exception as exc:
+            duration_ms = int((time.time() - start_time) * 1000)
+            return SandboxExecuteResult(
+                success=False,
+                exit_code=-1,
+                stdout="",
+                stderr=str(exc),
+                duration_ms=duration_ms,
+            )
 
 
 sandbox_service = SandboxService()
