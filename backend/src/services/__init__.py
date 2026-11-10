@@ -9,11 +9,15 @@ from .requirement_service import RequirementService, requirement_service
 from .solution_service import SolutionService, solution_service
 from .hitl_service import HITLService, hitl_service
 from .notification_service import NotificationService, notification_service
+from .sandbox_service import SandboxService, sandbox_service
+from .codegen_service import CodeGenService, codegen_service
 from .agents import (
     BugFixAgentService,
     bugfix_agent_service,
     FeatureDesignAgentService,
     feature_agent_service,
+    CodeGenAgentService,
+    codegen_agent_service,
 )
 
 project_service.set_agent_service(agent_service)
@@ -27,6 +31,9 @@ requirement_service.set_project_service(project_service)
 
 solution_service.set_requirement_service(requirement_service)
 solution_service.set_knowledge_service(knowledge_service)
+
+codegen_service.set_solution_service(solution_service)
+codegen_service.set_requirement_service(requirement_service)
 
 hitl_service.set_notification_service(notification_service)
 
@@ -48,8 +55,14 @@ __all__ = [
     "hitl_service",
     "NotificationService",
     "notification_service",
+    "SandboxService",
+    "sandbox_service",
+    "CodeGenService",
+    "codegen_service",
     "BugFixAgentService",
     "bugfix_agent_service",
     "FeatureDesignAgentService",
     "feature_agent_service",
+    "CodeGenAgentService",
+    "codegen_agent_service",
 ]
