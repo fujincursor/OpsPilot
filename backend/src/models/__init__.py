@@ -10,6 +10,22 @@ from .agent import (
     AgentConfigUpdate,
     AgentConfigResponse
 )
+from .knowledge import (
+    KnowledgeType,
+    KnowledgeStatus,
+    EmbeddingStatus,
+    KnowledgeBase,
+    KnowledgeBaseCreate,
+    KnowledgeBaseUpdate,
+    KnowledgeBaseResponse,
+    Document,
+    DocumentCreate,
+    DocumentResponse,
+    KnowledgeReadyStatus,
+    KnowledgeSearchQuery,
+    KnowledgeSearchResult,
+    KnowledgeSearchResponse,
+)
 
 __all__ = [
     "Project",
@@ -32,4 +48,18 @@ __all__ = [
     "AgentConfigCreate",
     "AgentConfigUpdate",
     "AgentConfigResponse",
+    "KnowledgeType",
+    "KnowledgeStatus",
+    "EmbeddingStatus",
+    "KnowledgeBase",
+    "KnowledgeBaseCreate",
+    "KnowledgeBaseUpdate",
+    "KnowledgeBaseResponse",
+    "Document",
+    "DocumentCreate",
+    "DocumentResponse",
+    "KnowledgeReadyStatus",
+    "KnowledgeSearchQuery",
+    "KnowledgeSearchResult",
+    "KnowledgeSearchResponse",
 ]
