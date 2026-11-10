@@ -47,7 +47,7 @@ export default function ReviewTimeline({ decisions, createdAt }: ReviewTimelineP
         <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-gray-200" />
 
         <div className="space-y-4">
-          {decisions.map((decision, index) => {
+          {decisions.map((decision) => {
             const config = decisionConfig[decision.decision]
             return (
               <div key={decision.id} className="relative flex gap-4">

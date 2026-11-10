@@ -8,7 +8,7 @@ import type {
   ReviewFilters,
 } from '../types'
 import { reviewService } from '../services'
-import { ReviewCard, ReviewStatusBadge } from '../components/Reviews'
+import { ReviewCard } from '../components/Reviews'
 import { PriorityBadge } from '../components/Requirements'
 
 const mockReviews: ReviewItem[] = [

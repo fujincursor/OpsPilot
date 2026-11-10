@@ -9,6 +9,8 @@ import KnowledgeDetail from './pages/KnowledgeDetail'
 import Requirements from './pages/Requirements'
 import RequirementDetail from './pages/RequirementDetail'
 import SolutionDetail from './pages/SolutionDetail'
+import Reviews from './pages/Reviews'
+import ReviewDetail from './pages/ReviewDetail'
 
 function App() {
   return (
@@ -24,6 +26,8 @@ function App() {
         <Route path="knowledge/:kbId" element={<KnowledgeDetail />} />
         <Route path="requirements/:reqId" element={<RequirementDetail />} />
         <Route path="solutions/:solutionId" element={<SolutionDetail />} />
+        <Route path="reviews" element={<Reviews />} />
+        <Route path="reviews/:reviewId" element={<ReviewDetail />} />
       </Route>
     </Routes>
   )
