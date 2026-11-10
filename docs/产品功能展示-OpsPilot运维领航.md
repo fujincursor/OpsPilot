@@ -123,19 +123,59 @@ flowchart TB
 
 ![工作台-功能模块](assets/screenshots/02-portal-modules.png)
 
-**9 大功能模块**：
+**9 大功能模块与 DeerFlow 组件映射**：
 
-| 模块 | 名称 | 说明 |
-|------|------|------|
-| **M1** | 多项目与 Agent 实例管理 | 创建运维项目，配置 Agent 实例（模型、Prompt、工具链），管理成员权限 |
-| **M2** | 项目信息与知识库前置维护 | 维护项目概述、架构、目录结构、配置说明与 Runbook |
-| **M3** | 知识库与系统理解增强 | 管理文档与代码索引，支持 RAG 检索，提升 Agent 理解能力 |
-| **M4** | 需求理解与分类 | 提交运维需求，Agent 自动分析并分类为 Bug 或新需求 |
-| **M5** | Bug 修复流程 | 查看 Bug 工单、生成修复方案，经 Review 后进入代码生成 |
-| **M6** | 新需求设计流程 | 查看新需求工单、生成技术方案，经 Review 后进入代码实现 |
-| **M7** | 人工 Review 工作台 | 对方案、代码、测试报告进行通过/驳回，查看审计日志 |
-| **M8** | 代码生成与语法校验 | 查看生成的代码变更，执行语法/静态检查 |
-| **M9** | 测试用例生成与执行 | 查看测试用例与执行结果，失败可重新执行或回退 |
+| 模块 | 名称 | 说明 | DeerFlow 组件 |
+|------|------|------|--------------|
+| **M1** | 多项目与 Agent 实例管理 | 创建运维项目，配置 Agent 实例（模型、Prompt、工具链），管理成员权限 | Projects + Agent Registry |
+| **M2** | 项目信息与知识库前置维护 | 维护项目概述、架构、目录结构、配置说明与 Runbook | Project Instructions + Document Shelf |
+| **M3** | 知识库与系统理解增强 | 管理文档与代码索引，支持 RAG 检索，提升 Agent 理解能力 | RAGFlow + DeerMem |
+| **M4** | 需求理解与分类 | 提交运维需求，Agent 自动分析并分类为 Bug 或新需求 | Lead Agent + Demand Analysis Skill |
+| **M5** | Bug 修复流程 | 查看 Bug 工单、生成修复方案，经 Review 后进入代码生成 | Bug Fix Sub-Agent |
+| **M6** | 新需求设计流程 | 查看新需求工单、生成技术方案，经 Review 后进入代码实现 | Feature Design Sub-Agent |
+| **M7** | 人工 Review 工作台 | 对方案、代码、测试报告进行通过/驳回，查看审计日志 | HITL Middleware + Approval Cards |
+| **M8** | 代码生成与语法校验 | 查看生成的代码变更，执行语法/静态检查 | Code Gen Sub-Agent + Sandbox |
+| **M9** | 测试用例生成与执行 | 查看测试用例与执行结果，失败可重新执行或回退 | Test Sub-Agent + Sandbox |
+
+```mermaid
+flowchart LR
+    subgraph 项目管理["🏢 项目管理"]
+        M1["M1<br/>项目与Agent管理"]
+        M2["M2<br/>知识库前置维护"]
+    end
+    
+    subgraph 知识服务["📚 知识服务"]
+        M3["M3<br/>知识库增强"]
+    end
+    
+    subgraph 需求处理["📝 需求处理"]
+        M4["M4<br/>需求理解与分类"]
+    end
+    
+    subgraph 执行引擎["⚙️ 执行引擎"]
+        M5["M5<br/>Bug修复"]
+        M6["M6<br/>需求设计"]
+        M8["M8<br/>代码生成"]
+        M9["M9<br/>测试执行"]
+    end
+    
+    subgraph 质量保障["✅ 质量保障"]
+        M7["M7<br/>Review工作台"]
+    end
+    
+    M1 --> M2 --> M3
+    M3 --> M4
+    M4 -->|Bug| M5
+    M4 -->|新需求| M6
+    M5 & M6 --> M7
+    M7 -->|通过| M8
+    M8 --> M7
+    M7 -->|通过| M9
+    
+    style M1 fill:#e3f2fd,stroke:#1565c0
+    style M7 fill:#fff3e0,stroke:#ef6c00
+    style M9 fill:#e8f5e9,stroke:#2e7d32
+```
 
 ---
 
