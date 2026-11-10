@@ -1,0 +1,217 @@
+# OpsPilot AI 团队配置
+# 定义团队结构、协作规则和工作流程
+
+team:
+  name: opspilot-ai-team
+  display_name: "OpsPilot 运维领航 AI 团队"
+  version: "1.0.0"
+  
+  # 团队描述
+  description: |
+    基于 DeerFlow 2.0 架构的智能运维 AI 团队，
+    采用 Lead Agent + Sub-Agents 编排模式，
+    实现从需求到交付的全流程自动化。
+
+# 团队成员
+members:
+  lead:
+    - name: ops-pilot-lead
+      config: agents/lead-agent.yaml
+      role: "Tech Lead - 团队领导者"
+      
+  specialists:
+    - name: bug-fix-agent
+      config: agents/bug-fix-agent.yaml
+      role: "Bug 修复专家"
+      trigger: "需求分类为 Bug"
+      
+    - name: feature-design-agent
+      config: agents/feature-design-agent.yaml
+      role: "需求设计专家"
+      trigger: "需求分类为新需求"
+      
+    - name: code-generation-agent
+      config: agents/code-generation-agent.yaml
+      role: "代码生成专家"
+      trigger: "方案 Review 通过"
+      
+    - name: test-execution-agent
+      config: agents/test-execution-agent.yaml
+      role: "测试执行专家"
+      trigger: "代码语法检查通过"
+
+# 工作流程定义
+workflows:
+  # Bug 修复工作流
+  bug_fix:
+    name: "Bug 修复流程"
+    stages:
+      - stage: analyze
+        agent: ops-pilot-lead
+        action: "需求分析与分类"
+        
+      - stage: diagnose
+        agent: bug-fix-agent
+        action: "问题定位与方案生成"
+        hitl: fix_plan_approve
+        
+      - stage: implement
+        agent: code-generation-agent
+        action: "代码生成与检查"
+        hitl: code_change_approve
+        
+      - stage: test
+        agent: test-execution-agent
+        action: "测试执行与验证"
+        on_failure: goto:implement
+        
+      - stage: complete
+        agent: ops-pilot-lead
+        action: "结果汇总与知识沉淀"
+
+  # 新需求工作流
+  feature_development:
+    name: "新需求开发流程"
+    stages:
+      - stage: analyze
+        agent: ops-pilot-lead
+        action: "需求分析与分类"
+        
+      - stage: design
+        agent: feature-design-agent
+        action: "技术方案设计"
+        hitl: design_doc_approve
+        
+      - stage: implement
+        agent: code-generation-agent
+        action: "代码生成与检查"
+        hitl: code_change_approve
+        
+      - stage: test
+        agent: test-execution-agent
+        action: "测试执行与验证"
+        on_failure: goto:implement
+        
+      - stage: complete
+        agent: ops-pilot-lead
+        action: "结果汇总与知识沉淀"
+
+# HITL 人工卡点配置
+hitl:
+  checkpoints:
+    fix_plan_approve:
+      name: "修复方案审批"
+      description: "审核 Bug 修复方案"
+      required_roles: ["developer", "reviewer"]
+      timeout_hours: 24
+      
+    design_doc_approve:
+      name: "设计文档审批"
+      description: "审核技术设计方案"
+      required_roles: ["architect", "reviewer"]
+      timeout_hours: 24
+      
+    code_change_approve:
+      name: "代码变更审批"
+      description: "审核代码变更"
+      required_roles: ["developer", "reviewer"]
+      timeout_hours: 24
+      
+  escalation:
+    enabled: true
+    timeout_hours: 4
+    notify_channels:
+      - slack
+      - feishu
+      - email
+
+# 知识库集成
+knowledge:
+  providers:
+    - name: ragflow
+      type: rag
+      config:
+        base_url: "${RAGFLOW_BASE_URL}"
+        api_key: "${RAGFLOW_API_KEY}"
+        
+    - name: deermem
+      type: memory
+      config:
+        persistence: true
+        scope: project
+        
+  search:
+    top_k: 10
+    similarity_threshold: 0.7
+    rerank: true
+
+# 沙箱配置
+sandbox:
+  default_type: docker_aio
+  
+  docker_aio:
+    image: "opspilot-sandbox:latest"
+    default_resources:
+      memory: "4g"
+      cpu: "2.0"
+    network:
+      mode: allowlist
+      default_allowed:
+        - "pypi.org"
+        - "registry.npmjs.org"
+        - "github.com"
+        
+  kubernetes:
+    namespace: "opspilot-sandbox"
+    service_account: "sandbox-runner"
+    resource_quota:
+      max_memory: "16Gi"
+      max_cpu: "8"
+
+# 监控与日志
+observability:
+  logging:
+    level: INFO
+    format: json
+    
+  tracing:
+    enabled: true
+    provider: langsmith
+    project: "opspilot-ai-team"
+    
+  metrics:
+    enabled: true
+    custom:
+      - task_completion_rate
+      - review_wait_time
+      - test_pass_rate
+      - agent_utilization
+
+# 通知配置
+notifications:
+  channels:
+    slack:
+      enabled: true
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      
+    feishu:
+      enabled: true
+      webhook_url: "${FEISHU_WEBHOOK_URL}"
+      
+    email:
+      enabled: true
+      smtp_config:
+        host: "${SMTP_HOST}"
+        port: 587
+        
+  events:
+    - event: task_started
+      channels: []
+    - event: hitl_pending
+      channels: [slack, feishu]
+    - event: hitl_timeout
+      channels: [slack, feishu, email]
+    - event: task_completed
+      channels: [slack]
+    - event: task_failed
+      channels: [slack, feishu, email]

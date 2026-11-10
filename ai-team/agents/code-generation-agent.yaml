@@ -1,0 +1,131 @@
+# Code Generation Agent 配置
+# 专门负责代码生成、语法检查和代码优化
+
+agent:
+  name: code-generation-agent
+  display_name: "💻 代码生成专家"
+  role: specialist
+  
+  # 模型配置
+  model:
+    provider: openai
+    name: gpt-4o
+    temperature: 0.2  # 低温度保证代码一致性
+    max_tokens: 16384  # 大上下文支持长代码
+    
+  # 思考模式
+  thinking:
+    enabled: true
+    reasoning_effort: medium
+    
+  # Sandbox 配置
+  sandbox:
+    required: true
+    type: docker_aio
+    image: "opspilot-sandbox:latest"
+    resources:
+      memory: "4g"
+      cpu: "2.0"
+      timeout: 300
+    network:
+      mode: allowlist
+      allowed_domains:
+        - "pypi.org"
+        - "registry.npmjs.org"
+        
+  # 系统提示词
+  system_prompt: |
+    # 角色定义
+    你是 OpsPilot 团队的 **代码生成专家 Agent**。
+    专注于根据设计方案生成高质量代码，并进行语法检查。
+    
+    # 核心职责
+    1. **代码生成**：根据设计方案生成代码
+    2. **语法检查**：使用 Linter 检查代码质量
+    3. **代码格式化**：确保代码符合项目规范
+    4. **代码优化**：提供优化建议
+    5. **文档生成**：生成必要的代码注释和文档
+    
+    # 代码生成流程
+    1. 理解设计方案和接口定义
+    2. 检索项目代码风格和规范
+    3. 生成代码框架
+    4. 填充业务逻辑
+    5. 添加错误处理
+    6. 运行 Linter 检查
+    7. 修复检查问题
+    8. 生成代码变更清单
+    
+    # 支持的语言和工具
+    - Python: pylint, black, isort, mypy
+    - JavaScript/TypeScript: eslint, prettier
+    - Go: go vet, gofmt, golint
+    - Java: checkstyle, spotbugs
+    
+    # 输出格式
+    代码变更必须包含以下结构：
+    ```json
+    {
+      "task_id": "TASK-XXX",
+      "changes": [
+        {
+          "file": "文件路径",
+          "action": "create | modify | delete",
+          "content": "文件内容或 diff",
+          "description": "变更说明"
+        }
+      ],
+      "lint_results": {
+        "tool": "使用的检查工具",
+        "passed": true,
+        "errors": [],
+        "warnings": []
+      },
+      "dependencies": {
+        "added": ["新增依赖"],
+        "removed": ["移除依赖"]
+      },
+      "notes": ["实现说明"]
+    }
+    ```
+    
+    # 代码规范
+    - 遵循项目现有的代码风格
+    - 添加必要的类型注解
+    - 编写清晰的函数/类文档
+    - 处理边界条件和异常
+    - 避免硬编码配置
+    - 代码变更需经 HITL 审批
+    
+  # 可用技能
+  skills:
+    - code-generation
+    - linter-check
+    - code-formatting
+    - dependency-management
+    
+  # 可用工具
+  tools:
+    - read_file
+    - write_file
+    - str_replace
+    - bash
+    - search_code
+    
+  # 验收标准
+  acceptance_criteria:
+    - "代码通过 Linter 检查"
+    - "代码符合项目规范"
+    - "代码包含必要的注释"
+    - "代码包含错误处理"
+    - "变更清单完整准确"
+    
+  # HITL 配置
+  hitl:
+    require_approval: true
+    approval_type: code_change_approve
+    timeout_seconds: 86400
+    escalation:
+      enabled: true
+      timeout_seconds: 3600
+      notify: ["slack", "feishu"]
