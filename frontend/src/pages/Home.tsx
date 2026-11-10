@@ -1,4 +1,7 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { analyticsService } from '../services'
+import type { DashboardStats } from '../types'
 
 interface StatCard {
   title: string
@@ -15,7 +18,7 @@ interface QuickLink {
   path: string
 }
 
-const stats: StatCard[] = [
+const defaultStats: StatCard[] = [
   { title: '待处理工单', value: 12, change: '+3', changeType: 'up', icon: '📋' },
   { title: '进行中任务', value: 5, icon: '⚡' },
   { title: '今日完成', value: 8, change: '+2', changeType: 'up', icon: '✅' },
@@ -36,10 +39,10 @@ const quickLinks: QuickLink[] = [
     path: '/projects',
   },
   {
-    title: '监控面板',
-    description: '查看系统监控数据',
+    title: '运营看板',
+    description: '查看运营数据分析',
     icon: '📊',
-    path: '/monitor',
+    path: '/projects/default/dashboard',
   },
   {
     title: '知识库',
@@ -82,6 +85,52 @@ const recentActivities = [
 
 export default function Home() {
   const navigate = useNavigate()
+  const [, setGlobalStats] = useState<DashboardStats | null>(null)
+  const [stats, setStats] = useState<StatCard[]>(defaultStats)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadGlobalStats()
+  }, [])
+
+  const loadGlobalStats = async () => {
+    try {
+      const data = await analyticsService.getGlobalStats()
+      setGlobalStats(data)
+      setStats([
+        { 
+          title: '总需求数', 
+          value: data.total_requirements, 
+          change: '+12%', 
+          changeType: 'up', 
+          icon: '📋' 
+        },
+        { 
+          title: '进行中任务', 
+          value: data.in_progress, 
+          icon: '⚡' 
+        },
+        { 
+          title: '已完成', 
+          value: data.completed, 
+          change: '+8%', 
+          changeType: 'up', 
+          icon: '✅' 
+        },
+        { 
+          title: '待审核', 
+          value: data.pending_review, 
+          change: '-5%', 
+          changeType: 'down', 
+          icon: '👀' 
+        },
+      ])
+    } catch (error) {
+      console.error('Failed to load global stats:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="p-6 bg-gray-50 min-h-full">
@@ -98,7 +147,15 @@ export default function Home() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {stats.map((stat) => (
+          {loading ? (
+            Array(4).fill(0).map((_, i) => (
+              <div key={i} className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm animate-pulse">
+                <div className="h-8 w-8 bg-gray-200 rounded mb-3"></div>
+                <div className="h-8 w-20 bg-gray-200 rounded mb-1"></div>
+                <div className="h-4 w-24 bg-gray-100 rounded"></div>
+              </div>
+            ))
+          ) : stats.map((stat) => (
             <div
               key={stat.title}
               className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm"

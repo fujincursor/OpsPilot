@@ -415,3 +415,51 @@ export interface TestTaskSummary {
 export interface CreateTestTaskRequest {
   codegen_task_id: string
 }
+
+// Dashboard & Analytics Types
+export interface DashboardStats {
+  total_requirements: number
+  completed: number
+  in_progress: number
+  pending_review: number
+  avg_completion_time: number
+}
+
+export interface TrendData {
+  date: string
+  count: number
+  type: 'created' | 'completed' | 'closed'
+}
+
+export interface AgentPerformance {
+  agent_type: 'lead' | 'bugfix' | 'feature' | 'doc' | 'review'
+  tasks_completed: number
+  success_rate: number
+  avg_time: number
+}
+
+export interface QualityMetrics {
+  first_pass_rate: number
+  code_quality_score: number
+  test_coverage_avg: number
+}
+
+export interface EfficiencyMetrics {
+  avg_analysis_time: number
+  avg_design_time: number
+  avg_coding_time: number
+  avg_test_time: number
+}
+
+export interface FunnelData {
+  stage: string
+  count: number
+  percentage: number
+}
+
+export interface DateRange {
+  start: string
+  end: string
+}
+
+export type ExportFormat = 'pdf' | 'excel' | 'csv'

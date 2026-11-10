@@ -134,6 +134,16 @@ export default function Sidebar({ currentProject = '项目 Alpha', sessions = mo
             </span>
           )}
         </button>
+        <button
+          onClick={() => navigate('/projects/default/dashboard')}
+          className={`w-full mt-2 py-2 text-sm font-medium flex items-center justify-center gap-1.5 rounded-lg transition-colors ${
+            location.pathname.includes('/dashboard')
+              ? 'bg-primary text-white'
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          📊 运营看板
+        </button>
       </div>
 
       {/* Session List */}

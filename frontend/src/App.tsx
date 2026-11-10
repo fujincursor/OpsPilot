@@ -13,6 +13,7 @@ import Reviews from './pages/Reviews'
 import ReviewDetail from './pages/ReviewDetail'
 import CodeGenDetail from './pages/CodeGenDetail'
 import TestDetail from './pages/TestDetail'
+import Dashboard from './pages/Dashboard'
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Route path="chat/:sessionId" element={<Chat />} />
         <Route path="projects" element={<Projects />} />
         <Route path="projects/:id" element={<ProjectDetail />} />
+        <Route path="projects/:id/dashboard" element={<Dashboard />} />
         <Route path="projects/:id/knowledge" element={<Knowledge />} />
         <Route path="projects/:id/requirements" element={<Requirements />} />
         <Route path="knowledge/:kbId" element={<KnowledgeDetail />} />
