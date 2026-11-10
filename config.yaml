@@ -1,7 +1,7 @@
 # OpsPilot 配置文件 - 基于 DeerFlow 框架
 # 此配置定义了 OpsPilot 运维领航的 Agent 系统
 
-config_version: 1
+config_version: 65
 
 # ============================================================================
 # 日志配置
@@ -24,7 +24,7 @@ token_usage:
 # ============================================================================
 token_budget:
   enabled: true
-  max_tokens: 100000
+  max_tokens: 200000
   warn_threshold: 0.8
   hard_stop_threshold: 1.0
 
@@ -38,7 +38,7 @@ max_recursion_limit: 500
 # 模型配置
 # ============================================================================
 models:
-  # OpenAI GPT-4
+  # OpenAI GPT-4o
   - name: gpt-4o
     display_name: GPT-4o
     use: langchain_openai:ChatOpenAI
@@ -47,21 +47,21 @@ models:
     timeout: 300.0
     max_retries: 2
     max_tokens: 4096
+    context_window: 128000
     supports_thinking: false
     supports_vision: true
 
-  # DeepSeek
+  # DeepSeek V3
   - name: deepseek-v3
     display_name: DeepSeek V3
-    use: langchain_openai:ChatOpenAI
+    use: langchain_deepseek:ChatDeepSeek
     model: deepseek-chat
     api_key: $DEEPSEEK_API_KEY
-    base_url: https://api.deepseek.com
     timeout: 300.0
     max_retries: 2
     max_tokens: 4096
 
-  # Claude (可选)
+  # Claude Sonnet (可选)
   - name: claude-sonnet
     display_name: Claude Sonnet 3.5
     use: langchain_anthropic:ChatAnthropic
@@ -74,145 +74,38 @@ models:
     supports_vision: true
 
 # ============================================================================
-# 工具配置
+# Sandbox 配置 (代码执行环境)
 # ============================================================================
-tools:
-  # 网页搜索
-  - name: web_search
-    enabled: true
-    group: search
-    use: deerflow.tools.builtins.tavily_search:TavilySearchTool
-    config:
-      api_key: $TAVILY_API_KEY
-      max_results: 5
+sandbox:
+  use: deerflow.sandbox.local:LocalSandboxProvider
+  allow_host_bash: true
+  prewarm: false
+  prewarm_max_concurrent: 1
 
-  # 网页抓取
-  - name: web_fetch
-    enabled: true
-    group: search
-    use: deerflow.tools.builtins.web_fetch:WebFetchTool
+# ============================================================================
+# Sub-Agent 运行时配置
+# ============================================================================
+subagent_runtime:
+  max_running: 3
+  max_queued: 64
+  admission_policy: queue
+  queue_timeout_seconds: 300
 
-  # 文件操作
-  - name: read_file
-    enabled: true
-    group: filesystem
-    use: deerflow.tools.builtins.filesystem:ReadFileTool
-
-  - name: write_file
-    enabled: true
-    group: filesystem
-    use: deerflow.tools.builtins.filesystem:WriteFileTool
-
-  - name: list_files
-    enabled: true
-    group: filesystem
-    use: deerflow.tools.builtins.filesystem:ListFilesTool
-
-  # Bash 执行
-  - name: bash
-    enabled: true
-    group: execution
-    use: deerflow.tools.builtins.bash:BashTool
-    config:
-      timeout: 60
-      allowed_commands:
-        - python
-        - pytest
-        - pip
-        - npm
-        - node
-        - git
-        - curl
-        - cat
-        - ls
-        - grep
-
-  # 代码执行
-  - name: python_repl
-    enabled: true
-    group: execution
-    use: deerflow.tools.builtins.python_repl:PythonReplTool
-    config:
-      timeout: 60
+# ============================================================================
+# Sub-Agents 配置 (可选覆盖)
+# ============================================================================
+# subagents:
+#   timeout_seconds: 1800
+#   agents:
+#     general-purpose:
+#       timeout_seconds: 1200
 
 # ============================================================================
 # Skills 配置
 # ============================================================================
 skills:
-  # Skills 目录路径
   paths:
     - skills/opspilot
-    - deerflow/skills/public
-
-  # 默认启用的 Skills
-  enabled:
-    - requirement-analysis
-    - bugfix-solution
-    - feature-design
-    - code-generation
-    - test-execution
-    - knowledge-retrieval
-    - deep-research
-
-# ============================================================================
-# Sub-Agents 配置
-# ============================================================================
-subagents:
-  enabled: true
-  max_concurrent: 3
-  
-  agents:
-    # 需求分析 Agent
-    - name: requirement_analyzer
-      display_name: 需求分析 Agent
-      description: 分析运维需求，进行分类和优先级评估
-      skills:
-        - requirement-analysis
-        - knowledge-retrieval
-      
-    # Bug 修复 Agent
-    - name: bugfix_agent
-      display_name: Bug 修复 Agent
-      description: 针对 Bug 类型需求生成修复方案
-      skills:
-        - bugfix-solution
-        - code-generation
-        - test-execution
-      
-    # 功能设计 Agent
-    - name: feature_agent
-      display_name: 功能设计 Agent
-      description: 针对功能请求生成设计方案
-      skills:
-        - feature-design
-        - deep-research
-      
-    # 代码生成 Agent
-    - name: codegen_agent
-      display_name: 代码生成 Agent
-      description: 根据设计方案生成代码
-      skills:
-        - code-generation
-        - test-execution
-      
-    # 测试 Agent
-    - name: test_agent
-      display_name: 测试 Agent
-      description: 执行测试并验证代码变更
-      skills:
-        - test-execution
-
-# ============================================================================
-# Sandbox 配置
-# ============================================================================
-sandbox:
-  mode: docker
-  config:
-    image: python:3.11-slim
-    timeout: 300
-    memory_limit: 512m
-    network_mode: none
-    working_dir: /workspace
 
 # ============================================================================
 # Memory 配置
@@ -229,13 +122,7 @@ memory:
 # HITL (Human-in-the-Loop) 配置
 # ============================================================================
 hitl:
-  enabled: true
-  require_approval:
-    - feature-design
-    - code-generation
-  auto_approve:
-    - bugfix-solution
-    - test-execution
+  enabled: false
 
 # ============================================================================
 # 知识库配置
@@ -243,31 +130,12 @@ hitl:
 knowledge_base:
   enabled: true
   scope_selection_enabled: true
-  
-  # 本地文档索引
   local:
     enabled: true
     paths:
       - docs/
+      - knowledge-base/
       - README.md
-    
-  # RAGFlow 集成 (可选)
-  ragflow:
-    enabled: false
-    base_url: $RAGFLOW_BASE_URL
-    api_key: $RAGFLOW_API_KEY
-
-# ============================================================================
-# API Gateway 配置
-# ============================================================================
-gateway:
-  host: 0.0.0.0
-  port: 8001
-  cors:
-    enabled: true
-    origins:
-      - http://localhost:3000
-      - http://localhost:8000
 
 # ============================================================================
 # 数据库配置
@@ -276,19 +144,3 @@ database:
   backend: sqlite
   connection:
     path: .opspilot/data/opspilot.db
-
-# ============================================================================
-# 调度器配置 (定时任务)
-# ============================================================================
-scheduler:
-  enabled: false
-  multi_instance: false
-  max_concurrent_runs: 5
-
-# ============================================================================
-# 项目设置
-# ============================================================================
-projects:
-  enabled: true
-  instructions_max_bytes: 8192
-  shelf_index_max_entries: 100

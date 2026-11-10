@@ -14,10 +14,24 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
-# 添加 DeerFlow 到 Python 路径
-DEERFLOW_PATH = Path(__file__).parent.parent.parent.parent.parent / "deerflow" / "backend" / "packages" / "harness"
+# 设置 DeerFlow 环境变量和路径
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.parent
+DEERFLOW_PATH = PROJECT_ROOT / "deerflow" / "backend" / "packages" / "harness"
+
 if DEERFLOW_PATH.exists():
     sys.path.insert(0, str(DEERFLOW_PATH))
+
+# 设置 DeerFlow 配置路径
+config_path = PROJECT_ROOT / "config.yaml"
+if config_path.exists():
+    os.environ.setdefault("DEER_FLOW_CONFIG_PATH", str(config_path))
+
+skills_path = PROJECT_ROOT / "skills"
+if skills_path.exists():
+    os.environ.setdefault("DEER_FLOW_SKILLS_PATH", str(skills_path))
+
+opspilot_home = PROJECT_ROOT / ".opspilot"
+os.environ.setdefault("DEER_FLOW_HOME", str(opspilot_home))
 
 
 @dataclass
@@ -55,16 +69,6 @@ class DeerFlowService:
         try:
             from deerflow.client import DeerFlowClient
             
-            # 设置配置路径
-            config_path = Path(__file__).parent.parent.parent.parent.parent / "config.yaml"
-            if config_path.exists():
-                os.environ.setdefault("DEER_FLOW_CONFIG_PATH", str(config_path))
-            
-            # 设置 Skills 路径
-            skills_path = Path(__file__).parent.parent.parent.parent.parent / "skills"
-            if skills_path.exists():
-                os.environ.setdefault("DEER_FLOW_SKILLS_PATH", str(skills_path))
-            
             self._client = DeerFlowClient()
             logger.info("DeerFlow Client 初始化成功")
             
@@ -74,6 +78,7 @@ class DeerFlowService:
             self._client = None
         except Exception as e:
             logger.error(f"DeerFlow Client 初始化失败: {e}")
+            logger.info("将使用模拟模式运行")
             self._client = None
     
     @property
