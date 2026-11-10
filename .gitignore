@@ -182,6 +182,7 @@ storage/
 
 # AI model caches
 models/
+!backend/src/models/
 embeddings_cache/
 
 # Test artifacts

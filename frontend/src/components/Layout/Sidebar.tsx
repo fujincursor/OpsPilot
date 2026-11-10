@@ -78,7 +78,10 @@ export default function Sidebar({ currentProject = '项目 Alpha', sessions = mo
         <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
           当前项目
         </div>
-        <div className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-primary-light transition-colors">
+        <div
+          onClick={() => navigate('/projects')}
+          className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-primary-light transition-colors"
+        >
           <div className="flex items-center justify-between text-sm font-semibold text-gray-800">
             <span>🏢 {currentProject}</span>
             <span className="text-gray-400">▼</span>
@@ -94,6 +97,12 @@ export default function Sidebar({ currentProject = '项目 Alpha', sessions = mo
             </div>
           </div>
         </div>
+        <button
+          onClick={() => navigate('/projects')}
+          className="w-full mt-3 py-2 text-sm text-primary hover:text-primary-hover font-medium flex items-center justify-center gap-1.5 bg-primary-light hover:bg-primary/20 rounded-lg transition-colors"
+        >
+          📁 项目管理
+        </button>
       </div>
 
       {/* Session List */}
