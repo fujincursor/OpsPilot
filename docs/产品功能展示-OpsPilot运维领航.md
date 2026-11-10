@@ -17,32 +17,76 @@
 
 ## 业务流程概览
 
-```
-用户提交需求 → Lead Agent 分析 → 知识检索 → 分类路由
-                                              ↓
-                        ┌───────────────────────┴───────────────────────┐
-                        ↓                                               ↓
-                    Bug 修复                                       新需求设计
-                        ↓                                               ↓
-                Bug Fix Agent                                   Feature Agent
-                        ↓                                               ↓
-                    修复方案                                        设计方案
-                        ↓                                               ↓
-              ┌─────────┴─────────┐                        ┌─────────┴─────────┐
-              ↓                   ↓                        ↓                   ↓
-         [HITL 审批]           驳回                    [HITL 审批]           驳回
-              ↓                                             ↓
-         Code Gen Agent                                Code Gen Agent
-              ↓                                             ↓
-           代码生成                                       代码生成
-              ↓                                             ↓
-         [HITL 审批]                                   [HITL 审批]
-              ↓                                             ↓
-          Test Agent                                    Test Agent
-              ↓                                             ↓
-           测试执行                                       测试执行
-              ↓                                             ↓
-           完成交付                                       完成交付
+```mermaid
+flowchart TB
+    subgraph 入口层["📝 需求入口"]
+        A[👤 用户提交需求]
+    end
+    
+    subgraph 分析层["🧠 智能分析"]
+        B[🤖 Lead Agent 分析]
+        C[(📚 知识库检索)]
+        D{🔀 分类路由}
+    end
+    
+    subgraph Bug修复["🐛 Bug 修复流程"]
+        E1[🔧 Bug Fix Agent]
+        F1[📋 修复方案]
+        G1{⏸️ HITL 审批}
+        H1[💻 Code Gen Agent]
+        I1[📝 代码生成]
+        J1{⏸️ HITL 审批}
+        K1[🧪 Test Agent]
+        L1[✅ 测试执行]
+    end
+    
+    subgraph 需求设计["✨ 新需求流程"]
+        E2[📐 Feature Agent]
+        F2[📋 设计方案]
+        G2{⏸️ HITL 审批}
+        H2[💻 Code Gen Agent]
+        I2[📝 代码生成]
+        J2{⏸️ HITL 审批}
+        K2[🧪 Test Agent]
+        L2[✅ 测试执行]
+    end
+    
+    subgraph 交付层["🎉 完成交付"]
+        M[🚀 交付完成]
+    end
+    
+    A --> B
+    B <--> C
+    B --> D
+    
+    D -->|Bug| E1
+    D -->|新需求| E2
+    
+    E1 --> F1 --> G1
+    G1 -->|通过| H1
+    G1 -.->|驳回| E1
+    H1 --> I1 --> J1
+    J1 -->|通过| K1
+    J1 -.->|驳回| H1
+    K1 --> L1 --> M
+    
+    E2 --> F2 --> G2
+    G2 -->|通过| H2
+    G2 -.->|驳回| E2
+    H2 --> I2 --> J2
+    J2 -->|通过| K2
+    J2 -.->|驳回| H2
+    K2 --> L2 --> M
+    
+    style A fill:#e1f5fe,stroke:#01579b
+    style B fill:#fff3e0,stroke:#e65100
+    style C fill:#f3e5f5,stroke:#7b1fa2
+    style D fill:#fff8e1,stroke:#f57f17
+    style G1 fill:#ffebee,stroke:#c62828
+    style G2 fill:#ffebee,stroke:#c62828
+    style J1 fill:#ffebee,stroke:#c62828
+    style J2 fill:#ffebee,stroke:#c62828
+    style M fill:#e8f5e9,stroke:#2e7d32
 ```
 
 ---
@@ -175,46 +219,84 @@
 
 ### 场景 1：Bug 修复流程
 
-```
-1. 用户在对话入口描述问题：「用户登录接口报 500 错误，日志显示数据库连接超时」
-   ↓
-2. Lead Agent 自动检索知识库，找到相关架构文档和配置指南
-   ↓
-3. 系统自动分类为 Bug，优先级设为「高」
-   ↓
-4. Bug Fix Agent 分析根因，生成修复方案
-   ↓
-5. HITL 审批：人工确认方案合理性 → 通过
-   ↓
-6. Code Gen Agent 生成代码变更
-   ↓
-7. HITL 审批：人工 Review 代码 → 通过
-   ↓
-8. Test Agent 执行测试用例 → 通过
-   ↓
-9. 完成交付
+```mermaid
+flowchart LR
+    subgraph 输入["💬 用户输入"]
+        A["🗣️ 用户登录接口报 500 错误<br/>日志显示数据库连接超时"]
+    end
+    
+    subgraph 分析["🔍 智能分析"]
+        B["📚 知识库检索<br/><small>架构文档 + 配置指南</small>"]
+        C["🏷️ 自动分类<br/><small>类型: Bug | 优先级: 高</small>"]
+    end
+    
+    subgraph 方案["📋 方案生成"]
+        D["🔧 Bug Fix Agent<br/><small>根因分析 + 修复方案</small>"]
+        E{{"⏸️ HITL 审批<br/><small>方案确认</small>"}}
+    end
+    
+    subgraph 编码["💻 代码生成"]
+        F["⚙️ Code Gen Agent<br/><small>生成代码变更</small>"]
+        G{{"⏸️ HITL 审批<br/><small>代码 Review</small>"}}
+    end
+    
+    subgraph 测试["🧪 测试验证"]
+        H["✅ Test Agent<br/><small>执行测试用例</small>"]
+    end
+    
+    subgraph 交付["🎉 完成"]
+        I["🚀 交付完成"]
+    end
+    
+    A --> B --> C --> D --> E
+    E -->|✓ 通过| F --> G
+    G -->|✓ 通过| H --> I
+    
+    style A fill:#e3f2fd,stroke:#1565c0
+    style E fill:#fff3e0,stroke:#ef6c00
+    style G fill:#fff3e0,stroke:#ef6c00
+    style I fill:#e8f5e9,stroke:#2e7d32
 ```
 
 ### 场景 2：新需求设计流程
 
-```
-1. 用户在对话入口描述需求：「需要新增用户权限管理模块，支持 RBAC 模型」
-   ↓
-2. Lead Agent 检索知识库，理解现有架构
-   ↓
-3. 系统自动分类为「新需求」
-   ↓
-4. Feature Design Agent 生成技术方案
-   ↓
-5. HITL 审批：人工确认设计方案 → 通过
-   ↓
-6. Code Gen Agent 生成代码框架
-   ↓
-7. HITL 审批：人工 Review 代码 → 通过
-   ↓
-8. Test Agent 执行测试 → 通过
-   ↓
-9. 完成交付
+```mermaid
+flowchart LR
+    subgraph 输入["💬 用户输入"]
+        A["🗣️ 新增用户权限管理模块<br/>支持 RBAC 模型"]
+    end
+    
+    subgraph 分析["🔍 智能分析"]
+        B["📚 知识库检索<br/><small>理解现有架构</small>"]
+        C["🏷️ 自动分类<br/><small>类型: 新需求</small>"]
+    end
+    
+    subgraph 设计["📐 方案设计"]
+        D["✨ Feature Design Agent<br/><small>生成技术方案</small>"]
+        E{{"⏸️ HITL 审批<br/><small>设计确认</small>"}}
+    end
+    
+    subgraph 编码["💻 代码生成"]
+        F["⚙️ Code Gen Agent<br/><small>生成代码框架</small>"]
+        G{{"⏸️ HITL 审批<br/><small>代码 Review</small>"}}
+    end
+    
+    subgraph 测试["🧪 测试验证"]
+        H["✅ Test Agent<br/><small>执行测试用例</small>"]
+    end
+    
+    subgraph 交付["🎉 完成"]
+        I["🚀 交付完成"]
+    end
+    
+    A --> B --> C --> D --> E
+    E -->|✓ 通过| F --> G
+    G -->|✓ 通过| H --> I
+    
+    style A fill:#f3e5f5,stroke:#7b1fa2
+    style E fill:#fff3e0,stroke:#ef6c00
+    style G fill:#fff3e0,stroke:#ef6c00
+    style I fill:#e8f5e9,stroke:#2e7d32
 ```
 
 ---
@@ -237,13 +319,68 @@
 
 基于 **DeerFlow 2.0** 框架构建：
 
-- **Lead Agent**：主编排，需求理解与任务分解
-- **Sub-Agents**：专业子 Agent（Bug Fix / Feature Design / Code Gen / Test）
-- **Middleware Chain**：HITL 人工卡点、审计日志
-- **Skills 系统**：可扩展技能模块
-- **Sandbox**：隔离代码执行环境
-- **DeerMem**：长期记忆持久化
-- **RAGFlow**：知识库检索增强
+```mermaid
+flowchart TB
+    subgraph 用户层["👤 用户交互层"]
+        UI["💬 对话式 UI"]
+        Monitor["📊 监控面板"]
+    end
+    
+    subgraph 编排层["🧠 Agent 编排层"]
+        Lead["🎯 Lead Agent<br/><small>主编排 · 需求理解 · 任务分解</small>"]
+        
+        subgraph SubAgents["🤖 Sub-Agents"]
+            BugFix["🔧 Bug Fix"]
+            Feature["📐 Feature Design"]
+            CodeGen["💻 Code Gen"]
+            Test["🧪 Test"]
+        end
+    end
+    
+    subgraph 中间件["⚙️ Middleware Chain"]
+        HITL["⏸️ HITL 人工卡点"]
+        Audit["📝 审计日志"]
+        Timeout["⏰ 超时升级"]
+    end
+    
+    subgraph 能力层["🔌 能力扩展层"]
+        Skills["🛠️ Skills 系统<br/><small>内置 + 自定义技能</small>"]
+        Sandbox["📦 Sandbox<br/><small>Docker · K8s · E2B</small>"]
+    end
+    
+    subgraph 数据层["💾 数据与知识层"]
+        DeerMem["🧠 DeerMem<br/><small>长期记忆持久化</small>"]
+        RAG["📚 RAGFlow<br/><small>知识库检索增强</small>"]
+    end
+    
+    UI --> Lead
+    Monitor --> Lead
+    Lead --> SubAgents
+    SubAgents --> HITL
+    HITL --> Audit
+    HITL --> Timeout
+    SubAgents --> Skills
+    SubAgents --> Sandbox
+    Lead <--> DeerMem
+    Lead <--> RAG
+    
+    style Lead fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style HITL fill:#ffebee,stroke:#c62828
+    style RAG fill:#e8f5e9,stroke:#2e7d32
+    style DeerMem fill:#e3f2fd,stroke:#1565c0
+```
+
+**核心组件说明**：
+
+| 组件 | 功能 |
+|------|------|
+| **Lead Agent** | 主编排器，负责需求理解与任务分解 |
+| **Sub-Agents** | 专业子 Agent（Bug Fix / Feature Design / Code Gen / Test） |
+| **Middleware Chain** | HITL 人工卡点、审计日志、超时升级 |
+| **Skills 系统** | 可扩展技能模块（内置 + 自定义） |
+| **Sandbox** | 隔离代码执行环境（Docker / K8s / E2B） |
+| **DeerMem** | 长期记忆持久化 |
+| **RAGFlow** | 知识库检索增强 |
 
 ---
 
@@ -260,4 +397,4 @@ OpsPilot 运维领航通过 AI Agent 技术，将传统的运维工单流程转�
 
 ---
 
-*文档版本：v1.0 | 更新时间：2026-11-10*
+*文档版本：v1.1 | 更新时间：2026-11-10 | 新增 Mermaid 流程图*
