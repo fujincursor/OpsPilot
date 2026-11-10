@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent 执行监控 - OpsPilot 运维领航</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- 顶栏 -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">
+          <span class="logo-icon">🚀</span>
+          <span class="logo-brand">
+            <span class="logo-en">OpsPilot</span>
+            <span class="logo-zh">运维领航</span>
+          </span>
+        </div>
+        <nav>
+          <a href="../portal/index.html" class="nav-link">工作台</a>
+          <a href="../m1/project-list.html" class="nav-link">项目管理</a>
+          <a href="../chat/index.html" class="nav-link">对话</a>
+          <a href="#" class="nav-link active">监控</a>
+        </nav>
+      </div>
+      <div class="header-right">
+        <span class="header-status">🟢 系统正常</span>
+        <div class="user-avatar">张</div>
+      </div>
+    </header>
+
+    <!-- 监控主内容 -->
+    <main class="monitor-layout">
+      <!-- 页面头部 -->
+      <div class="monitor-header">
+        <h1 class="monitor-title">Agent 执行监控</h1>
+        <div class="monitor-actions">
+          <select class="input" style="width: 160px; height: 36px;">
+            <option>项目: 全部</option>
+            <option selected>项目 Alpha</option>
+            <option>项目 Beta</option>
+          </select>
+          <button class="btn btn-primary" style="height: 36px;">🔄 刷新</button>
+        </div>
+      </div>
+
+      <!-- 统计卡片 -->
+      <div class="stats-grid">
+        <div class="stat-card running">
+          <div class="stat-icon">📊</div>
+          <div class="stat-value">3</div>
+          <div class="stat-label">执行中</div>
+          <div class="stat-detail">Bug修复: 2 · 需求: 1</div>
+        </div>
+        <div class="stat-card pending">
+          <div class="stat-icon">⏸️</div>
+          <div class="stat-value">2</div>
+          <div class="stat-label">等待审批</div>
+          <div class="stat-detail">方案审批: 1 · 代码审批: 1</div>
+        </div>
+        <div class="stat-card complete">
+          <div class="stat-icon">✅</div>
+          <div class="stat-value">8</div>
+          <div class="stat-label">今日完成</div>
+          <div class="stat-detail">Bug: 5 · 需求: 3</div>
+        </div>
+        <div class="stat-card failed">
+          <div class="stat-icon">❌</div>
+          <div class="stat-value">1</div>
+          <div class="stat-label">失败</div>
+          <div class="stat-detail">重试中: 0</div>
+        </div>
+      </div>
+
+      <!-- 执行中任务 -->
+      <section class="task-section">
+        <div class="section-header">
+          <h2 class="section-title">
+            当前执行中任务
+            <span class="section-count">(3)</span>
+          </h2>
+        </div>
+        <div class="task-grid">
+          <!-- 任务卡片 1 -->
+          <div class="task-card">
+            <div class="task-card-header">
+              <div class="task-type-icon bug">🐛</div>
+              <div class="task-info">
+                <div class="task-title">
+                  数据库连接超时问题
+                  <span class="task-id">BUG-2024-001</span>
+                </div>
+                <div class="task-meta">项目 Alpha · 张三提交</div>
+              </div>
+              <span class="task-status running">🔄 执行中</span>
+            </div>
+            <div class="task-card-body">
+              <div class="task-stage">
+                <span class="task-stage-label">当前阶段:</span> 代码生成
+              </div>
+              <div class="task-agent">
+                <span class="task-agent-icon">💻</span>
+                <span>Code Gen Agent</span>
+              </div>
+              
+              <div class="task-progress-wrapper">
+                <div class="task-progress-steps">
+                  <span class="task-progress-step done">✓ 需求分析</span>
+                  <span class="task-progress-step done">✓ 方案生成</span>
+                  <span class="task-progress-step done">✓ 方案审批</span>
+                  <span class="task-progress-step active">◉ 代码生成</span>
+                  <span class="task-progress-step">○ 测试</span>
+                </div>
+                <div class="task-progress-bar">
+                  <div class="task-progress-fill" style="width: 70%;"></div>
+                </div>
+              </div>
+
+              <div class="task-time-info">
+                <span>开始: 10:30</span>
+                <span>已执行: 45 分钟</span>
+                <span>预计剩余: 15 分钟</span>
+              </div>
+
+              <div class="task-resources">
+                <div class="task-resource">
+                  <span class="task-resource-label">Tokens:</span>
+                  <span class="task-resource-value">8,450</span>
+                </div>
+                <div class="task-resource">
+                  <span class="task-resource-label">API 调用:</span>
+                  <span class="task-resource-value">12</span>
+                </div>
+                <div class="task-resource">
+                  <span class="task-resource-label">知识引用:</span>
+                  <span class="task-resource-value">3</span>
+                </div>
+              </div>
+            </div>
+            <div class="task-card-footer">
+              <button class="task-action-btn">⏸️ 暂停</button>
+              <button class="task-action-btn">⏹️ 终止</button>
+              <button class="task-action-btn">📋 日志</button>
+              <button class="task-action-btn primary" onclick="location.href='task-detail.html'">查看详情</button>
+            </div>
+          </div>
+
+          <!-- 任务卡片 2 -->
+          <div class="task-card">
+            <div class="task-card-header">
+              <div class="task-type-icon feature">✨</div>
+              <div class="task-info">
+                <div class="task-title">
+                  用户权限模块设计
+                  <span class="task-id">FEAT-2024-003</span>
+                </div>
+                <div class="task-meta">项目 Alpha · 李四提交</div>
+              </div>
+              <span class="task-status running">🔄 执行中</span>
+            </div>
+            <div class="task-card-body">
+              <div class="task-stage">
+                <span class="task-stage-label">当前阶段:</span> 设计方案生成
+              </div>
+              <div class="task-agent">
+                <span class="task-agent-icon">📐</span>
+                <span>Feature Design Agent</span>
+              </div>
+              
+              <div class="task-progress-wrapper">
+                <div class="task-progress-steps">
+                  <span class="task-progress-step done">✓ 需求分析</span>
+                  <span class="task-progress-step active">◉ 方案生成</span>
+                  <span class="task-progress-step">○ 方案审批</span>
+                  <span class="task-progress-step">○ 代码生成</span>
+                  <span class="task-progress-step">○ 测试</span>
+                </div>
+                <div class="task-progress-bar">
+                  <div class="task-progress-fill" style="width: 35%;"></div>
+                </div>
+              </div>
+
+              <div class="task-time-info">
+                <span>开始: 09:15</span>
+                <span>已执行: 1 小时 30 分钟</span>
+                <span>预计剩余: 2 小时</span>
+              </div>
+
+              <div class="task-resources">
+                <div class="task-resource">
+                  <span class="task-resource-label">Tokens:</span>
+                  <span class="task-resource-value">12,800</span>
+                </div>
+                <div class="task-resource">
+                  <span class="task-resource-label">API 调用:</span>
+                  <span class="task-resource-value">18</span>
+                </div>
+                <div class="task-resource">
+                  <span class="task-resource-label">知识引用:</span>
+                  <span class="task-resource-value">5</span>
+                </div>
+              </div>
+            </div>
+            <div class="task-card-footer">
+              <button class="task-action-btn">⏸️ 暂停</button>
+              <button class="task-action-btn">⏹️ 终止</button>
+              <button class="task-action-btn">📋 日志</button>
+              <button class="task-action-btn primary">查看详情</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 等待审批任务 -->
+      <section class="task-section">
+        <div class="section-header">
+          <h2 class="section-title">
+            等待审批任务
+            <span class="section-count">(2)</span>
+          </h2>
+        </div>
+        <div class="task-grid">
+          <!-- 等待审批卡片 -->
+          <div class="task-card pending-card">
+            <div class="task-card-header">
+              <div class="task-type-icon bug">🐛</div>
+              <div class="task-info">
+                <div class="task-title">
+                  API 响应超时优化
+                  <span class="task-id">BUG-2024-003</span>
+                </div>
+                <div class="task-meta">项目 Alpha · 王五提交</div>
+              </div>
+              <span class="task-status pending">🟡 待审批</span>
+            </div>
+            <div class="task-card-body">
+              <div class="pending-info">
+                <div class="pending-info-title">
+                  📋 等待: 修复方案审批
+                </div>
+                <div class="pending-info-detail">
+                  审批人: 张三<br>
+                  已等待: 2 小时 15 分钟<br>
+                  超时剩余: 21 小时 45 分钟
+                </div>
+              </div>
+            </div>
+            <div class="task-card-footer">
+              <button class="task-action-btn">📩 催促</button>
+              <button class="task-action-btn">🔄 重新指派</button>
+              <button class="task-action-btn primary" onclick="location.href='../chat/approval.html'">去审批</button>
+            </div>
+          </div>
+
+          <!-- 代码审批卡片 -->
+          <div class="task-card pending-card">
+            <div class="task-card-header">
+              <div class="task-type-icon feature">✨</div>
+              <div class="task-info">
+                <div class="task-title">
+                  日志采集优化
+                  <span class="task-id">FEAT-2024-002</span>
+                </div>
+                <div class="task-meta">项目 Alpha · 赵六提交</div>
+              </div>
+              <span class="task-status pending">🟡 待审批</span>
+            </div>
+            <div class="task-card-body">
+              <div class="pending-info">
+                <div class="pending-info-title">
+                  💻 等待: 代码变更审批
+                </div>
+                <div class="pending-info-detail">
+                  审批人: 李四<br>
+                  已等待: 45 分钟<br>
+                  超时剩余: 23 小时 15 分钟
+                </div>
+              </div>
+            </div>
+            <div class="task-card-footer">
+              <button class="task-action-btn">📩 催促</button>
+              <button class="task-action-btn">🔄 重新指派</button>
+              <button class="task-action-btn primary">去审批</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

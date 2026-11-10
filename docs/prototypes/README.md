@@ -1,14 +1,36 @@
 # 运维 Agent 生产系统 - 页面原型索引
 
-本目录包含**统一入口（含登录）**与 **M1～M9 共 9 个模块**的静态 HTML 页面原型，样式统一遵循 [《页面原型风格规范》](../页面原型风格规范.md)。
+本目录包含基于 **DeerFlow 2.0 架构**的 HTML 页面原型，遵循 [《页面原型风格规范》](../页面原型风格规范.md)。
+
+---
+
+## 🆕 DeerFlow 新增原型
+
+### Phase 1: 核心交互重设计
+
+| 模块 | 页面 | 说明 |
+|------|------|------|
+| **对话式入口** | [chat/welcome.html](chat/welcome.html) | 新会话欢迎状态 |
+| | [chat/index.html](chat/index.html) | 对话主界面（消息流） |
+| | [chat/approval.html](chat/approval.html) | HITL 审批卡片示例 |
+
+### Phase 2: 新增功能页面
+
+| 模块 | 页面 | 说明 |
+|------|------|------|
+| **执行监控** | [monitor/index.html](monitor/index.html) | Agent 执行监控主页 |
+| | [monitor/task-detail.html](monitor/task-detail.html) | 任务执行详情 |
+| **配置管理** | [m1/project-settings-skills.html](m1/project-settings-skills.html) | Skills 配置 |
+| | [m1/project-settings-sandbox.html](m1/project-settings-sandbox.html) | Sandbox 配置 |
 
 ---
 
 ## 推荐访问顺序（单点登录流程）
 
-1. **[统一登录](portal/login.html)** → 模拟登录，任意输入即可进入工作台  
-2. **[工作台（统一入口）](portal/index.html)** → 展示 9 个模块入口与功能描述，选择模块进入  
-3. 从工作台点击各模块「进入」链接，进入对应模块首屏；各模块内可继续按链接浏览
+1. **[统一登录](portal/login.html)** → 模拟登录，任意输入即可进入工作台
+2. **[工作台](portal/index.html)** → 展示功能模块入口
+3. **[对话入口](chat/welcome.html)** → 🆕 DeerFlow 对话式交互
+4. **[执行监控](monitor/index.html)** → 🆕 Agent 执行状态监控
 
 ---
 
@@ -16,42 +38,73 @@
 
 | 页面 | 文件 | 说明 |
 |------|------|------|
-| 登录 | [portal/login.html](portal/login.html) | 统一登录页，登录后跳转工作台 |
-| 工作台 | [portal/index.html](portal/index.html) | 统一入口，9 个模块卡片及功能描述、进入链接 |
-
-设计说明见 [统一入口与单点登录-设计说明](../统一入口与单点登录-设计说明.md)。
+| 登录 | [portal/login.html](portal/login.html) | 统一登录页 |
+| 工作台 | [portal/index.html](portal/index.html) | 统一入口工作台 |
 
 ---
 
-## 各模块入口与功能描述
+## 项目管理（M1）
 
-| 模块 | 功能描述 | 入口页 |
-|------|----------|--------|
-| **M1** 多项目与 Agent 实例管理 | 创建与管理运维项目，配置每个项目专属的 Agent 实例（模型、Prompt、工具链），管理项目成员与权限。 | [m1/project-list.html](m1/project-list.html) |
-| **M2** 项目信息与知识库前置维护 | 维护项目概述、架构、目录结构、配置说明与 Runbook；完成知识库就绪后，该项目方可提交需求与 Bug。 | [m2/profile-overview.html](m2/profile-overview.html) |
-| **M3** 知识库与系统理解增强 | 管理文档与代码索引，支持 RAG 检索与反馈写入，提升 Agent 对当前项目的理解能力。 | [m3/knowledge-overview.html](m3/knowledge-overview.html) |
-| **M4** 需求理解与分类 | 提交日常运维需求，由 Agent 自动分析并分类为 Bug 或新需求，并驱动后续修复或设计流程。 | [m4/ticket-list.html](m4/ticket-list.html) |
-| **M5** Bug 修复流程 | 查看 Bug 工单、生成与查看修复方案，经 Review 后进入代码生成与测试。 | [m5/bug-list.html](m5/bug-list.html) |
-| **M6** 新需求设计流程 | 查看新需求工单、生成与查看技术方案/设计文档，经 Review 后进入代码实现与测试。 | [m6/feature-list.html](m6/feature-list.html) |
-| **M7** 人工 Review 工作台 | 对待审的方案、代码变更与测试报告进行通过/驳回操作，并查看 Review 历史与审计日志。 | [m7/review-list.html](m7/review-list.html) |
-| **M8** 代码生成与语法校验 | 查看根据方案生成的代码变更，执行语法/静态检查，直至通过后进入测试。 | [m8/code-change-list.html](m8/code-change-list.html) |
-| **M9** 测试用例生成与执行 | 查看测试用例与执行结果，查看测试报告，失败可重新执行或回退修复。 | [m9/test-run-list.html](m9/test-run-list.html) |
-
----
-
-## 各模块原型目录
-
-| 模块 | 目录 | 说明 |
+| 页面 | 文件 | 说明 |
 |------|------|------|
-| 统一入口 | [portal/](portal/) | 登录、工作台 |
-| M1 | [m1/](m1/) | 项目列表、新建/编辑项目、Agent 配置、成员管理等 |
-| M2 | [m2/](m2/) | 项目信息概览、编辑、知识库就绪状态 |
-| M3 | [m3/](m3/) | 知识库概览、文档列表/新建/详情、代码索引、索引任务等 |
-| M4 | [m4/](m4/) | 需求工单列表、提交、工单详情 |
-| M5 | [m5/](m5/) | Bug 工单列表、详情、修复方案（多种状态） |
-| M6 | [m6/](m6/) | 新需求列表、详情、设计文档（多种状态） |
-| M7 | [m7/](m7/) | Review 待审列表、方案/代码/测试报告 Review 详情 |
-| M8 | [m8/](m8/) | 代码变更列表、代码变更详情（通过/失败/生成中） |
-| M9 | [m9/](m9/) | 测试运行列表、测试报告详情 |
+| 项目列表 | [m1/project-list.html](m1/project-list.html) | 项目管理首页 |
+| 新建项目 | [m1/project-new.html](m1/project-new.html) | 创建项目表单 |
+| 项目详情 | [m1/project-detail.html](m1/project-detail.html) | 项目概览 |
+| 基本信息 | [m1/project-settings-basic.html](m1/project-settings-basic.html) | 设置 - 基本信息 |
+| Agent 配置 | [m1/project-settings-agent.html](m1/project-settings-agent.html) | 设置 - Agent |
+| Skills 配置 | [m1/project-settings-skills.html](m1/project-settings-skills.html) | 🆕 设置 - Skills |
+| Sandbox 配置 | [m1/project-settings-sandbox.html](m1/project-settings-sandbox.html) | 🆕 设置 - Sandbox |
+| 成员管理 | [m1/project-settings-members.html](m1/project-settings-members.html) | 设置 - 成员 |
+| 高级 | [m1/project-settings-advanced.html](m1/project-settings-advanced.html) | 设置 - 高级 |
 
-各模块目录内均有 README 与详细页面列表，可进入后按需查看。
+---
+
+## 对话式入口（Chat）🆕
+
+| 页面 | 文件 | 说明 |
+|------|------|------|
+| 欢迎页 | [chat/welcome.html](chat/welcome.html) | 新会话欢迎状态 |
+| 对话主页 | [chat/index.html](chat/index.html) | 消息流与知识检索 |
+| HITL 审批 | [chat/approval.html](chat/approval.html) | 内嵌审批卡片 |
+
+---
+
+## Agent 执行监控（Monitor）🆕
+
+| 页面 | 文件 | 说明 |
+|------|------|------|
+| 监控主页 | [monitor/index.html](monitor/index.html) | 任务概览与卡片 |
+| 任务详情 | [monitor/task-detail.html](monitor/task-detail.html) | 流程图与日志 |
+
+---
+
+## 知识库（M3）
+
+| 页面 | 文件 | 说明 |
+|------|------|------|
+| 知识概览 | [m3/knowledge-overview.html](m3/knowledge-overview.html) | 知识库首页 |
+| 文档列表 | [m3/knowledge-doc-list.html](m3/knowledge-doc-list.html) | 文档管理 |
+| 文档详情 | [m3/knowledge-doc-detail.html](m3/knowledge-doc-detail.html) | 文档查看 |
+| 代码索引 | [m3/knowledge-code-index.html](m3/knowledge-code-index.html) | 代码索引管理 |
+
+---
+
+## 其他模块
+
+各模块目录内均有 README 与详细页面列表，可进入后按需查看：
+
+- [m2/](m2/) - 项目信息维护
+- [m4/](m4/) - 需求工单（将被对话式入口替代）
+- [m5/](m5/) - Bug 工单
+- [m6/](m6/) - 新需求
+- [m7/](m7/) - Review 工作台（将被 HITL 卡片替代）
+- [m8/](m8/) - 代码生成
+- [m9/](m9/) - 测试报告
+
+---
+
+## 设计文档
+
+- [DeerFlow原型设计-索引.md](../DeerFlow原型设计-索引.md) - 原型设计总览
+- [DeerFlow架构重设计-运维Agent生产系统.md](../DeerFlow架构重设计-运维Agent生产系统.md) - 架构设计
+- [页面原型风格规范.md](../页面原型风格规范.md) - 样式规范

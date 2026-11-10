@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HITL 审批 - OpsPilot 运维领航</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* HITL 审批卡片样式 */
+    .approval-card {
+      background: var(--bg-card);
+      border: 2px solid var(--warning);
+      border-radius: var(--radius-lg);
+      margin-top: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(217, 119, 6, 0.15);
+    }
+
+    .approval-header {
+      padding: 14px 18px;
+      background: rgba(245, 158, 11, 0.08);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .approval-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      background: var(--warning);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .approval-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .approval-status {
+      margin-left: auto;
+      padding: 4px 10px;
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--warning);
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .approval-body {
+      padding: 18px;
+    }
+
+    .approval-meta {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      display: flex;
+      gap: 20px;
+    }
+
+    .approval-section {
+      background: var(--bg-page);
+      border-radius: var(--radius-md);
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    .approval-section:last-of-type {
+      margin-bottom: 0;
+    }
+
+    .approval-section-header {
+      padding: 12px 16px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .approval-section-toggle {
+      margin-left: auto;
+      color: var(--primary);
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .approval-section-body {
+      padding: 14px 16px;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text-primary);
+    }
+
+    .approval-files {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .approval-file {
+      padding: 6px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .approval-timeout {
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      margin-top: 16px;
+    }
+
+    .approval-timeout-header {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--warning);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .approval-timeout-info {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .approval-actions {
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 12px;
+    }
+
+    .approval-btn {
+      padding: 10px 24px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background var(--transition), transform 0.1s;
+    }
+
+    .approval-btn:active {
+      transform: scale(0.98);
+    }
+
+    .approval-btn.approve {
+      background: var(--success);
+      color: #fff;
+    }
+
+    .approval-btn.approve:hover {
+      background: #047857;
+    }
+
+    .approval-btn.reject {
+      background: #fff;
+      border: 1px solid var(--error);
+      color: var(--error);
+    }
+
+    .approval-btn.reject:hover {
+      background: rgba(220, 38, 38, 0.05);
+    }
+
+    .approval-btn.secondary {
+      background: var(--bg-page);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .approval-btn.secondary:hover {
+      background: var(--bg-card);
+      border-color: var(--text-tertiary);
+    }
+
+    /* 已通过状态 */
+    .approval-card.approved {
+      border-color: var(--success);
+    }
+
+    .approval-card.approved .approval-header {
+      background: rgba(16, 185, 129, 0.08);
+    }
+
+    .approval-card.approved .approval-status {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+    }
+
+    .approval-result {
+      padding: 14px 16px;
+      background: rgba(16, 185, 129, 0.08);
+      border-radius: var(--radius-md);
+      margin-top: 16px;
+    }
+
+    .approval-result-header {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--success);
+      margin-bottom: 8px;
+    }
+
+    .approval-result-info {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- 顶栏 -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">
+          <span class="logo-icon">🚀</span>
+          <span class="logo-brand">
+            <span class="logo-en">OpsPilot</span>
+            <span class="logo-zh">运维领航</span>
+          </span>
+        </div>
+        <nav>
+          <a href="../portal/index.html" class="nav-link">工作台</a>
+          <a href="../m1/project-list.html" class="nav-link">项目管理</a>
+          <a href="#" class="nav-link active">对话</a>
+          <a href="../monitor/index.html" class="nav-link">监控</a>
+        </nav>
+      </div>
+      <div class="header-right">
+        <span class="header-status">🟢 Agent 就绪</span>
+        <div class="user-avatar">张</div>
+      </div>
+    </header>
+
+    <!-- 对话布局 -->
+    <div class="chat-layout">
+      <!-- 侧栏 -->
+      <aside class="chat-sidebar">
+        <div class="sidebar-section">
+          <div class="sidebar-title">当前项目</div>
+          <div class="project-selector">
+            <div class="project-name">
+              🏢 项目 Alpha
+              <span style="margin-left: auto; color: var(--text-tertiary);">▼</span>
+            </div>
+          </div>
+        </div>
+        <div class="session-list">
+          <div class="session-group">
+            <div class="session-group-title">📌 今天</div>
+            <div class="session-item active">
+              <div class="session-title">数据库连接超时问题</div>
+              <div class="session-meta">
+                <span class="session-status pending">待审批</span>
+                <span>BUG-2024-001</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button class="new-session-btn">➕ 开始新会话</button>
+      </aside>
+
+      <!-- 主对话区 -->
+      <main class="chat-main">
+        <div class="message-area">
+          <div class="message-list">
+            <!-- 用户消息 -->
+            <div class="message user">
+              <div class="message-bubble">
+                <div class="message-content">
+                  用户登录接口报 500 错误，日志显示数据库连接超时
+                </div>
+                <div class="message-time">👤 张三 · 10:30</div>
+              </div>
+            </div>
+
+            <!-- Agent 方案生成完成 + HITL 审批卡片 -->
+            <div class="message agent">
+              <div class="message-bubble">
+                <div class="message-header">
+                  <span class="message-avatar agent">🔧</span>
+                  <span class="message-sender">Bug Fix Agent</span>
+                  <span class="message-status">方案已生成 ✓</span>
+                </div>
+                <div class="message-content">
+                  修复方案已生成，请审批：
+                </div>
+
+                <!-- HITL 审批卡片 - 待审批状态 -->
+                <div class="approval-card">
+                  <div class="approval-header">
+                    <span class="approval-icon">📋</span>
+                    <span class="approval-title">修复方案审批</span>
+                    <span class="approval-status">🟡 待审批</span>
+                  </div>
+                  <div class="approval-body">
+                    <div class="approval-meta">
+                      <span>工单: BUG-2024-001</span>
+                      <span>数据库连接超时问题</span>
+                    </div>
+
+                    <!-- 根因分析 -->
+                    <div class="approval-section">
+                      <div class="approval-section-header">
+                        📊 根因分析
+                        <span class="approval-section-toggle">展开 ▼</span>
+                      </div>
+                      <div class="approval-section-body">
+                        数据库连接池配置不当，<code>maxConnections</code> 设置为 10，在高并发场景下连接耗尽导致新请求超时。
+                        <br><br>
+                        <strong>影响范围:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                          <li>用户登录接口 (/api/auth/login)</li>
+                          <li>用户信息查询接口 (/api/user/info)</li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    <!-- 修复建议 -->
+                    <div class="approval-section">
+                      <div class="approval-section-header">
+                        🔧 修复建议
+                        <span class="approval-section-toggle">展开 ▼</span>
+                      </div>
+                      <div class="approval-section-body">
+                        <ol style="margin: 0; padding-left: 20px;">
+                          <li style="margin-bottom: 8px;">
+                            <strong>修改 config/db-pool.yaml</strong><br>
+                            <code>maxConnections: 10 → 50</code>
+                          </li>
+                          <li style="margin-bottom: 8px;">
+                            <strong>增加连接池监控指标</strong><br>
+                            添加 prometheus metrics 暴露连接池使用率
+                          </li>
+                          <li>
+                            <strong>优化连接获取超时处理</strong><br>
+                            增加重试机制，超时后自动重试 3 次
+                          </li>
+                        </ol>
+                      </div>
+                    </div>
+
+                    <!-- 涉及文件 -->
+                    <div class="approval-section">
+                      <div class="approval-section-header">
+                        📁 涉及文件 (3)
+                        <span class="approval-section-toggle">展开 ▼</span>
+                      </div>
+                      <div class="approval-section-body">
+                        <div class="approval-files">
+                          <span class="approval-file">config/db-pool.yaml</span>
+                          <span class="approval-file">src/database/connection.py</span>
+                          <span class="approval-file">src/database/metrics.py (新增)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 超时提醒 -->
+                    <div class="approval-timeout">
+                      <div class="approval-timeout-header">
+                        ⏰ 审批超时提醒
+                      </div>
+                      <div class="approval-timeout-info">
+                        距离自动升级还有 <strong>23 小时 25 分钟</strong><br>
+                        超时后将通知: 管理员 @admin
+                      </div>
+                    </div>
+
+                    <!-- 操作按钮 -->
+                    <div class="approval-actions">
+                      <button class="approval-btn approve">✅ 通过方案</button>
+                      <button class="approval-btn reject">❌ 驳回</button>
+                      <button class="approval-btn secondary">💬 添加评论</button>
+                      <button class="approval-btn secondary">📄 查看完整方案</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="message-time">🔧 Bug Fix Agent · 10:45</div>
+              </div>
+            </div>
+
+            <!-- 已通过的审批卡片示例 -->
+            <div class="message agent">
+              <div class="message-bubble">
+                <div class="message-header">
+                  <span class="message-avatar agent">🔧</span>
+                  <span class="message-sender">Bug Fix Agent</span>
+                  <span class="message-status" style="color: var(--success);">审批通过 ✓</span>
+                </div>
+
+                <div class="approval-card approved">
+                  <div class="approval-header">
+                    <span class="approval-icon" style="background: var(--success);">📋</span>
+                    <span class="approval-title">修复方案审批</span>
+                    <span class="approval-status">🟢 已通过</span>
+                  </div>
+                  <div class="approval-body">
+                    <div class="approval-meta">
+                      <span>工单: BUG-2024-002</span>
+                      <span>API 响应超时优化</span>
+                    </div>
+
+                    <div class="approval-result">
+                      <div class="approval-result-header">✅ 审批结果: 通过</div>
+                      <div class="approval-result-info">
+                        审批人: 李四 · 审批时间: 2024-01-14 15:30<br>
+                        审批意见: LGTM，方案合理
+                      </div>
+                    </div>
+
+                    <div class="approval-actions">
+                      <button class="approval-btn secondary">📄 查看完整方案</button>
+                      <button class="approval-btn secondary">📋 查看审批记录</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="message-time">🔧 Bug Fix Agent · 昨天 15:30</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- 输入区域 -->
+        <div class="input-area">
+          <div class="input-container">
+            <div class="input-wrapper">
+              <div class="input-actions">
+                <button class="input-action-btn">📎</button>
+                <button class="input-action-btn">📷</button>
+              </div>
+              <textarea class="input-textarea" placeholder="请描述您遇到的问题或需求..." rows="1"></textarea>
+              <button class="send-btn">发送 ➤</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

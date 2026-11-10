@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skills 配置 - 项目设置 - OpsPilot 运维领航</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .settings-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 24px;
+      padding: 4px;
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      width: fit-content;
+      border: 1px solid var(--border);
+    }
+
+    .settings-tab {
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .settings-tab:hover {
+      color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .settings-tab.active {
+      color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .skills-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .skills-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .skill-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px 18px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      transition: border-color var(--transition);
+    }
+
+    .skill-card:hover {
+      border-color: var(--primary);
+    }
+
+    .skill-checkbox {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--primary);
+    }
+
+    .skill-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-sm);
+      background: var(--primary-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .skill-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .skill-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .skill-tag {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .skill-tag.builtin {
+      background: rgba(99, 102, 241, 0.1);
+      color: #6366F1;
+    }
+
+    .skill-tag.custom {
+      background: rgba(16, 185, 129, 0.1);
+      color: #10B981;
+    }
+
+    .skill-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .skill-stats {
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    .skill-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .skill-action-btn {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .skill-action-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .disabled-section {
+      margin-top: 24px;
+      padding: 16px;
+      background: var(--bg-page);
+      border-radius: var(--radius-md);
+    }
+
+    .disabled-header {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .disabled-item {
+      padding: 10px 14px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-actions {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- 顶栏 -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">
+          <span class="logo-icon">🚀</span>
+          <span class="logo-brand">
+            <span class="logo-en">OpsPilot</span>
+            <span class="logo-zh">运维领航</span>
+          </span>
+        </div>
+        <nav>
+          <a href="../portal/index.html" class="nav-link">工作台</a>
+          <a href="project-list.html" class="nav-link active">项目管理</a>
+          <a href="../chat/index.html" class="nav-link">对话</a>
+          <a href="../monitor/index.html" class="nav-link">监控</a>
+        </nav>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">张</div>
+      </div>
+    </header>
+
+    <!-- 主内容 -->
+    <main class="content">
+      <h1 class="page-title">项目设置 · Alpha</h1>
+
+      <!-- 设置 Tab -->
+      <div class="settings-tabs">
+        <a href="project-settings-basic.html" class="settings-tab">基本信息</a>
+        <a href="project-settings-agent.html" class="settings-tab">Agent 配置</a>
+        <a href="#" class="settings-tab active">Skills 配置</a>
+        <a href="project-settings-sandbox.html" class="settings-tab">Sandbox 配置</a>
+        <a href="project-settings-members.html" class="settings-tab">成员管理</a>
+        <a href="project-settings-advanced.html" class="settings-tab">高级</a>
+      </div>
+
+      <!-- Skills 配置内容 -->
+      <div class="card" style="padding: 24px;">
+        <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 24px;">
+          配置项目可用的 Skills（技能模块），Agent 将使用这些 Skills 完成任务。
+        </p>
+
+        <!-- 已启用 Skills -->
+        <div class="skills-header">
+          <span class="skills-title">已启用 Skills (6)</span>
+          <button class="btn btn-primary" style="height: 36px;">+ 添加 Skill</button>
+        </div>
+
+        <div class="skill-card">
+          <input type="checkbox" class="skill-checkbox" checked>
+          <div class="skill-icon">📊</div>
+          <div class="skill-info">
+            <div class="skill-name">
+              demand-analysis
+              <span class="skill-tag builtin">内置</span>
+            </div>
+            <div class="skill-desc">需求分析与分类</div>
+            <div class="skill-stats">📊 使用次数: 128</div>
+          </div>
+          <div class="skill-actions">
+            <button class="skill-action-btn">⚙️ 配置</button>
+            <button class="skill-action-btn">🗑️ 禁用</button>
+          </div>
+        </div>
+
+        <div class="skill-card">
+          <input type="checkbox" class="skill-checkbox" checked>
+          <div class="skill-icon">📚</div>
+          <div class="skill-info">
+            <div class="skill-name">
+              knowledge-search
+              <span class="skill-tag builtin">内置</span>
+            </div>
+            <div class="skill-desc">知识库 RAG 检索</div>
+            <div class="skill-stats">📊 使用次数: 256</div>
+          </div>
+          <div class="skill-actions">
+            <button class="skill-action-btn">⚙️ 配置</button>
+            <button class="skill-action-btn">🗑️ 禁用</button>
+          </div>
+        </div>
+
+        <div class="skill-card">
+          <input type="checkbox" class="skill-checkbox" checked>
+          <div class="skill-icon">💻</div>
+          <div class="skill-info">
+            <div class="skill-name">
+              code-generation
+              <span class="skill-tag builtin">内置</span>
+            </div>
+            <div class="skill-desc">代码生成</div>
+            <div class="skill-stats">📊 使用次数: 89</div>
+          </div>
+          <div class="skill-actions">
+            <button class="skill-action-btn">⚙️ 配置</button>
+            <button class="skill-action-btn">🗑️ 禁用</button>
+          </div>
+        </div>
+
+        <div class="skill-card">
+          <input type="checkbox" class="skill-checkbox" checked>
+          <div class="skill-icon">🔍</div>
+          <div class="skill-info">
+            <div class="skill-name">
+              code-lint
+              <span class="skill-tag builtin">内置</span>
+            </div>
+            <div class="skill-desc">代码语法检查</div>
+            <div class="skill-stats">📊 使用次数: 89</div>
+          </div>
+          <div class="skill-actions">
+            <button class="skill-action-btn">⚙️ 配置</button>
+            <button class="skill-action-btn">🗑️ 禁用</button>
+          </div>
+        </div>
+
+        <div class="skill-card">
+          <input type="checkbox" class="skill-checkbox" checked>
+          <div class="skill-icon">🧪</div>
+          <div class="skill-info">
+            <div class="skill-name">
+              test-execution
+              <span class="skill-tag builtin">内置</span>
+            </div>
+            <div class="skill-desc">测试用例执行</div>
+            <div class="skill-stats">📊 使用次数: 67</div>
+          </div>
+          <div class="skill-actions">
+            <button class="skill-action-btn">⚙️ 配置</button>
+            <button class="skill-action-btn">🗑️ 禁用</button>
+          </div>
+        </div>
+
+        <div class="skill-card">
+          <input type="checkbox" class="skill-checkbox" checked>
+          <div class="skill-icon" style="background: rgba(16, 185, 129, 0.1);">🔔</div>
+          <div class="skill-info">
+            <div class="skill-name">
+              custom-notify
+              <span class="skill-tag custom">自定义</span>
+            </div>
+            <div class="skill-desc">自定义通知技能</div>
+            <div class="skill-stats">📊 使用次数: 23</div>
+          </div>
+          <div class="skill-actions">
+            <button class="skill-action-btn">⚙️ 配置</button>
+            <button class="skill-action-btn">✏️ 编辑</button>
+            <button class="skill-action-btn">🗑️ 删除</button>
+          </div>
+        </div>
+
+        <!-- 已禁用 Skills -->
+        <div class="disabled-section">
+          <div class="disabled-header">
+            已禁用 Skills (2) <span style="color: var(--text-tertiary);">▼</span>
+          </div>
+          <div class="disabled-item">
+            <span>• deploy-production (生产环境部署) - 禁用原因: 安全限制</span>
+            <button class="skill-action-btn">启用</button>
+          </div>
+          <div class="disabled-item">
+            <span>• db-migration (数据库迁移) - 禁用原因: 未配置</span>
+            <button class="skill-action-btn">启用</button>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn" style="background: var(--bg-page); border: 1px solid var(--border); color: var(--text-secondary);">取消</button>
+          <button class="btn btn-primary">保存配置</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

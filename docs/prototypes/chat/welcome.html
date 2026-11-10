@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>新会话 - OpsPilot 运维领航</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- 顶栏 -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">
+          <span class="logo-icon">🚀</span>
+          <span class="logo-brand">
+            <span class="logo-en">OpsPilot</span>
+            <span class="logo-zh">运维领航</span>
+          </span>
+        </div>
+        <nav>
+          <a href="../portal/index.html" class="nav-link">工作台</a>
+          <a href="../m1/project-list.html" class="nav-link">项目管理</a>
+          <a href="#" class="nav-link active">对话</a>
+          <a href="../monitor/index.html" class="nav-link">监控</a>
+        </nav>
+      </div>
+      <div class="header-right">
+        <span class="header-status">🟢 Agent 就绪</span>
+        <div class="user-avatar">张</div>
+      </div>
+    </header>
+
+    <!-- 对话布局 -->
+    <div class="chat-layout">
+      <!-- 侧栏 -->
+      <aside class="chat-sidebar">
+        <!-- 项目选择器 -->
+        <div class="sidebar-section">
+          <div class="sidebar-title">当前项目</div>
+          <div class="project-selector">
+            <div class="project-name">
+              🏢 项目 Alpha
+              <span style="margin-left: auto; color: var(--text-tertiary);">▼</span>
+            </div>
+            <div class="project-status">
+              <div class="project-status-item">
+                <span class="status-dot ready"></span>
+                知识库: 就绪
+              </div>
+              <div class="project-status-item">
+                <span class="status-dot ready"></span>
+                Agent: 已配置
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 历史会话 -->
+        <div class="session-list">
+          <div class="session-group">
+            <div class="session-group-title">📌 今天</div>
+            <div class="session-item">
+              <div class="session-title">用户权限模块设计</div>
+              <div class="session-meta">
+                <span class="session-status pending">待审批</span>
+                <span>FEAT-2024-003</span>
+              </div>
+            </div>
+          </div>
+          <div class="session-group">
+            <div class="session-group-title">📌 昨天</div>
+            <div class="session-item">
+              <div class="session-title">API 响应优化</div>
+              <div class="session-meta">
+                <span class="session-status complete">已完成</span>
+                <span>BUG-2024-002</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 新建会话 -->
+        <button class="new-session-btn">
+          ➕ 开始新会话
+        </button>
+      </aside>
+
+      <!-- 主对话区 -->
+      <main class="chat-main">
+        <!-- 欢迎消息 -->
+        <div class="message-area">
+          <div class="message-list">
+            <div class="welcome-message">
+              <div class="welcome-avatar">🤖</div>
+              <div class="welcome-title">运维 Agent · 项目 Alpha</div>
+              <div class="welcome-desc">
+                您好！我是项目 Alpha 的智能运维助手。<br>
+                我可以帮您处理 Bug 修复、需求分析、代码生成等任务。
+              </div>
+              <ol class="welcome-steps">
+                <li>1️⃣ 自动检索相关知识库</li>
+                <li>2️⃣ 分析并分类您的需求</li>
+                <li>3️⃣ 生成解决方案并提交审批</li>
+              </ol>
+              <div class="quick-actions">
+                <button class="quick-btn" onclick="location.href='index.html'">
+                  🐛 报告 Bug
+                </button>
+                <button class="quick-btn">
+                  ✨ 提需求
+                </button>
+                <button class="quick-btn">
+                  ❓ 咨询问题
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 输入区域 -->
+        <div class="input-area">
+          <div class="input-container">
+            <div class="input-wrapper">
+              <div class="input-actions">
+                <button class="input-action-btn" title="上传附件">📎</button>
+                <button class="input-action-btn" title="上传截图">📷</button>
+              </div>
+              <textarea class="input-textarea" placeholder="请描述您遇到的问题或需求..." rows="1"></textarea>
+              <button class="send-btn">
+                发送 ➤
+              </button>
+            </div>
+            <div class="input-hint">💡 按 Enter 发送，Shift+Enter 换行</div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

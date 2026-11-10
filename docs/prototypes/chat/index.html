@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>对话式需求入口 - OpsPilot 运维领航</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- 顶栏 -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">
+          <span class="logo-icon">🚀</span>
+          <span class="logo-brand">
+            <span class="logo-en">OpsPilot</span>
+            <span class="logo-zh">运维领航</span>
+          </span>
+        </div>
+        <nav>
+          <a href="../portal/index.html" class="nav-link">工作台</a>
+          <a href="../m1/project-list.html" class="nav-link">项目管理</a>
+          <a href="#" class="nav-link active">对话</a>
+          <a href="../monitor/index.html" class="nav-link">监控</a>
+        </nav>
+      </div>
+      <div class="header-right">
+        <span class="header-status">🟢 Agent 就绪</span>
+        <div class="user-avatar">张</div>
+      </div>
+    </header>
+
+    <!-- 对话布局 -->
+    <div class="chat-layout">
+      <!-- 侧栏 -->
+      <aside class="chat-sidebar">
+        <!-- 项目选择器 -->
+        <div class="sidebar-section">
+          <div class="sidebar-title">当前项目</div>
+          <div class="project-selector">
+            <div class="project-name">
+              🏢 项目 Alpha
+              <span style="margin-left: auto; color: var(--text-tertiary);">▼</span>
+            </div>
+            <div class="project-status">
+              <div class="project-status-item">
+                <span class="status-dot ready"></span>
+                知识库: 就绪
+              </div>
+              <div class="project-status-item">
+                <span class="status-dot ready"></span>
+                Agent: 已配置
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 历史会话 -->
+        <div class="session-list">
+          <div class="session-group">
+            <div class="session-group-title">📌 今天</div>
+            <div class="session-item active">
+              <div class="session-title">数据库连接超时问题</div>
+              <div class="session-meta">
+                <span class="session-status running">进行中</span>
+                <span>BUG-2024-001</span>
+              </div>
+            </div>
+            <div class="session-item">
+              <div class="session-title">用户权限模块设计</div>
+              <div class="session-meta">
+                <span class="session-status pending">待审批</span>
+                <span>FEAT-2024-003</span>
+              </div>
+            </div>
+          </div>
+          <div class="session-group">
+            <div class="session-group-title">📌 昨天</div>
+            <div class="session-item">
+              <div class="session-title">API 响应优化</div>
+              <div class="session-meta">
+                <span class="session-status complete">已完成</span>
+                <span>BUG-2024-002</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 新建会话 -->
+        <button class="new-session-btn">
+          ➕ 开始新会话
+        </button>
+      </aside>
+
+      <!-- 主对话区 -->
+      <main class="chat-main">
+        <!-- 消息流 -->
+        <div class="message-area">
+          <div class="message-list">
+            <!-- 用户消息 -->
+            <div class="message user">
+              <div class="message-bubble">
+                <div class="message-content">
+                  用户登录接口报 500 错误，日志显示数据库连接超时，请帮忙排查一下
+                </div>
+                <div class="message-time">👤 张三 · 10:30</div>
+              </div>
+            </div>
+
+            <!-- Agent 分析完成消息 -->
+            <div class="message agent">
+              <div class="message-bubble">
+                <div class="message-header">
+                  <span class="message-avatar agent">🤖</span>
+                  <span class="message-sender">Lead Agent</span>
+                  <span class="message-status">分析完成 ✓</span>
+                </div>
+                <div class="message-content">
+                  我已完成问题分析，以下是结果：
+                </div>
+
+                <!-- 知识检索结果 -->
+                <div class="knowledge-card">
+                  <div class="knowledge-header">
+                    📚 知识检索结果
+                    <span class="knowledge-toggle">收起 ▲</span>
+                  </div>
+                  <div class="knowledge-content">
+                    <div class="knowledge-item">
+                      <div class="knowledge-item-title">
+                        📄 项目架构说明.md
+                        <span class="knowledge-relevance">相关度 92%</span>
+                      </div>
+                      <div class="knowledge-snippet">
+                        "...数据库连接池配置位于 config/db-pool.yaml，默认最大连接数为 10..."
+                      </div>
+                    </div>
+                    <div class="knowledge-item">
+                      <div class="knowledge-item-title">
+                        📄 数据库配置指南.md
+                        <span class="knowledge-relevance">相关度 87%</span>
+                      </div>
+                      <div class="knowledge-snippet">
+                        "...高并发场景建议将 maxConnections 设置为 50 以上..."
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 分类结果 -->
+                <div class="classify-card">
+                  <div class="classify-header">🏷️ 需求分类结果</div>
+                  <div class="classify-tags">
+                    <div class="classify-tag">
+                      <span class="classify-tag-label">类型</span>
+                      <span class="classify-tag-value bug">🐛 Bug</span>
+                    </div>
+                    <div class="classify-tag">
+                      <span class="classify-tag-label">优先级</span>
+                      <span class="classify-tag-value high">🔴 高</span>
+                    </div>
+                    <div class="classify-tag">
+                      <span class="classify-tag-label">工单编号</span>
+                      <span class="classify-tag-value">BUG-2024-001</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="message-content" style="margin-top: 12px;">
+                  问题已创建为 Bug 工单，正在启动修复流程...
+                </div>
+                <div class="message-time">🤖 Lead Agent · 10:32</div>
+              </div>
+            </div>
+
+            <!-- Sub-Agent 执行卡片 -->
+            <div class="message agent">
+              <div class="message-bubble">
+                <div class="message-header">
+                  <span class="message-avatar agent">🔧</span>
+                  <span class="message-sender">Bug Fix Agent</span>
+                  <span class="message-status analyzing">
+                    <span class="typing-indicator">
+                      <span class="typing-dot"></span>
+                      <span class="typing-dot"></span>
+                      <span class="typing-dot"></span>
+                    </span>
+                    执行中...
+                  </span>
+                </div>
+                <div class="message-content">
+                  正在分析问题根因并生成修复方案...
+                </div>
+
+                <div class="agent-card">
+                  <div class="agent-card-header">
+                    <span class="agent-icon">🔧</span>
+                    <span class="agent-name">执行步骤</span>
+                  </div>
+                  <div class="agent-card-body">
+                    <ul class="agent-steps">
+                      <li class="agent-step">
+                        <span class="agent-step-icon done">✓</span>
+                        1. 代码定位 - 找到相关代码文件
+                      </li>
+                      <li class="agent-step">
+                        <span class="agent-step-icon done">✓</span>
+                        2. 问题分析 - 识别根本原因
+                      </li>
+                      <li class="agent-step active">
+                        <span class="agent-step-icon running">◉</span>
+                        3. 方案生成 - 生成修复方案中...
+                      </li>
+                      <li class="agent-step">
+                        <span class="agent-step-icon pending">○</span>
+                        4. 方案审批 - 等待人工审批
+                      </li>
+                    </ul>
+                    <div class="agent-progress">
+                      <div class="progress-bar">
+                        <div class="progress-fill" style="width: 60%;"></div>
+                      </div>
+                      <div class="progress-text">60%</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="message-time">🔧 Bug Fix Agent · 10:33</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- 输入区域 -->
+        <div class="input-area">
+          <div class="input-container">
+            <div class="input-wrapper">
+              <div class="input-actions">
+                <button class="input-action-btn" title="上传附件">📎</button>
+                <button class="input-action-btn" title="上传截图">📷</button>
+              </div>
+              <textarea class="input-textarea" placeholder="请描述您遇到的问题或需求..." rows="1"></textarea>
+              <button class="send-btn">
+                发送 ➤
+              </button>
+            </div>
+            <div class="input-hint">💡 按 Enter 发送，Shift+Enter 换行</div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

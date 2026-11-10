@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sandbox 配置 - 项目设置 - OpsPilot 运维领航</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .settings-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 24px;
+      padding: 4px;
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      width: fit-content;
+      border: 1px solid var(--border);
+    }
+
+    .settings-tab {
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .settings-tab:hover {
+      color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .settings-tab.active {
+      color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .config-section {
+      margin-bottom: 24px;
+      padding: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+    }
+
+    .section-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 16px;
+    }
+
+    .env-selector {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .env-option {
+      padding: 20px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-lg);
+      cursor: pointer;
+      text-align: center;
+      transition: all var(--transition);
+    }
+
+    .env-option:hover {
+      border-color: var(--primary);
+    }
+
+    .env-option.selected {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .env-icon {
+      font-size: 36px;
+      margin-bottom: 12px;
+    }
+
+    .env-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .env-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .form-hint {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      margin-top: 6px;
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 20px;
+    }
+
+    .radio-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+
+    .radio-item input {
+      accent-color: var(--primary);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-option {
+      padding: 8px 16px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .btn-option.selected {
+      border-color: var(--primary);
+      background: var(--primary-light);
+      color: var(--primary);
+    }
+
+    .domain-list {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+
+    .domain-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .domain-item:last-child {
+      border-bottom: none;
+    }
+
+    .domain-item .delete-btn {
+      color: var(--error);
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .add-domain-btn {
+      padding: 10px 14px;
+      background: var(--bg-page);
+      color: var(--primary);
+      font-size: 13px;
+      cursor: pointer;
+      border: none;
+      width: 100%;
+      text-align: left;
+    }
+
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--text-primary);
+    }
+
+    .checkbox-item input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--primary);
+    }
+
+    .form-actions {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- 顶栏 -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">
+          <span class="logo-icon">🚀</span>
+          <span class="logo-brand">
+            <span class="logo-en">OpsPilot</span>
+            <span class="logo-zh">运维领航</span>
+          </span>
+        </div>
+        <nav>
+          <a href="../portal/index.html" class="nav-link">工作台</a>
+          <a href="project-list.html" class="nav-link active">项目管理</a>
+          <a href="../chat/index.html" class="nav-link">对话</a>
+          <a href="../monitor/index.html" class="nav-link">监控</a>
+        </nav>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">张</div>
+      </div>
+    </header>
+
+    <!-- 主内容 -->
+    <main class="content">
+      <h1 class="page-title">项目设置 · Alpha</h1>
+
+      <!-- 设置 Tab -->
+      <div class="settings-tabs">
+        <a href="project-settings-basic.html" class="settings-tab">基本信息</a>
+        <a href="project-settings-agent.html" class="settings-tab">Agent 配置</a>
+        <a href="project-settings-skills.html" class="settings-tab">Skills 配置</a>
+        <a href="#" class="settings-tab active">Sandbox 配置</a>
+        <a href="project-settings-members.html" class="settings-tab">成员管理</a>
+        <a href="project-settings-advanced.html" class="settings-tab">高级</a>
+      </div>
+
+      <!-- Sandbox 配置内容 -->
+      <div class="card" style="padding: 24px;">
+        <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 24px;">
+          配置代码执行的隔离环境，Agent 将在此环境中运行代码检查和测试。
+        </p>
+
+        <!-- 执行环境选择 -->
+        <div class="config-section">
+          <h3 class="section-title">执行环境</h3>
+          <div class="env-selector">
+            <div class="env-option selected">
+              <div class="env-icon">🐳</div>
+              <div class="env-name">Docker AIO</div>
+              <div class="env-desc">本地 Docker<br>适合开发/测试</div>
+            </div>
+            <div class="env-option">
+              <div class="env-icon">☸️</div>
+              <div class="env-name">Kubernetes</div>
+              <div class="env-desc">K8s Pod<br>适合生产环境</div>
+            </div>
+            <div class="env-option">
+              <div class="env-icon">☁️</div>
+              <div class="env-name">E2B Cloud</div>
+              <div class="env-desc">云端沙箱<br>按需使用</div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">基础镜像</label>
+            <select class="input" style="width: 100%;">
+              <option selected>python:3.11-slim</option>
+              <option>python:3.10-slim</option>
+              <option>node:20-alpine</option>
+              <option>openjdk:17-slim</option>
+            </select>
+            <div class="form-hint">💡 推荐镜像: python:3.11-slim, node:20-alpine, openjdk:17-slim</div>
+          </div>
+        </div>
+
+        <!-- 资源限制 -->
+        <div class="config-section">
+          <h3 class="section-title">资源限制</h3>
+          
+          <div class="form-group">
+            <label class="form-label">内存限制</label>
+            <div class="btn-group">
+              <button class="btn-option">1GB</button>
+              <button class="btn-option">2GB</button>
+              <button class="btn-option selected">4GB</button>
+              <button class="btn-option">8GB</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">CPU 限制</label>
+            <div class="btn-group">
+              <button class="btn-option">1 核</button>
+              <button class="btn-option selected">2 核</button>
+              <button class="btn-option">4 核</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">执行超时</label>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="number" class="input" value="600" style="width: 120px;">
+              <span style="color: var(--text-secondary); font-size: 14px;">秒 (最大 3600 秒)</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">磁盘空间</label>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="number" class="input" value="10" style="width: 120px;">
+              <span style="color: var(--text-secondary); font-size: 14px;">GB (最大 50 GB)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 网络策略 -->
+        <div class="config-section">
+          <h3 class="section-title">网络策略</h3>
+          
+          <div class="form-group">
+            <label class="form-label">网络模式</label>
+            <div class="radio-group">
+              <label class="radio-item">
+                <input type="radio" name="network">
+                禁用网络 (最安全)
+              </label>
+              <label class="radio-item">
+                <input type="radio" name="network" checked>
+                白名单模式 (推荐)
+              </label>
+              <label class="radio-item">
+                <input type="radio" name="network">
+                允许所有 (不推荐)
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">允许访问的域名</label>
+            <div class="domain-list">
+              <div class="domain-item">
+                <span>pypi.org</span>
+                <span class="delete-btn">删除</span>
+              </div>
+              <div class="domain-item">
+                <span>npmjs.org</span>
+                <span class="delete-btn">删除</span>
+              </div>
+              <div class="domain-item">
+                <span>github.com</span>
+                <span class="delete-btn">删除</span>
+              </div>
+              <div class="domain-item">
+                <span>registry.npmmirror.com</span>
+                <span class="delete-btn">删除</span>
+              </div>
+              <button class="add-domain-btn">+ 添加域名</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 安全配置 -->
+        <div class="config-section">
+          <h3 class="section-title">安全配置</h3>
+          <div class="checkbox-group">
+            <label class="checkbox-item">
+              <input type="checkbox" checked>
+              以非 root 用户运行
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" checked>
+              禁用特权模式
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" checked>
+              只读文件系统 (除工作目录外)
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" checked>
+              禁用 setuid/setgid
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox">
+              启用 Seccomp 配置文件
+            </label>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn" style="background: var(--bg-page); border: 1px solid var(--border); color: var(--text-secondary);">测试配置</button>
+          <button class="btn btn-primary">保存配置</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

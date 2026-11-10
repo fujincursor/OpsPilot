@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>任务详情 - OpsPilot 运维领航</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .detail-layout {
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      gap: 24px;
+      padding: 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .detail-header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    .back-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .back-link:hover {
+      color: var(--primary);
+    }
+
+    .detail-title-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+    }
+
+    .detail-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    /* 流程图区域 */
+    .flow-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .panel-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .panel-btn {
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .panel-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .flow-content {
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    .flow-node {
+      width: 200px;
+      padding: 14px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      text-align: center;
+      position: relative;
+    }
+
+    .flow-node-icon {
+      font-size: 20px;
+      margin-bottom: 6px;
+    }
+
+    .flow-node-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .flow-node-status {
+      font-size: 11px;
+      color: var(--text-tertiary);
+    }
+
+    .flow-node.done {
+      border-color: var(--success);
+      background: rgba(16, 185, 129, 0.05);
+    }
+
+    .flow-node.done .flow-node-status {
+      color: var(--success);
+    }
+
+    .flow-node.active {
+      border-color: var(--primary);
+      border-width: 2px;
+      background: var(--primary-light);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+    }
+
+    .flow-node.active .flow-node-status {
+      color: var(--primary);
+    }
+
+    .flow-node.hitl {
+      border-style: dashed;
+    }
+
+    .flow-connector {
+      width: 2px;
+      height: 24px;
+      background: var(--border);
+    }
+
+    .flow-connector.done {
+      background: var(--success);
+    }
+
+    /* 详情面板 */
+    .detail-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .info-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .info-card-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .info-card-body {
+      padding: 16px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .info-row:last-child {
+      border-bottom: none;
+    }
+
+    .info-label {
+      color: var(--text-secondary);
+    }
+
+    .info-value {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    /* 日志面板 */
+    .log-panel {
+      background: #1E1E1E;
+      border-radius: var(--radius-md);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .log-line {
+      padding: 4px 12px;
+      display: flex;
+      gap: 12px;
+      border-bottom: 1px solid #333;
+    }
+
+    .log-time {
+      color: #6B7280;
+      flex-shrink: 0;
+    }
+
+    .log-agent {
+      color: #60A5FA;
+      flex-shrink: 0;
+      min-width: 120px;
+    }
+
+    .log-message {
+      color: #D4D4D4;
+    }
+
+    .log-message.success {
+      color: #10B981;
+    }
+
+    .log-message.info {
+      color: #60A5FA;
+    }
+
+    /* 资源使用 */
+    .resource-bar {
+      margin-bottom: 12px;
+    }
+
+    .resource-bar-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .resource-bar-label {
+      color: var(--text-secondary);
+    }
+
+    .resource-bar-value {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .resource-bar-track {
+      height: 8px;
+      background: var(--bg-page);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .resource-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s;
+    }
+
+    .resource-bar-fill.cpu { background: #3B82F6; }
+    .resource-bar-fill.memory { background: #8B5CF6; }
+    .resource-bar-fill.tokens { background: #10B981; }
+
+    @media (max-width: 1024px) {
+      .detail-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- 顶栏 -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">
+          <span class="logo-icon">🚀</span>
+          <span class="logo-brand">
+            <span class="logo-en">OpsPilot</span>
+            <span class="logo-zh">运维领航</span>
+          </span>
+        </div>
+        <nav>
+          <a href="../portal/index.html" class="nav-link">工作台</a>
+          <a href="../m1/project-list.html" class="nav-link">项目管理</a>
+          <a href="../chat/index.html" class="nav-link">对话</a>
+          <a href="index.html" class="nav-link active">监控</a>
+        </nav>
+      </div>
+      <div class="header-right">
+        <div class="user-avatar">张</div>
+      </div>
+    </header>
+
+    <!-- 详情内容 -->
+    <main class="detail-layout">
+      <!-- 头部 -->
+      <div class="detail-header">
+        <a href="index.html" class="back-link">← 返回监控列表</a>
+        <div class="detail-title-section">
+          <span style="font-size: 24px;">🐛</span>
+          <h1 class="detail-title">BUG-2024-001 · 数据库连接超时问题</h1>
+          <span class="task-status running">🔄 执行中</span>
+        </div>
+      </div>
+
+      <!-- 左侧：流程图 -->
+      <div class="flow-panel">
+        <div class="panel-header">
+          执行流程
+          <div class="panel-actions">
+            <button class="panel-btn">全屏</button>
+            <button class="panel-btn">刷新</button>
+          </div>
+        </div>
+        <div class="flow-content">
+          <div class="flow-node done">
+            <div class="flow-node-icon">🤖</div>
+            <div class="flow-node-name">Lead Agent</div>
+            <div class="flow-node-status">✓ 完成 2分</div>
+          </div>
+          <div class="flow-connector done"></div>
+          
+          <div class="flow-node done">
+            <div class="flow-node-icon">🔧</div>
+            <div class="flow-node-name">Bug Fix Agent</div>
+            <div class="flow-node-status">✓ 完成 15分</div>
+          </div>
+          <div class="flow-connector done"></div>
+          
+          <div class="flow-node done hitl">
+            <div class="flow-node-icon">⏸️</div>
+            <div class="flow-node-name">HITL 方案审批</div>
+            <div class="flow-node-status">✓ 已通过</div>
+          </div>
+          <div class="flow-connector done"></div>
+          
+          <div class="flow-node active">
+            <div class="flow-node-icon">💻</div>
+            <div class="flow-node-name">Code Gen Agent</div>
+            <div class="flow-node-status">◉ 执行中 60%</div>
+          </div>
+          <div class="flow-connector"></div>
+          
+          <div class="flow-node hitl">
+            <div class="flow-node-icon">⏸️</div>
+            <div class="flow-node-name">HITL 代码审批</div>
+            <div class="flow-node-status">○ 等待</div>
+          </div>
+          <div class="flow-connector"></div>
+          
+          <div class="flow-node">
+            <div class="flow-node-icon">🧪</div>
+            <div class="flow-node-name">Test Agent</div>
+            <div class="flow-node-status">○ 等待</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧：详情面板 -->
+      <div class="detail-panel">
+        <!-- 基本信息 -->
+        <div class="info-card">
+          <div class="info-card-header">📋 任务信息</div>
+          <div class="info-card-body">
+            <div class="info-row">
+              <span class="info-label">工单编号</span>
+              <span class="info-value">BUG-2024-001</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">工单类型</span>
+              <span class="info-value">🐛 Bug</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">优先级</span>
+              <span class="info-value" style="color: var(--error);">🔴 高</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">提交人</span>
+              <span class="info-value">张三</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">开始时间</span>
+              <span class="info-value">10:30</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">已执行</span>
+              <span class="info-value">45 分钟</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 资源消耗 -->
+        <div class="info-card">
+          <div class="info-card-header">📊 资源消耗</div>
+          <div class="info-card-body">
+            <div class="resource-bar">
+              <div class="resource-bar-header">
+                <span class="resource-bar-label">Token 消耗</span>
+                <span class="resource-bar-value">8,450 / 100,000</span>
+              </div>
+              <div class="resource-bar-track">
+                <div class="resource-bar-fill tokens" style="width: 8.5%;"></div>
+              </div>
+            </div>
+            <div class="resource-bar">
+              <div class="resource-bar-header">
+                <span class="resource-bar-label">预估成本</span>
+                <span class="resource-bar-value">$0.25</span>
+              </div>
+            </div>
+            <div class="info-row">
+              <span class="info-label">API 调用</span>
+              <span class="info-value">12 次</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">知识引用</span>
+              <span class="info-value">3 条</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 执行日志 -->
+        <div class="info-card">
+          <div class="info-card-header">
+            📋 执行日志
+            <div style="margin-left: auto; display: flex; gap: 8px;">
+              <button class="panel-btn">导出</button>
+              <button class="panel-btn">实时刷新: ON</button>
+            </div>
+          </div>
+          <div class="log-panel">
+            <div class="log-line">
+              <span class="log-time">11:15:32</span>
+              <span class="log-agent">💻 Code Gen</span>
+              <span class="log-message info">[INFO] 开始生成代码变更...</span>
+            </div>
+            <div class="log-line">
+              <span class="log-time">11:15:25</span>
+              <span class="log-agent">⏸️ HITL</span>
+              <span class="log-message success">[INFO] 方案审批通过，继续执行</span>
+            </div>
+            <div class="log-line">
+              <span class="log-time">10:45:12</span>
+              <span class="log-agent">🔧 Bug Fix</span>
+              <span class="log-message success">[INFO] 修复方案生成完成</span>
+            </div>
+            <div class="log-line">
+              <span class="log-time">10:32:18</span>
+              <span class="log-agent">🤖 Lead</span>
+              <span class="log-message">[INFO] 需求分类完成: Bug, 优先级: 高</span>
+            </div>
+            <div class="log-line">
+              <span class="log-time">10:31:05</span>
+              <span class="log-agent">📚 Knowledge</span>
+              <span class="log-message">[INFO] 检索到 3 条相关文档</span>
+            </div>
+            <div class="log-line">
+              <span class="log-time">10:30:00</span>
+              <span class="log-agent">🤖 Lead</span>
+              <span class="log-message">[INFO] 任务开始执行</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
