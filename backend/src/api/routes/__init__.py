@@ -12,6 +12,7 @@ from .solutions import router as solutions_router
 from .reviews import router as reviews_router
 from .codegen import router as codegen_router
 from .tests import router as tests_router
+from .analytics import router as analytics_router
 
 api_router = APIRouter()
 api_router.include_router(health_router, tags=["health"])
@@ -24,3 +25,4 @@ api_router.include_router(solutions_router, tags=["solutions"])
 api_router.include_router(reviews_router, tags=["reviews"])
 api_router.include_router(codegen_router, tags=["codegen"])
 api_router.include_router(tests_router, tags=["tests"])
+api_router.include_router(analytics_router, tags=["analytics"])

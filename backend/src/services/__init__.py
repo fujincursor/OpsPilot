@@ -13,6 +13,7 @@ from .sandbox_service import SandboxService, sandbox_service
 from .codegen_service import CodeGenService, codegen_service
 from .test_service import TestService, test_service
 from .feedback_service import FeedbackService, feedback_service
+from .analytics_service import AnalyticsService, analytics_service
 from .agents import (
     BugFixAgentService,
     bugfix_agent_service,
@@ -50,6 +51,13 @@ feedback_service.set_test_service(test_service)
 
 hitl_service.set_notification_service(notification_service)
 
+analytics_service.set_project_service(project_service)
+analytics_service.set_requirement_service(requirement_service)
+analytics_service.set_agent_service(agent_service)
+analytics_service.set_solution_service(solution_service)
+analytics_service.set_codegen_service(codegen_service)
+analytics_service.set_test_service(test_service)
+
 __all__ = [
     "ProjectService",
     "project_service",
@@ -76,6 +84,8 @@ __all__ = [
     "test_service",
     "FeedbackService",
     "feedback_service",
+    "AnalyticsService",
+    "analytics_service",
     "BugFixAgentService",
     "bugfix_agent_service",
     "FeatureDesignAgentService",
