@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { NotificationBell } from '../Reviews'
 
 interface HeaderProps {
   agentStatus?: 'ready' | 'busy' | 'offline'
@@ -65,6 +66,18 @@ export default function Header({ agentStatus = 'ready', userName = '张' }: Head
             对话
           </NavLink>
           <NavLink
+            to="/reviews"
+            className={({ isActive }) =>
+              `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-primary-light text-primary'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`
+            }
+          >
+            Review
+          </NavLink>
+          <NavLink
             to="/monitor"
             className={({ isActive }) =>
               `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -80,6 +93,9 @@ export default function Header({ agentStatus = 'ready', userName = '张' }: Head
       </div>
 
       <div className="flex items-center gap-4">
+        {/* Notifications */}
+        <NotificationBell />
+
         {/* Agent Status */}
         <span className="text-sm text-gray-600 flex items-center gap-1">
           {status.emoji} {status.text}

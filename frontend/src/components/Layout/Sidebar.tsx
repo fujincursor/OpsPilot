@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { reviewService } from '../../services'
 
 interface Session {
   id: string
@@ -42,6 +43,21 @@ export default function Sidebar({ currentProject = '项目 Alpha', sessions = mo
   const navigate = useNavigate()
   const location = useLocation()
   const [selectedSession, setSelectedSession] = useState<string | null>(null)
+  const [pendingReviewCount, setPendingReviewCount] = useState(0)
+
+  useEffect(() => {
+    loadPendingReviewCount()
+  }, [])
+
+  const loadPendingReviewCount = async () => {
+    try {
+      const reviews = await reviewService.getPendingReviews()
+      const count = reviews.filter((r) => r.status === 'pending').length
+      setPendingReviewCount(count)
+    } catch {
+      setPendingReviewCount(3)
+    }
+  }
 
   const statusConfig = {
     running: { className: 'bg-blue-100 text-blue-600', text: '进行中' },
@@ -102,6 +118,21 @@ export default function Sidebar({ currentProject = '项目 Alpha', sessions = mo
           className="w-full mt-3 py-2 text-sm text-primary hover:text-primary-hover font-medium flex items-center justify-center gap-1.5 bg-primary-light hover:bg-primary/20 rounded-lg transition-colors"
         >
           📁 项目管理
+        </button>
+        <button
+          onClick={() => navigate('/reviews')}
+          className={`w-full mt-2 py-2 text-sm font-medium flex items-center justify-center gap-1.5 rounded-lg transition-colors ${
+            location.pathname.startsWith('/reviews')
+              ? 'bg-primary text-white'
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          ✅ Review 工作台
+          {pendingReviewCount > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-red-500 text-white rounded-full">
+              {pendingReviewCount}
+            </span>
+          )}
         </button>
       </div>
 

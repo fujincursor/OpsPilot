@@ -246,3 +246,57 @@ export interface UpdateSolutionStatusRequest {
   status: SolutionStatus
   comment?: string
 }
+
+// Review Types
+export type ReviewStatus = 'pending' | 'in_review' | 'approved' | 'rejected' | 'revision_requested'
+export type ReviewItemType = 'solution' | 'code' | 'test'
+
+export interface ReviewItem {
+  id: string
+  item_type: ReviewItemType
+  item_id: string
+  project_id: string
+  title: string
+  description: string
+  status: ReviewStatus
+  priority: RequirementPriority
+  reviewer?: string
+  comments_count: number
+  created_at: string
+  due_at?: string
+}
+
+export interface ReviewComment {
+  id: string
+  review_item_id: string
+  author: string
+  content: string
+  created_at: string
+}
+
+export interface ReviewDecision {
+  id: string
+  review_item_id: string
+  decision: 'approved' | 'rejected' | 'revision_requested'
+  reviewer: string
+  reason: string
+  created_at: string
+}
+
+export type NotificationType = 'review_assigned' | 'review_completed' | 'comment_added' | 'revision_requested'
+
+export interface Notification {
+  id: string
+  type: NotificationType
+  title: string
+  message: string
+  read: boolean
+  created_at: string
+  link?: string
+}
+
+export interface ReviewFilters {
+  item_type?: ReviewItemType
+  status?: ReviewStatus
+  priority?: RequirementPriority
+}

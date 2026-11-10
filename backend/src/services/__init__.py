@@ -7,6 +7,8 @@ from .knowledge_service import KnowledgeService, knowledge_service
 from .lead_agent_service import LeadAgentService, lead_agent_service
 from .requirement_service import RequirementService, requirement_service
 from .solution_service import SolutionService, solution_service
+from .hitl_service import HITLService, hitl_service
+from .notification_service import NotificationService, notification_service
 from .agents import (
     BugFixAgentService,
     bugfix_agent_service,
@@ -26,6 +28,8 @@ requirement_service.set_project_service(project_service)
 solution_service.set_requirement_service(requirement_service)
 solution_service.set_knowledge_service(knowledge_service)
 
+hitl_service.set_notification_service(notification_service)
+
 __all__ = [
     "ProjectService",
     "project_service",
@@ -40,6 +44,10 @@ __all__ = [
     "requirement_service",
     "SolutionService",
     "solution_service",
+    "HITLService",
+    "hitl_service",
+    "NotificationService",
+    "notification_service",
     "BugFixAgentService",
     "bugfix_agent_service",
     "FeatureDesignAgentService",

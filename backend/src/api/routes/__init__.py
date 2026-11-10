@@ -9,6 +9,7 @@ from .agents import router as agents_router
 from .knowledge import router as knowledge_router
 from .requirements import router as requirements_router
 from .solutions import router as solutions_router
+from .reviews import router as reviews_router
 
 api_router = APIRouter()
 api_router.include_router(health_router, tags=["health"])
@@ -18,3 +19,4 @@ api_router.include_router(agents_router, tags=["agents"])
 api_router.include_router(knowledge_router, tags=["knowledge"])
 api_router.include_router(requirements_router, tags=["requirements"])
 api_router.include_router(solutions_router, tags=["solutions"])
+api_router.include_router(reviews_router, tags=["reviews"])
