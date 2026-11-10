@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import type { BugFixSolution, FeatureDesignSolution, SolutionStatus } from '../types'
-import { solutionService } from '../services'
+import type { BugFixSolution, FeatureDesignSolution, SolutionStatus, CodeGenTaskSummary } from '../types'
+import { solutionService, codegenService } from '../services'
 import {
   SolutionStatusBadge,
   BugFixView,
@@ -10,6 +10,7 @@ import {
   AffectedFiles,
   statusConfig,
 } from '../components/Solutions'
+import { CodeGenStatusBadge } from '../components/CodeGen'
 
 const mockBugFixSolution: BugFixSolution = {
   id: 'sol-1',
@@ -210,6 +211,21 @@ const mockFeatureDesignSolution: FeatureDesignSolution = {
 
 type SolutionData = BugFixSolution | FeatureDesignSolution
 
+const mockCodeGenTasks: CodeGenTaskSummary[] = [
+  {
+    id: 'cg-1',
+    status: 'completed',
+    files_count: 3,
+    created_at: '2024-03-16T15:45:00Z',
+  },
+  {
+    id: 'cg-2',
+    status: 'failed',
+    files_count: 0,
+    created_at: '2024-03-16T14:30:00Z',
+  },
+]
+
 export default function SolutionDetail() {
   const { solutionId } = useParams<{ solutionId: string }>()
   const navigate = useNavigate()
@@ -218,10 +234,14 @@ export default function SolutionDetail() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [showStatusModal, setShowStatusModal] = useState(false)
+  const [codeGenTasks, setCodeGenTasks] = useState<CodeGenTaskSummary[]>([])
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false)
+  const [isLoadingTasks, setIsLoadingTasks] = useState(false)
 
   useEffect(() => {
     if (solutionId) {
       loadSolution(solutionId)
+      loadCodeGenTasks(solutionId)
     }
   }, [solutionId])
 
@@ -235,6 +255,33 @@ export default function SolutionDetail() {
       setSolution(id.includes('2') ? mockFeatureDesignSolution : mockBugFixSolution)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const loadCodeGenTasks = async (id: string) => {
+    setIsLoadingTasks(true)
+    try {
+      const tasks = await codegenService.getTasksBySolution(id)
+      setCodeGenTasks(tasks)
+    } catch {
+      console.log('Using mock codegen tasks')
+      setCodeGenTasks(mockCodeGenTasks)
+    } finally {
+      setIsLoadingTasks(false)
+    }
+  }
+
+  const handleGenerateCode = async () => {
+    if (!solutionId) return
+    setIsGeneratingCode(true)
+    try {
+      const task = await codegenService.createCodeGenTask(solutionId)
+      navigate(`/codegen/${task.id}`)
+    } catch {
+      const newTaskId = `cg-${Date.now()}`
+      navigate(`/codegen/${newTaskId}`)
+    } finally {
+      setIsGeneratingCode(false)
     }
   }
 
@@ -331,6 +378,22 @@ export default function SolutionDetail() {
               <SolutionStatusBadge status={solution.status} size="lg" />
             </div>
             <div className="flex items-center gap-2">
+              {solution.status === 'approved' && (
+                <button
+                  onClick={handleGenerateCode}
+                  disabled={isGeneratingCode}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isGeneratingCode ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      生成中...
+                    </>
+                  ) : (
+                    <>⚙️ 生成代码</>
+                  )}
+                </button>
+              )}
               <button
                 onClick={handleRegenerate}
                 disabled={isRegenerating}
@@ -424,6 +487,72 @@ export default function SolutionDetail() {
             </button>
           )}
         </div>
+
+        {(codeGenTasks.length > 0 || isLoadingTasks) && (
+          <div className="mt-6 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <span>⚙️</span>
+                代码生成任务
+              </h3>
+              {solution.status === 'approved' && (
+                <button
+                  onClick={handleGenerateCode}
+                  disabled={isGeneratingCode}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isGeneratingCode ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      创建中...
+                    </>
+                  ) : (
+                    <>+ 新建任务</>
+                  )}
+                </button>
+              )}
+            </div>
+            <div className="divide-y divide-gray-100">
+              {isLoadingTasks ? (
+                <div className="p-6 text-center text-gray-400">
+                  <div className="w-6 h-6 border-2 border-gray-300 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                  加载中...
+                </div>
+              ) : codeGenTasks.length === 0 ? (
+                <div className="p-6 text-center text-gray-400">
+                  暂无代码生成任务
+                </div>
+              ) : (
+                codeGenTasks.map((task) => (
+                  <button
+                    key={task.id}
+                    onClick={() => navigate(`/codegen/${task.id}`)}
+                    className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-4">
+                      <CodeGenStatusBadge status={task.status} />
+                      <span className="text-sm font-mono text-gray-500">{task.id}</span>
+                      <span className="text-sm text-gray-500">
+                        {task.files_count} 个文件
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-gray-400">
+                        {new Date(task.created_at).toLocaleString('zh-CN', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                      <span className="text-gray-300">→</span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {showStatusModal && (

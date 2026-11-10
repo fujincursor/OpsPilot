@@ -300,3 +300,62 @@ export interface ReviewFilters {
   status?: ReviewStatus
   priority?: RequirementPriority
 }
+
+// Code Generation Types
+export type CodeGenStatus = 'pending' | 'generating' | 'linting' | 'completed' | 'failed'
+
+export type DiffLineType = 'add' | 'remove' | 'context'
+
+export interface DiffLine {
+  type: DiffLineType
+  content: string
+  line_number: number
+}
+
+export interface LintResult {
+  passed: boolean
+  errors: LintMessage[]
+  warnings: LintMessage[]
+}
+
+export interface LintMessage {
+  file: string
+  line: number
+  column: number
+  message: string
+  rule?: string
+}
+
+export type CodeFileAction = 'create' | 'modify' | 'delete'
+
+export interface CodeFile {
+  path: string
+  content: string
+  language: string
+  action: CodeFileAction
+  diff?: DiffLine[]
+}
+
+export interface CodeGenTask {
+  id: string
+  solution_id: string
+  requirement_id: string
+  status: CodeGenStatus
+  language: string
+  files: CodeFile[]
+  lint_result?: LintResult
+  error_message?: string
+  created_at: string
+  updated_at?: string
+}
+
+export interface CreateCodeGenTaskRequest {
+  solution_id: string
+}
+
+export interface CodeGenTaskSummary {
+  id: string
+  status: CodeGenStatus
+  files_count: number
+  created_at: string
+}
