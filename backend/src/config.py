@@ -1,5 +1,6 @@
 """配置管理模块"""
 
+import secrets
 from functools import lru_cache
 from typing import List
 
@@ -19,6 +20,11 @@ class Settings(BaseSettings):
     cors_allow_credentials: bool = True
     cors_allow_methods: List[str] = ["*"]
     cors_allow_headers: List[str] = ["*"]
+
+    jwt_secret_key: str = secrets.token_urlsafe(32)
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 30
+    jwt_refresh_token_expire_days: int = 7
 
     class Config:
         env_file = ".env"

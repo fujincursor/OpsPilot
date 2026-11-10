@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import get_settings
 from .api.routes import api_router
 from .api.routes.health import router as health_router
+from .api.middleware import JWTAuthMiddleware, ProjectContextMiddleware
 
 settings = get_settings()
 
@@ -18,6 +19,8 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
+app.add_middleware(ProjectContextMiddleware)
+app.add_middleware(JWTAuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
