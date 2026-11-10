@@ -108,3 +108,60 @@ export interface KnowledgeStatusSummary {
   ready: number
   error: number
 }
+
+export type RequirementType = 'bug' | 'feature' | 'question'
+export type RequirementStatus = 'pending' | 'analyzing' | 'designing' | 'reviewing' | 'coding' | 'testing' | 'completed' | 'closed'
+export type RequirementPriority = 'low' | 'medium' | 'high' | 'critical'
+
+export interface AnalysisResult {
+  type: RequirementType
+  priority: RequirementPriority
+  keywords: string[]
+  confidence: number
+}
+
+export interface Requirement {
+  id: string
+  project_id: string
+  title: string
+  description: string
+  source: string
+  type: RequirementType
+  priority: RequirementPriority
+  status: RequirementStatus
+  assignee?: string
+  created_by: string
+  analysis_result?: AnalysisResult
+  created_at: string
+  updated_at?: string
+}
+
+export interface CreateRequirementRequest {
+  title: string
+  description: string
+  source?: string
+  type?: RequirementType
+  priority?: RequirementPriority
+}
+
+export interface UpdateRequirementRequest {
+  title?: string
+  description?: string
+  type?: RequirementType
+  priority?: RequirementPriority
+  assignee?: string
+}
+
+export interface RequirementFilters {
+  type?: RequirementType
+  status?: RequirementStatus
+  priority?: RequirementPriority
+  assignee?: string
+}
+
+export interface StatusHistoryItem {
+  status: RequirementStatus
+  changed_at: string
+  changed_by: string
+  comment?: string
+}

@@ -291,7 +291,7 @@ export default function ProjectDetail() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
             <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <span>📊</span>
@@ -315,6 +315,50 @@ export default function ProjectDetail() {
                 <div className="text-sm text-gray-500">任务成功率</div>
               </div>
             </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                <span>📋</span>
+                需求管理
+              </h3>
+              <button
+                onClick={() => navigate(`/projects/${id}/requirements`)}
+                className="text-sm text-primary hover:text-primary-hover font-medium transition-colors"
+              >
+                查看全部 →
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm">🐛</span>
+                  <span className="text-sm text-gray-700">Bug</span>
+                </div>
+                <span className="text-sm text-gray-500">12 个待处理</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm">✨</span>
+                  <span className="text-sm text-gray-700">Feature</span>
+                </div>
+                <span className="text-sm text-gray-500">8 个进行中</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm">❓</span>
+                  <span className="text-sm text-gray-700">Question</span>
+                </div>
+                <span className="text-sm text-gray-500">3 个待回复</span>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate(`/projects/${id}/requirements`)}
+              className="w-full mt-4 py-2.5 text-sm font-medium text-primary bg-primary-light hover:bg-primary/20 rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              📋 进入需求管理
+            </button>
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
