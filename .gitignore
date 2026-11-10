@@ -198,3 +198,4 @@ test-screenshots/
 
 # Sandbox workspaces
 sandbox-workspace/
+frontend/.vite/
