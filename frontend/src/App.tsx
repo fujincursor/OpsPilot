@@ -4,6 +4,8 @@ import Home from './pages/Home'
 import Chat from './pages/Chat'
 import Projects from './pages/Projects'
 import ProjectDetail from './pages/ProjectDetail'
+import Knowledge from './pages/Knowledge'
+import KnowledgeDetail from './pages/KnowledgeDetail'
 
 function App() {
   return (
@@ -14,6 +16,8 @@ function App() {
         <Route path="chat/:sessionId" element={<Chat />} />
         <Route path="projects" element={<Projects />} />
         <Route path="projects/:id" element={<ProjectDetail />} />
+        <Route path="projects/:id/knowledge" element={<Knowledge />} />
+        <Route path="knowledge/:kbId" element={<KnowledgeDetail />} />
       </Route>
     </Routes>
   )

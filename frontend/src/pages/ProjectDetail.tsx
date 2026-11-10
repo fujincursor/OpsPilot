@@ -318,10 +318,18 @@ export default function ProjectDetail() {
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-            <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span>📚</span>
-              知识库状态
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                <span>📚</span>
+                知识库状态
+              </h3>
+              <button
+                onClick={() => navigate(`/projects/${id}/knowledge`)}
+                className="text-sm text-primary hover:text-primary-hover font-medium transition-colors"
+              >
+                管理知识库 →
+              </button>
+            </div>
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center gap-3">
@@ -345,6 +353,12 @@ export default function ProjectDetail() {
                 <span className="text-sm text-gray-500">同步中...</span>
               </div>
             </div>
+            <button
+              onClick={() => navigate(`/projects/${id}/knowledge`)}
+              className="w-full mt-4 py-2.5 text-sm font-medium text-primary bg-primary-light hover:bg-primary/20 rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              📚 进入知识库管理
+            </button>
           </div>
         </div>
       </div>

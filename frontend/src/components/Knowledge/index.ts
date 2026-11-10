@@ -1,0 +1,5 @@
+export { default as KnowledgeCard } from './KnowledgeCard'
+export { default as CreateKnowledgeModal } from './CreateKnowledgeModal'
+export { default as DocumentList } from './DocumentList'
+export { default as UploadArea } from './UploadArea'
+export { default as SearchTest } from './SearchTest'
