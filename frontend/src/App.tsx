@@ -8,6 +8,7 @@ import Knowledge from './pages/Knowledge'
 import KnowledgeDetail from './pages/KnowledgeDetail'
 import Requirements from './pages/Requirements'
 import RequirementDetail from './pages/RequirementDetail'
+import SolutionDetail from './pages/SolutionDetail'
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
         <Route path="projects/:id/requirements" element={<Requirements />} />
         <Route path="knowledge/:kbId" element={<KnowledgeDetail />} />
         <Route path="requirements/:reqId" element={<RequirementDetail />} />
+        <Route path="solutions/:solutionId" element={<SolutionDetail />} />
       </Route>
     </Routes>
   )

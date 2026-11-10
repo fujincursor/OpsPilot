@@ -165,3 +165,84 @@ export interface StatusHistoryItem {
   changed_by: string
   comment?: string
 }
+
+export type SolutionStatus = 'draft' | 'pending_review' | 'approved' | 'rejected' | 'implemented'
+export type SolutionType = 'bug_fix' | 'feature_design'
+
+export interface Solution {
+  id: string
+  requirement_id: string
+  type: SolutionType
+  title: string
+  content: string
+  impact_analysis: string
+  affected_files: string[]
+  status: SolutionStatus
+  created_by_agent: string
+  reviewed_by?: string
+  created_at: string
+}
+
+export interface BugFixSolution extends Solution {
+  type: 'bug_fix'
+  root_cause: string
+  fix_steps: FixStep[]
+  regression_risk: RegressionRisk
+}
+
+export interface FixStep {
+  order: number
+  description: string
+  code_snippet?: string
+  file_path?: string
+}
+
+export interface RegressionRisk {
+  level: 'low' | 'medium' | 'high'
+  description: string
+  affected_areas: string[]
+}
+
+export interface FeatureDesignSolution extends Solution {
+  type: 'feature_design'
+  architecture: ArchitectureDesign
+  api_design: ApiDesign[]
+  database_changes: DatabaseChange[]
+  dependencies: string[]
+}
+
+export interface ArchitectureDesign {
+  overview: string
+  components: ArchitectureComponent[]
+  diagram?: string
+}
+
+export interface ArchitectureComponent {
+  name: string
+  description: string
+  responsibilities: string[]
+}
+
+export interface ApiDesign {
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+  endpoint: string
+  description: string
+  request_body?: string
+  response_body?: string
+}
+
+export interface DatabaseChange {
+  type: 'create_table' | 'alter_table' | 'create_index' | 'migration'
+  table_name: string
+  description: string
+  sql?: string
+}
+
+export interface GenerateSolutionRequest {
+  requirement_id: string
+}
+
+export interface UpdateSolutionStatusRequest {
+  status: SolutionStatus
+  comment?: string
+}

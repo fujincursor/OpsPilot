@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import type { Requirement, RequirementStatus, StatusHistoryItem } from '../types'
-import { requirementService } from '../services'
+import type { Requirement, RequirementStatus, StatusHistoryItem, Solution } from '../types'
+import { requirementService, solutionService } from '../services'
 import {
   TypeIcon,
   PriorityBadge,
@@ -10,6 +10,7 @@ import {
   StatusTimeline,
   statusConfig,
 } from '../components/Requirements'
+import { SolutionCard, GenerateButton } from '../components/Solutions'
 
 const mockRequirement: Requirement = {
   id: '1',
@@ -61,6 +62,25 @@ const mockHistory: StatusHistoryItem[] = [
 
 const mockTeamMembers = ['张三', '李四', '王五', '赵六', '孙七']
 
+const mockSolutions: Solution[] = [
+  {
+    id: 'sol-1',
+    requirement_id: '1',
+    type: 'bug_fix',
+    title: '修复用户登录超时问题',
+    content: '通过优化 Token 刷新机制和会话管理来解决用户登录后过早被登出的问题。',
+    impact_analysis: '本次修复主要影响认证模块和会话管理模块。',
+    affected_files: [
+      'src/services/authService.ts',
+      'src/utils/tokenManager.ts',
+      'src/middleware/authMiddleware.ts',
+    ],
+    status: 'pending_review',
+    created_by_agent: 'BugFix Agent',
+    created_at: '2024-03-16T15:30:00Z',
+  },
+]
+
 export default function RequirementDetail() {
   const { reqId } = useParams<{ reqId: string }>()
   const navigate = useNavigate()
@@ -70,6 +90,9 @@ export default function RequirementDetail() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [showStatusModal, setShowStatusModal] = useState(false)
+  const [solutions, setSolutions] = useState<Solution[]>([])
+  const [isGeneratingSolution, setIsGeneratingSolution] = useState(false)
+  const [isLoadingSolutions, setIsLoadingSolutions] = useState(false)
 
   useEffect(() => {
     if (reqId) {
@@ -92,6 +115,45 @@ export default function RequirementDetail() {
       setHistory(mockHistory)
     } finally {
       setIsLoading(false)
+    }
+    loadSolutions(id)
+  }
+
+  const loadSolutions = async (id: string) => {
+    setIsLoadingSolutions(true)
+    try {
+      const data = await solutionService.getSolutions(id)
+      setSolutions(data)
+    } catch {
+      console.log('Using mock solutions')
+      setSolutions(mockSolutions)
+    } finally {
+      setIsLoadingSolutions(false)
+    }
+  }
+
+  const handleGenerateSolution = async () => {
+    if (!reqId) return
+    setIsGeneratingSolution(true)
+    try {
+      const newSolution = await solutionService.generateSolution(reqId)
+      setSolutions((prev) => [newSolution, ...prev])
+    } catch {
+      const mockNewSolution: Solution = {
+        id: `sol-${Date.now()}`,
+        requirement_id: reqId,
+        type: requirement?.type === 'bug' ? 'bug_fix' : 'feature_design',
+        title: `${requirement?.type === 'bug' ? '修复' : '实现'}：${requirement?.title}`,
+        content: '基于需求分析，AI 生成了以下解决方案...',
+        impact_analysis: '该方案将影响以下模块...',
+        affected_files: ['src/example.ts'],
+        status: 'draft',
+        created_by_agent: requirement?.type === 'bug' ? 'BugFix Agent' : 'Feature Agent',
+        created_at: new Date().toISOString(),
+      }
+      setSolutions((prev) => [mockNewSolution, ...prev])
+    } finally {
+      setIsGeneratingSolution(false)
     }
   }
 
@@ -265,6 +327,44 @@ export default function RequirementDetail() {
           )}
 
           <StatusTimeline history={history} currentStatus={requirement.status} />
+        </div>
+
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-gray-800">解决方案</h2>
+              {solutions.length > 0 && (
+                <span className="px-2 py-0.5 bg-gray-100 rounded-full text-xs text-gray-600">
+                  {solutions.length} 个方案
+                </span>
+              )}
+            </div>
+            <GenerateButton
+              onClick={handleGenerateSolution}
+              isLoading={isGeneratingSolution}
+              label="生成方案"
+            />
+          </div>
+
+          {isLoadingSolutions ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : solutions.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+              <div className="text-4xl mb-3">💡</div>
+              <h3 className="text-gray-800 font-medium mb-2">暂无解决方案</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                点击「生成方案」按钮，让 AI 分析需求并生成解决方案
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {solutions.map((solution) => (
+                <SolutionCard key={solution.id} solution={solution} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
