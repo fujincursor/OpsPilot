@@ -4,6 +4,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 
 from ...api.deps import require_role
 from ...models.user import User, UserRole
@@ -26,6 +27,7 @@ from ...models.review import (
     Notification,
     NotificationResponse,
 )
+from ...services.codegen_service import codegen_service
 from ...services.hitl_service import hitl_service
 from ...services.notification_service import notification_service
 from ...services.workflow_service import workflow_service
@@ -88,6 +90,49 @@ async def list_project_reviews(
 
 
 @router.get(
+    "/reviews",
+    response_model=ReviewItemResponse,
+)
+async def list_reviews(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(50, ge=1, le=200, description="每页数量"),
+    project_id: Optional[UUID] = Query(None, description="项目 ID"),
+    item_type: Optional[ReviewItemType] = Query(None, description="审核项类型"),
+    status: Optional[ReviewStatus] = Query(None, description="状态筛选"),
+    priority: Optional[ReviewPriority] = Query(None, description="优先级筛选"),
+    reviewer: Optional[str] = Query(None, description="审核人"),
+) -> ReviewItemResponse:
+    """返回全部审核项，包含已通过、已拒绝和要求修改。"""
+    workflow_service.sync_pending_solution_reviews()
+    filters = ReviewFilters(
+        item_type=item_type,
+        status=status,
+        priority=priority,
+        reviewer=reviewer,
+    )
+    reviews = hitl_service.get_pending_reviews(
+        project_id=project_id,
+        reviewer=reviewer,
+        filters=filters,
+        page=page,
+        page_size=page_size,
+        only_open=False,
+    )
+    total = hitl_service.count_pending_reviews(
+        project_id=project_id,
+        reviewer=reviewer,
+        filters=filters,
+        only_open=False,
+    )
+    return ReviewItemResponse(
+        items=reviews,
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get(
     "/reviews/pending",
     response_model=ReviewItemResponse,
 )
@@ -134,6 +179,27 @@ async def list_pending_reviews(
         total=total,
         page=page,
         page_size=page_size,
+    )
+
+
+@router.get("/reviews/{review_id}/changed-code")
+async def download_changed_code(review_id: UUID) -> Response:
+    """下载审批通过的代码变更，压缩包内保留原目录结构。"""
+    review = hitl_service.get_review_item(review_id)
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    if review.item_type != ReviewItemType.CODE or review.status != ReviewStatus.APPROVED:
+        raise HTTPException(status_code=400, detail="只有审批通过的代码可以下载")
+    payload = codegen_service.changed_code_zip(review.item_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="代码任务不存在")
+    if not payload:
+        raise HTTPException(status_code=400, detail="这次审批没有可下载的代码变更")
+    filename = f"code-changes-{str(review_id)[:8]}.zip"
+    return Response(
+        content=payload,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -194,6 +260,7 @@ async def approve_review(
     current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.REVIEWER])),
 ) -> ReviewItem:
     """通过审核，并按主流程进入代码生成或测试。"""
+    existing = hitl_service.get_review_item(review_id)
     review = hitl_service.approve(
         review_id=review_id,
         reviewer=current_user.username,
@@ -203,7 +270,29 @@ async def approve_review(
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
 
-    await workflow_service.on_approved(review)
+    was_open = existing is not None and existing.status in {ReviewStatus.PENDING, ReviewStatus.IN_REVIEW}
+    if was_open and review.status == ReviewStatus.APPROVED:
+        if review.item_type == ReviewItemType.SOLUTION:
+            from ...models.solution import SolutionStatus
+            from ...services.solution_service import solution_service
+
+            solution_service.update_solution_status(
+                review.item_id,
+                SolutionStatus.APPROVED,
+                reviewed_by=review.reviewer,
+            )
+        elif review.item_type == ReviewItemType.CODE:
+            from ...models.requirement import RequirementStatus
+            from ...services.requirement_service import requirement_service
+
+            requirement = workflow_service._requirement_for(review)
+            if (
+                requirement is not None
+                and requirement.auto_advance
+                and requirement.status not in {RequirementStatus.CLOSED, RequirementStatus.COMPLETED}
+            ):
+                requirement_service.update_status(requirement.id, RequirementStatus.TESTING)
+        workflow_service.schedule_approved(review)
     return review
 
 
@@ -244,6 +333,8 @@ async def request_revision(
     current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.REVIEWER])),
 ) -> ReviewItem:
     """要求修改，并带着意见回到方案或代码生成。"""
+    existing = hitl_service.get_review_item(review_id)
+    was_open = existing is not None and existing.status in {ReviewStatus.PENDING, ReviewStatus.IN_REVIEW}
     review = hitl_service.request_revision(
         review_id=review_id,
         reviewer=current_user.username,
@@ -253,7 +344,8 @@ async def request_revision(
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
 
-    await workflow_service.on_revision(review, data.comments)
+    if was_open and review.status == ReviewStatus.REVISION_REQUESTED:
+        workflow_service.schedule_revision(review, data.comments)
     return review
 
 

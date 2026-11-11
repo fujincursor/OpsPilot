@@ -189,6 +189,7 @@ class HITLService:
         review_item.status = ReviewStatus.APPROVED
         review_item.reviewer = reviewer
         review_item.updated_at = datetime.utcnow()
+        self._review_items[review_item.id] = review_item
 
         self._add_history_entry(
             review_id,
@@ -256,6 +257,7 @@ class HITLService:
         review_item.status = ReviewStatus.REJECTED
         review_item.reviewer = reviewer
         review_item.updated_at = datetime.utcnow()
+        self._review_items[review_item.id] = review_item
 
         self._add_history_entry(
             review_id,
@@ -312,6 +314,7 @@ class HITLService:
             content=f"[修改请求] {comments}",
         )
         review_item.comments.append(comment)
+        self._review_items[review_item.id] = review_item
 
         self._add_history_entry(
             review_id,
@@ -408,8 +411,9 @@ class HITLService:
         filters: Optional[ReviewFilters] = None,
         page: int = 1,
         page_size: int = 20,
+        only_open: bool = True,
     ) -> List[ReviewItem]:
-        """获取待审列表。列出前先处理已经到期的审核。"""
+        """获取审核列表。only_open 为真时只返回待审核和审核中。"""
         self.check_timeout_escalation()
         if project_id:
             review_ids = self._project_reviews.get(project_id, [])
@@ -420,8 +424,9 @@ class HITLService:
         else:
             reviews = list(self._review_items.values())
 
-        pending_statuses = [ReviewStatus.PENDING, ReviewStatus.IN_REVIEW]
-        reviews = [r for r in reviews if r.status in pending_statuses]
+        if only_open:
+            pending_statuses = [ReviewStatus.PENDING, ReviewStatus.IN_REVIEW]
+            reviews = [r for r in reviews if r.status in pending_statuses]
 
         if item_type:
             reviews = [r for r in reviews if r.item_type == item_type]
@@ -461,8 +466,9 @@ class HITLService:
         item_type: Optional[ReviewItemType] = None,
         reviewer: Optional[str] = None,
         filters: Optional[ReviewFilters] = None,
+        only_open: bool = True,
     ) -> int:
-        """统计待审数量"""
+        """统计审核数量。only_open 为真时只统计待审核和审核中。"""
         if project_id:
             review_ids = self._project_reviews.get(project_id, [])
             reviews = [
@@ -472,8 +478,9 @@ class HITLService:
         else:
             reviews = list(self._review_items.values())
 
-        pending_statuses = [ReviewStatus.PENDING, ReviewStatus.IN_REVIEW]
-        reviews = [r for r in reviews if r.status in pending_statuses]
+        if only_open:
+            pending_statuses = [ReviewStatus.PENDING, ReviewStatus.IN_REVIEW]
+            reviews = [r for r in reviews if r.status in pending_statuses]
 
         if item_type:
             reviews = [r for r in reviews if r.item_type == item_type]

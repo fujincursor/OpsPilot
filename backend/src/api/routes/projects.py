@@ -1,9 +1,10 @@
 """项目管理 API"""
 
+import asyncio
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 
 from ...models.project import (
@@ -14,6 +15,7 @@ from ...models.project import (
     ProjectStatus
 )
 from ...services.project_service import project_service
+from ...services.workspace_service import WorkspaceError, workspace_service
 
 router = APIRouter()
 
@@ -66,6 +68,48 @@ async def update_project(project_id: UUID, data: ProjectUpdate) -> Project:
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return project
+
+
+class GitImportRequest(BaseModel):
+    """从 Git 仓库导入源代码。"""
+    repo_url: str
+    branch: str = ""
+
+
+@router.post("/{project_id}/code/git", response_model=Project)
+async def import_project_git(project_id: UUID, data: GitImportRequest) -> Project:
+    """把仓库克隆到该项目的工作目录，并作为后续方案和代码生成的唯一代码来源。"""
+    if not project_service.get(project_id):
+        raise HTTPException(status_code=404, detail="Project not found")
+    try:
+        return await asyncio.to_thread(
+            workspace_service.import_git,
+            project_id,
+            data.repo_url,
+            data.branch,
+        )
+    except WorkspaceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/{project_id}/code/upload", response_model=Project)
+async def import_project_zip(
+    project_id: UUID,
+    file: UploadFile = File(...),
+) -> Project:
+    """把上传的 zip 解压到该项目的工作目录。"""
+    if not project_service.get(project_id):
+        raise HTTPException(status_code=404, detail="Project not found")
+    payload = await file.read()
+    try:
+        return await asyncio.to_thread(
+            workspace_service.import_zip,
+            project_id,
+            payload,
+            file.filename or "source.zip",
+        )
+    except WorkspaceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 class SandboxTestResult(BaseModel):

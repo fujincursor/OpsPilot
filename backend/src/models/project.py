@@ -100,6 +100,12 @@ class Project(ProjectBase):
     members: List[ProjectMember] = Field(default_factory=list, description="项目成员")
     prompt_template: str = Field(default="", description="项目 Prompt 模板")
     toolchain: str = Field(default="", description="工具链说明")
+    code_origin: str = Field(default="none", description="代码来源：none、git、upload")
+    code_status: str = Field(default="empty", description="代码状态：empty、ready、failed")
+    code_branch: str = Field(default="", description="Git 分支")
+    code_revision: str = Field(default="", description="提交号或上传包校验值")
+    code_message: str = Field(default="", description="最近一次导入结果")
+    code_updated_at: Optional[datetime] = Field(None, description="代码导入时间")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="创建时间")
     updated_at: datetime = Field(default_factory=datetime.utcnow, description="更新时间")
 

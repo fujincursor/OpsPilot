@@ -63,7 +63,9 @@ export default function BugFixView({ solution }: BugFixViewProps) {
                   <span className="text-xs font-bold text-primary">{step.order}</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-700 mb-2">{step.description}</p>
+                  <div className="markdown-body text-sm text-gray-700 mb-2">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{step.description}</ReactMarkdown>
+                  </div>
                   {step.file_path && (
                     <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
                       <span>📄</span>
@@ -95,7 +97,9 @@ export default function BugFixView({ solution }: BugFixViewProps) {
           </div>
         </div>
         <div className="p-4 bg-white/50">
-          <p className="text-sm text-gray-700 mb-3">{risk.description}</p>
+          <div className="markdown-body text-sm text-gray-700 mb-3">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{risk.description}</ReactMarkdown>
+          </div>
           {(risk.affected_areas || []).length > 0 && (
             <div>
               <div className="text-xs text-gray-500 mb-2">可能受影响的区域：</div>

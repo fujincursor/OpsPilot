@@ -68,7 +68,7 @@ export default function Reviews() {
   const loadReviews = async () => {
     setIsLoading(true)
     try {
-      const data = await reviewService.getPendingReviews()
+      const data = await reviewService.getReviews()
       setReviews(data)
     } catch (error) {
       console.error(error)
@@ -94,8 +94,9 @@ export default function Reviews() {
   }
 
   const hasActiveFilters = Object.values(filters).some((v) => v !== undefined)
-  const pendingCount = reviews.filter((r) => r.status === 'pending').length
-  const overdueCount = reviews.filter((r) => r.due_at && new Date(r.due_at) < new Date()).length
+  const openReviews = reviews.filter((r) => r.status === 'pending' || r.status === 'in_review')
+  const pendingCount = openReviews.length
+  const overdueCount = openReviews.filter((r) => r.due_at && new Date(r.due_at) < new Date()).length
 
   return (
     <div className="p-6 bg-gray-50 min-h-full">

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { AgentCard, AgentConfigModal } from '../components/Agents'
 import SkillContentModal from '../components/Skills/SkillContentModal'
 import { agentService, projectService } from '../services'
+import { projectErrorMessage } from '../services/projectService'
 import type { AgentConfig, Project, ProjectMember, ProjectSkill, SandboxSettings, UpdateAgentConfigRequest } from '../types'
 
 const tabs = ['基本信息', 'Agent', 'Skills', 'Sandbox', '成员', '高级'] as const
@@ -40,6 +41,10 @@ export default function ProjectSettings() {
   const [viewingSkill, setViewingSkill] = useState<ProjectSkill | null>(null)
   const [message, setMessage] = useState('')
   const [sandboxResult, setSandboxResult] = useState('')
+  const [branch, setBranch] = useState('')
+  const [sourceFile, setSourceFile] = useState<File | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [importError, setImportError] = useState('')
 
   useEffect(() => {
     if (!id) return
@@ -90,6 +95,7 @@ export default function ProjectSettings() {
       },
     })
     setProject(updated)
+    setSkills(updated.skills || [])
     setMessage('已保存')
   }
 
@@ -98,6 +104,46 @@ export default function ProjectSettings() {
     await save()
     const result = await projectService.testSandbox(id)
     setSandboxResult(result.message)
+  }
+
+  const applyCodeProject = (updated: Project) => {
+    setProject(updated)
+    setRepoUrl(updated.repo_url || '')
+    setMessage(updated.code_message || '源代码已更新')
+    setImportError('')
+  }
+
+  const syncGit = async () => {
+    if (!id || !repoUrl.trim()) {
+      setImportError('请先填写仓库地址')
+      return
+    }
+    setImporting(true)
+    setImportError('')
+    try {
+      applyCodeProject(await projectService.importGit(id, repoUrl.trim(), branch.trim()))
+    } catch (error) {
+      setImportError(projectErrorMessage(error, '从 GitHub 同步失败'))
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  const uploadZip = async () => {
+    if (!id || !sourceFile) {
+      setImportError('请选择 zip 压缩包')
+      return
+    }
+    setImporting(true)
+    setImportError('')
+    try {
+      applyCodeProject(await projectService.uploadSource(id, sourceFile))
+      setSourceFile(null)
+    } catch (error) {
+      setImportError(projectErrorMessage(error, '上传源代码失败'))
+    } finally {
+      setImporting(false)
+    }
   }
 
   if (!project) {
@@ -114,7 +160,12 @@ export default function ProjectSettings() {
             <button
               key={item}
               type="button"
-              onClick={() => setTab(item)}
+              onClick={() => {
+                setTab(item)
+                if (item === 'Skills' && id) {
+                  projectService.getProject(id).then((data) => setSkills(data.skills || [])).catch(() => undefined)
+                }
+              }}
               className={`rounded-lg px-3 py-1.5 text-sm ${tab === item ? 'bg-primary text-white' : 'bg-white border border-gray-200 text-gray-600'}`}
             >
               {item}
@@ -155,8 +206,39 @@ export default function ProjectSettings() {
                 <textarea value={description} onChange={(event) => setDescription(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2" rows={3} />
               </label>
               <label className="block text-sm text-gray-600">仓库地址
-                <input value={repoUrl} onChange={(event) => setRepoUrl(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2" />
+                <input value={repoUrl} onChange={(event) => setRepoUrl(event.target.value)} placeholder="https://github.com/your-org/your-repo" className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2" />
               </label>
+              <div className="rounded-lg border border-gray-100 bg-gray-50 p-4 space-y-3">
+                <div className="text-sm text-gray-700">
+                  代码来源：{project.code_status === 'ready' ? '已导入' : '未导入'}
+                  {project.code_origin === 'git' && ' · GitHub'}
+                  {project.code_origin === 'upload' && ' · 本地上传'}
+                  {project.code_branch ? ` · ${project.code_branch}` : ''}
+                  {project.code_revision ? ` · ${project.code_revision.slice(0, 12)}` : ''}
+                </div>
+                <p className="text-xs text-gray-500">
+                  方案生成、代码定位和写回只使用服务器上已上传的这份源代码，不会修改运行服务的工作目录。
+                </p>
+                <p className="text-xs text-gray-500">
+                  {project.code_message || '还没有导入源代码。'}
+                  {project.code_updated_at ? ` 更新于 ${new Date(project.code_updated_at).toLocaleString('zh-CN')}` : ''}
+                </p>
+                <label className="block text-sm text-gray-600">分支
+                  <input value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="留空使用默认分支" className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2" />
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" disabled={importing} onClick={syncGit} className="rounded-lg bg-primary px-3 py-2 text-sm text-white disabled:opacity-50">
+                    {importing ? '处理中...' : '从 GitHub 同步'}
+                  </button>
+                </div>
+                <label className="block text-sm text-gray-600">上传 zip
+                  <input type="file" accept=".zip,application/zip" onChange={(event) => setSourceFile(event.target.files?.[0] || null)} className="mt-1 block w-full text-sm" />
+                </label>
+                <button type="button" disabled={importing} onClick={uploadZip} className="rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-700 disabled:opacity-50">
+                  上传源代码
+                </button>
+                {importError && <p className="text-sm text-red-600">{importError}</p>}
+              </div>
             </>
           )}
           {tab === 'Agent' && (

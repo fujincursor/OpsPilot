@@ -119,19 +119,28 @@ def _is_page_open_problem(text: str) -> bool:
 
 
 def _source_files(root: Path) -> list[Path]:
+    preferred = _collect_sources(root, [root / relative for relative in SOURCE_DIRS])
+    if preferred:
+        return preferred
+    return _collect_sources(root, [root])
+
+
+def _collect_sources(root: Path, directories: list[Path]) -> list[Path]:
     files: list[Path] = []
-    for relative in SOURCE_DIRS:
-        directory = root / relative
+    for directory in directories:
         if not directory.exists():
             continue
         for path in directory.rglob("*"):
             if not path.is_file() or path.suffix.lower() not in SOURCE_SUFFIXES:
                 continue
-            if any(part in SKIP_DIRS for part in path.parts) or path.name == "code_locator.py":
+            relative_parts = path.relative_to(root).parts
+            if any(part in SKIP_DIRS for part in relative_parts) or path.name == "code_locator.py":
                 continue
             if path.stat().st_size > 1_000_000:
                 continue
             files.append(path)
+            if len(files) >= 3000:
+                return files
     return files
 
 
@@ -232,7 +241,7 @@ def _keyword_hits(root: Path, files: list[Path], terms: list[str]) -> list[CodeL
         if any(term.lower() in item[1].path.lower() for term in specific)
     ]
     chosen = path_matches or ranked
-    return [item[1] for item in chosen[:2]]
+    return [item[1] for item in chosen[:8]]
 
 
 def _normalize_route(path: str) -> str:

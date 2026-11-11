@@ -10,9 +10,11 @@
 
 import asyncio
 import difflib
+import io
 import json
 import logging
 import re
+import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Union, TYPE_CHECKING
@@ -162,9 +164,10 @@ class CodeGenService:
         if not applicable:
             raise ValueError("没有可写回项目的代码文件")
 
+        root = self._workspace_root(self._task_project_id(task))
         applied: List[str] = []
         for item in applicable:
-            target = self._project_file(item.path)
+            target = self._project_file(item.path, root)
             if item.action == FileAction.DELETE:
                 if target.is_file():
                     target.unlink()
@@ -180,17 +183,118 @@ class CodeGenService:
         task.applied_at = datetime.utcnow()
         return self._save_task(task)
 
-    def _project_file(self, relative: str) -> Path:
+    def _task_project_id(self, task: CodeGenTask) -> Optional[UUID]:
+        if not self._requirement_service:
+            return None
+        requirement = self._requirement_service.get(task.requirement_id)
+        return requirement.project_id if requirement is not None else None
+
+    def _task_root(self, task: CodeGenTask) -> Optional[Path]:
+        project_id = self._task_project_id(task)
+        if project_id is None:
+            return None
+        from .workspace_service import workspace_service
+
+        if not workspace_service.is_ready(project_id):
+            return None
+        return workspace_service.directory(project_id)
+
+    def _workspace_root(self, project_id: Optional[UUID]) -> Path:
+        from .workspace_service import workspace_service
+
+        if project_id is None or not workspace_service.is_ready(project_id):
+            raise RuntimeError("项目尚未导入源代码。请先在项目设置中从 GitHub 克隆或上传源代码。")
+        root = workspace_service.directory(project_id).resolve()
+        install = Path(__file__).resolve().parents[3]
+        upload_base = (install / "backend" / "data" / "workspaces").resolve()
+        if root.parent != upload_base:
+            raise RuntimeError("代码只能写入服务器上已上传的源代码，不能修改工作目录。")
+        return root
+
+    def _mentioned_paths(self, *texts: str) -> List[str]:
+        pattern = re.compile(r"(?:[\w.-]+/)+[\w.-]+\.(?:py|ts|tsx|js|jsx|vue|go|java|css|html)")
+        found: List[str] = []
+        for text in texts:
+            for match in pattern.findall(text or ""):
+                safe = self._safe_path(match)
+                if safe and safe not in found:
+                    found.append(safe)
+        return found
+
+    def _basis_paths(self, solution, requirement, step: CodeGenStep, root: Path) -> List[str]:
+        """方案点和当前步骤点名的文件，加上工作目录里检索到的文件。"""
+        named = self._mentioned_paths(
+            step.title,
+            "\n".join(getattr(solution, "affected_files", []) or []),
+        )
+        existing = [path for path in named if self._read_repo_file(path, root)]
+        if len(existing) < 4:
+            _summary, locations = self._locate_step(solution, requirement, root)
+            for location in locations:
+                if location.path in existing or not self._read_repo_file(location.path, root):
+                    continue
+                existing.append(location.path)
+                if len(existing) >= 6:
+                    break
+        return existing[:6]
+
+    def _basis_sources(self, paths: List[str], root: Path) -> str:
+        sections: List[str] = []
+        for path in paths:
+            content = self._read_repo_file(path, root)
+            if not content:
+                continue
+            shown = content if len(content) <= 50000 else content[:50000] + "\n# 文件过长，其余内容未展示"
+            sections.append(f"### {path}\n```\n{shown}\n```")
+        if not sections:
+            return ""
+        return (
+            "\n\n## 服务器已上传的源代码\n"
+            "下面是已经上传到服务器的项目源代码。代码调整只能发生在这份目录里，"
+            "不要修改运行服务所用的工作目录。已有文件请基于给出的内容输出完整文件，action 使用 modify；"
+            "这份目录里还没有、但这一步必须新增的文件，action 使用 create。\n\n"
+            + "\n\n".join(sections)
+        )
+
+    def _expects_code_change(self, title: str, basis: List[str]) -> bool:
+        if any(word in title for word in ("若", "如果", "尚未", "无需", "不必", "确认")):
+            return False
+        if self._must_write_files(title):
+            return True
+        return bool(basis) and any(word in title for word in ("修改", "调整", "更新", "修复"))
+
+    def _ground_generated(self, files: List[CodeFile], root: Path) -> List[CodeFile]:
+        """代码只落到服务器已上传的目录。已有文件记为修改，新文件记为新增。"""
+        grounded: List[CodeFile] = []
+        for item in files:
+            if item.action == FileAction.VIEW:
+                continue
+            safe = self._safe_path(item.path)
+            if not safe:
+                continue
+            item.path = safe
+            exists = bool(self._read_repo_file(safe, root))
+            if item.action == FileAction.DELETE:
+                if exists:
+                    grounded.append(item)
+                continue
+            if not item.content.strip():
+                continue
+            item.action = FileAction.MODIFY if exists else FileAction.CREATE
+            grounded.append(item)
+        return grounded
+
+    def _project_file(self, relative: str, root: Path) -> Path:
         raw = relative.replace("\\", "/").strip()
         if not raw or raw.startswith("/") or (len(raw) >= 2 and raw[1] == ":"):
             raise ValueError(f"不允许的路径: {relative}")
         parts = [part for part in raw.split("/") if part not in ("", ".")]
-        blocked = {".git", "node_modules", "venv", ".venv", "deerflow", "__pycache__", "data"}
+        blocked = {".git", "node_modules", "venv", ".venv", "deerflow", "__pycache__"}
         if not parts or any(part == ".." or part in blocked for part in parts):
             raise ValueError(f"不允许的路径: {relative}")
-        root = Path(__file__).resolve().parents[3]
-        target = root.joinpath(*parts).resolve()
-        if target != root and root not in target.parents:
+        base = root.resolve()
+        target = base.joinpath(*parts).resolve()
+        if target != base and base not in target.parents:
             raise ValueError(f"路径超出项目目录: {relative}")
         return target
 
@@ -200,8 +304,8 @@ class CodeGenService:
     def _must_write_files(self, title: str) -> bool:
         return any(word in title for word in ("实现", "编写", "实施"))
 
-    def _retry_prompt(self, step: CodeGenStep, steps: List[CodeGenStep]) -> str:
-        sources = self._located_sources(steps) or "还没有定位到文件。"
+    def _retry_prompt(self, step: CodeGenStep, steps: List[CodeGenStep], root: Path, basis_paths: List[str]) -> str:
+        sources = self._basis_sources(basis_paths, root) or self._located_sources(steps, root) or "还没有定位到文件。"
         return f"""上一次没有输出代码文件。请只完成当前步骤，并只输出一个 json 代码块。
 
 当前步骤：{step.title}
@@ -210,7 +314,8 @@ class CodeGenService:
 
 规则：
 - files 不能为空。
-- 只修改上面已经给出的现有文件，action 使用 modify，content 写修改后的完整内容。
+- 文件都相对服务器上已上传的源代码目录。已有文件 action 使用 modify，新文件 action 使用 create，content 写完整内容。
+- 不要把文件写到运行服务的工作目录。
 - 不要创建 models/resource.py，也不要使用 /{{resource}} 这种占位路径。
 - 监控页面要展示系统里已经保存的数据。
 格式：
@@ -219,9 +324,7 @@ class CodeGenService:
 ```
 """
 
-    def _locate_step(self, solution, requirement) -> tuple[str, List[CodeLocation]]:
-        from pathlib import Path
-
+    def _locate_step(self, solution, requirement, root: Path) -> tuple[str, List[CodeLocation]]:
         from .code_locator import locate_code
 
         texts = [solution.title, solution.content[:2000]]
@@ -230,7 +333,6 @@ class CodeGenService:
                 getattr(requirement, "title", "") or "",
                 getattr(requirement, "description", "") or "",
             ])
-        root = Path(__file__).resolve().parents[3]
         return locate_code(root, texts)
 
     def _step_record(self, step: CodeGenStep) -> str:
@@ -336,8 +438,12 @@ class CodeGenService:
         if project_id is None:
             return ""
         try:
+            from .agent_runtime import agent_runtime
             from .knowledge_service import knowledge_service
+            from .project_service import project_service
 
+            if agent_runtime.skill_enabled(project_id, "knowledge-retrieval"):
+                project_service.record_skill_use(project_id, "knowledge-retrieval")
             hits = knowledge_service.search_knowledge(
                 project_id,
                 query,
@@ -364,13 +470,15 @@ class CodeGenService:
         files: List[CodeFile],
         project_id: Optional[UUID],
         additional_instructions: Optional[str],
+        root: Path,
+        basis_paths: List[str],
     ) -> str:
         titles = "\n".join(f"{item.index}. {item.title}" for item in steps)
         done = "\n\n".join(previous) or "还没有已完成的步骤。"
         paths = "\n".join(f"- {item.path}" for item in files) or "还没有生成文件。"
         extra = f"\n\n补充要求:\n{additional_instructions}" if additional_instructions else ""
         knowledge = self._knowledge_context(project_id, f"{solution.title}\n{step.title}")
-        sources = self._located_sources(steps)
+        sources = self._basis_sources(basis_paths, root) or self._located_sources(steps, root)
         return f"""你是代码生成代理。请只执行方案中的当前步骤，不要提前完成后面的步骤。
 
 ## 方案
@@ -404,7 +512,8 @@ class CodeGenService:
 - path 使用相对路径，不要使用盘符，也不要包含 .. 。
 - 把要落地的文件放进 files，不要直接修改仓库。
 - 修改已有功能时，改已定位到的真实文件。监控页面就修改已定位的页面，让页面数据来自系统里已经保存的记录。
-- 需要修改已有文件时，基于上面给出的现有内容输出修改后的完整文件，action 使用 modify。{extra}
+- 代码调整只写入服务器上已上传的源代码目录，不要修改运行服务的工作目录。
+- 已有文件只能基于「服务器已上传的源代码」输出完整内容，action 使用 modify。目录里没有的新文件 action 使用 create。{extra}
 """
 
     def _parse_step_output(self, text: str) -> tuple[str, List[CodeFile]]:
@@ -567,6 +676,12 @@ class CodeGenService:
             task.status = CodeGenStatus.FAILED
             task.error_message = "CodeGen Agent 未启用，这一阶段不会执行"
             return self._save_task(task)
+        try:
+            root = self._workspace_root(project_id)
+        except RuntimeError as exc:
+            task.status = CodeGenStatus.FAILED
+            task.error_message = str(exc)
+            return self._save_task(task)
 
         previous: List[str] = []
         for step in task.steps:
@@ -574,13 +689,18 @@ class CodeGenService:
             self._save_task(task)
             logger.info("开始执行方案步骤 %s/%s: %s", step.index, len(task.steps), step.title)
             if self._is_locate_step(step.title):
-                summary, locations = self._locate_step(solution, requirement)
+                summary, locations = self._locate_step(solution, requirement, root)
                 step.output = summary
                 step.locations = locations
                 step.status = CodeGenStepStatus.COMPLETED
                 previous.append(self._step_record(step))
                 self._save_task(task)
                 continue
+            basis_paths = self._basis_paths(solution, requirement, step, root)
+            step.locations = [
+                CodeLocation(path=path, line=1, reason="服务端已导入源代码")
+                for path in basis_paths
+            ]
             prompt = self._step_prompt(
                 solution,
                 requirement,
@@ -590,6 +710,8 @@ class CodeGenService:
                 task.files,
                 project_id,
                 additional_instructions,
+                root,
+                basis_paths,
             )
             response = await asyncio.to_thread(
                 deerflow_service.complete,
@@ -605,15 +727,26 @@ class CodeGenService:
                 return self._save_task(task)
 
             summary, files = self._parse_step_output(response.message)
-            if not files and self._must_write_files(step.title):
+            files = self._ground_generated(files, root)
+            if not files and self._expects_code_change(step.title, basis_paths):
                 retry = await asyncio.to_thread(
                     deerflow_service.complete,
-                    agent_runtime.render_task(codegen_agent, self._retry_prompt(step, task.steps)),
+                    agent_runtime.render_task(
+                        codegen_agent,
+                        self._retry_prompt(step, task.steps, root, basis_paths),
+                    ),
                     f"codegen-{task.id}",
                     model_name=codegen_agent.model_name,
                 )
                 if retry.success:
                     summary, files = self._parse_step_output(retry.message)
+                    files = self._ground_generated(files, root)
+            if not files and self._expects_code_change(step.title, basis_paths):
+                step.status = CodeGenStepStatus.FAILED
+                step.error_message = "没有生成可写入服务器已上传源代码的文件"
+                task.status = CodeGenStatus.FAILED
+                task.error_message = f"第 {step.index} 步没有生成可写入服务器已上传源代码的文件"
+                return self._save_task(task)
             step.output = summary
             step.files = files
             step.status = CodeGenStepStatus.COMPLETED
@@ -711,11 +844,14 @@ class CodeGenService:
     def _files_for_display(self, task: CodeGenTask) -> List[CodeFile]:
         files: List[CodeFile] = []
         seen: set[str] = set()
+        root = self._task_root(task)
         for item in task.files:
-            original = self._read_repo_file(item.path)
+            original = self._read_repo_file(item.path, root)
             copied = item.model_copy(deep=True)
-            new_content = "" if item.action == FileAction.DELETE else item.content
-            old_content = "" if item.action == FileAction.CREATE and not original else original
+            if copied.action != FileAction.DELETE and not original:
+                copied.action = FileAction.CREATE
+            new_content = "" if copied.action == FileAction.DELETE else copied.content
+            old_content = "" if copied.action == FileAction.CREATE else original
             copied.diff = self._line_diff(old_content, new_content)
             files.append(copied)
             seen.add(item.path)
@@ -723,7 +859,7 @@ class CodeGenService:
         for location in self._task_locations(task):
             if location.path in seen:
                 continue
-            content = self._read_repo_file(location.path)
+            content = self._read_repo_file(location.path, root)
             if not content:
                 continue
             files.append(CodeFile(
@@ -764,13 +900,13 @@ class CodeGenService:
         strong = [item for item in locations if "文件内容与问题描述匹配" not in item.reason]
         return strong or locations
 
-    def _located_sources(self, steps: List[CodeGenStep]) -> str:
+    def _located_sources(self, steps: List[CodeGenStep], root: Optional[Path]) -> str:
         sections: List[str] = []
         seen: set[str] = set()
         for location in self._prefer_step_locations(steps):
             if location.path in seen:
                 continue
-            content = self._read_repo_file(location.path)
+            content = self._read_repo_file(location.path, root)
             if not content:
                 continue
             seen.add(location.path)
@@ -779,13 +915,15 @@ class CodeGenService:
             return ""
         return "\n\n## 已定位文件的现有内容\n" + "\n\n".join(sections)
 
-    def _read_repo_file(self, relative: str) -> str:
+    def _read_repo_file(self, relative: str, root: Optional[Path]) -> str:
+        if root is None:
+            return ""
         safe = self._safe_path(relative)
         if not safe:
             return ""
-        root = Path(__file__).resolve().parents[3]
-        path = (root / safe).resolve()
-        if not path.is_file() or root.resolve() not in path.parents:
+        base = root.resolve()
+        path = (base / safe).resolve()
+        if not path.is_file() or base not in path.parents:
             return ""
         if path.stat().st_size > 1_000_000:
             return ""
@@ -837,7 +975,7 @@ class CodeGenService:
 
     def _get_original_file_content(self, task: CodeGenTask, file_path: str) -> str:
         """获取仓库里的原始文件内容。"""
-        return self._read_repo_file(file_path)
+        return self._read_repo_file(file_path, self._task_root(task))
 
     def _generate_unified_diff(
         self,
@@ -1137,6 +1275,35 @@ class CodeGenService:
         if not task:
             return None
         return task.files
+
+    def changed_code_zip(self, task_id: UUID) -> Optional[bytes]:
+        """把新增和修改的文件按原目录打成压缩包。没有变更时返回空字节。"""
+        task = self.get_task(task_id)
+        if task is None:
+            return None
+        buffer = io.BytesIO()
+        written = 0
+        notes: List[str] = []
+        with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            seen: set[str] = set()
+            for item in task.files:
+                if item.action == FileAction.VIEW:
+                    continue
+                safe = self._safe_path(item.path)
+                if not safe or safe in seen:
+                    continue
+                seen.add(safe)
+                if item.action == FileAction.DELETE:
+                    notes.append(f"删除 {safe}")
+                    continue
+                archive.writestr(safe, item.content)
+                written += 1
+                label = "新增" if item.action == FileAction.CREATE else "修改"
+                notes.append(f"{label} {safe}")
+            if written == 0 and not notes:
+                return b""
+            archive.writestr("变更说明.txt", "\n".join(notes) + "\n")
+        return buffer.getvalue()
 
     def get_lint_result(self, task_id: UUID) -> Optional[LintResult]:
         """获取 Lint 结果

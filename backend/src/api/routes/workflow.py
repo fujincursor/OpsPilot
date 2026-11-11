@@ -26,6 +26,11 @@ class WorkflowItem(BaseModel):
     sandbox_profile: str = ""
     updated_at: Optional[str] = None
     current_agent: str = ""
+    code_review_id: Optional[UUID] = None
+    codegen_task_id: Optional[UUID] = None
+    codegen_status: str = ""
+    codegen_error: str = ""
+    codegen_files: List[str] = Field(default_factory=list)
 
 
 class WorkflowBoard(BaseModel):
@@ -56,6 +61,7 @@ def _current_agent(stage: str, requirement_type: str, project_id: UUID) -> str:
         "分析": "需求分析",
         "方案": "方案设计",
         "待审批": "人工审批",
+        "代码审批": "人工审批",
         "编码": "代码生成",
         "测试": "测试执行",
         "完成": "已完成",
@@ -64,11 +70,39 @@ def _current_agent(stage: str, requirement_type: str, project_id: UUID) -> str:
     }.get(stage, "Lead Agent")
 
 
+def _latest_codegen(requirement_id: UUID):
+    """取出这条需求最近一次代码生成任务和待审的代码审批。"""
+    from ...models.review import ReviewItemType, ReviewStatus
+    from ...services.codegen_service import codegen_service
+    from ...services.hitl_service import hitl_service
+
+    tasks = [
+        task for task in codegen_service._tasks.values()
+        if task.requirement_id == requirement_id
+    ]
+    if not tasks:
+        return None, None
+    task = max(tasks, key=lambda item: item.updated_at)
+    review = next(
+        (
+            item for item in hitl_service._review_items.values()
+            if item.item_type == ReviewItemType.CODE
+            and item.item_id == task.id
+            and item.status in {ReviewStatus.PENDING, ReviewStatus.IN_REVIEW}
+        ),
+        None,
+    )
+    return task, review
+
+
 def _board(project_id: UUID) -> WorkflowBoard:
+    workflow_service.reconcile_approved_code()
     requirements, _ = requirement_service.list(project_id, page=1, page_size=200)
     profile = workflow_service._sandbox_profile(project_id)
-    items = [
-        WorkflowItem(
+    items = []
+    for item in requirements:
+        task, review = _latest_codegen(item.id)
+        items.append(WorkflowItem(
             requirement_id=item.id,
             title=item.title,
             type=item.type.value,
@@ -79,12 +113,15 @@ def _board(project_id: UUID) -> WorkflowBoard:
             sandbox_profile=profile,
             updated_at=item.updated_at.isoformat() if item.updated_at else None,
             current_agent=_current_agent(workflow_service.stage_label(item), item.type.value, project_id),
-        )
-        for item in requirements
-    ]
+            code_review_id=review.id if review else None,
+            codegen_task_id=task.id if task else None,
+            codegen_status=task.status.value if task else "",
+            codegen_error=(task.error_message or "") if task else "",
+            codegen_files=[file.path for file in task.files] if task else [],
+        ))
     return WorkflowBoard(
         running=sum(1 for item in items if item.stage in {"分析", "方案", "编码", "测试"}),
-        pending_review=sum(1 for item in items if item.stage == "待审批"),
+        pending_review=sum(1 for item in items if item.stage in {"待审批", "方案审批", "代码审批"}),
         completed=sum(1 for item in items if item.stage == "完成"),
         closed=sum(1 for item in items if item.stage == "已关闭"),
         items=items,

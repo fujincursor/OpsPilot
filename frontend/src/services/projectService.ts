@@ -1,4 +1,5 @@
 import api from './api'
+import axios from 'axios'
 import type { Project, CreateProjectRequest, UpdateProjectRequest } from '../types'
 
 interface ListResponse<T> {
@@ -49,6 +50,37 @@ export const projectService = {
     const response = await api.put<Project>(`/projects/${id}`, { status: 'archived' })
     return response.data
   },
+
+  async importGit(id: string, repoUrl: string, branch = ''): Promise<Project> {
+    const response = await api.post<Project>(`/projects/${id}/code/git`, {
+      repo_url: repoUrl,
+      branch,
+    }, { timeout: 130000 })
+    return response.data
+  },
+
+  async uploadSource(id: string, file: File): Promise<Project> {
+    const form = new FormData()
+    form.append('file', file)
+    const response = await api.post<Project>(`/projects/${id}/code/upload`, form, {
+      timeout: 130000,
+      transformRequest: [(data, headers) => {
+        if (headers && typeof (headers as { delete?: (name: string) => void }).delete === 'function') {
+          (headers as { delete: (name: string) => void }).delete('Content-Type')
+        }
+        return data
+      }],
+    })
+    return response.data
+  },
+}
+
+export function projectErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const detail = (error.response?.data as { detail?: unknown } | undefined)?.detail
+    if (typeof detail === 'string' && detail.trim()) return detail
+  }
+  return fallback
 }
 
 export default projectService

@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, TYPE_CHECKING
 from uuid import UUID
 
 from ..db import DocumentDict
-from ..models.project import Project, ProjectCreate, ProjectUpdate, ProjectStatus
+from ..models.project import Project, ProjectCreate, ProjectSkill, ProjectUpdate, ProjectStatus
 
 if TYPE_CHECKING:
     from .agent_service import AgentService
@@ -92,6 +92,8 @@ class ProjectService:
             return None
 
         update_data = data.model_dump(exclude_unset=True)
+        if "skills" in update_data:
+            update_data["skills"] = self._keep_skill_usage(project, update_data["skills"])
         for field, value in update_data.items():
             setattr(project, field, value)
 
@@ -99,11 +101,41 @@ class ProjectService:
         self._projects[project.id] = project
         return project
 
+    def record_skill_use(self, project_id: UUID, key: str) -> None:
+        """技能参与一次执行后，把项目设置里的使用次数加一。"""
+        project = self._projects.get(project_id)
+        if project is None or not key:
+            return
+        matched = False
+        for skill in project.skills:
+            if skill.key == key:
+                skill.usage_count = int(skill.usage_count or 0) + 1
+                matched = True
+                break
+        if not matched:
+            return
+        project.updated_at = datetime.utcnow()
+        self._projects[project.id] = project
+
+    @staticmethod
+    def _keep_skill_usage(project: Project, incoming) -> list:
+        """保存项目设置时保留已经累计的使用次数。"""
+        previous = {item.key: int(item.usage_count or 0) for item in project.skills}
+        merged = []
+        for raw in incoming or []:
+            skill = raw if isinstance(raw, ProjectSkill) else ProjectSkill.model_validate(raw)
+            skill.usage_count = previous.get(skill.key, int(skill.usage_count or 0))
+            merged.append(skill)
+        return merged
+
     def delete(self, project_id: UUID) -> bool:
         """删除项目及其相关 Agent 配置"""
         if project_id in self._projects:
             if self._agent_service:
                 self._agent_service.delete_agents_by_project(project_id)
+            from .workspace_service import workspace_service
+
+            workspace_service.remove(project_id)
             del self._projects[project_id]
             return True
         return False

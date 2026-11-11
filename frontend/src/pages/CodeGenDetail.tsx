@@ -91,14 +91,14 @@ export default function CodeGenDetail() {
       .filter((file) => file.action === 'create' || file.action === 'modify' || file.action === 'delete')
       .map((file) => file.path)
     if (paths.length === 0) return
-    const confirmed = window.confirm(`把以下文件写回项目？\n${paths.join('\n')}`)
+    const confirmed = window.confirm(`把以下文件写回服务器上已上传的源代码？不会修改工作目录。\n${paths.join('\n')}`)
     if (!confirmed) return
     setIsApplying(true)
     setApplyMessage('')
     try {
       const updated = await codegenService.applyToProject(taskId)
       setTask(updated)
-      setApplyMessage(`已写回 ${updated.applied_paths?.length || paths.length} 个文件`)
+      setApplyMessage(`已写入服务器上已上传的源代码，共 ${updated.applied_paths?.length || paths.length} 个文件`)
     } catch {
       setApplyMessage('写回失败，请再试一次')
     } finally {
@@ -310,7 +310,7 @@ export default function CodeGenDetail() {
 
           {(applyMessage || (task.applied_paths && task.applied_paths.length > 0)) && (
             <p className={`mt-4 text-sm ${applyMessage.includes('失败') ? 'text-red-600' : 'text-green-700'}`}>
-              {applyMessage || `已写回 ${task.applied_paths?.join('、')}`}
+              {applyMessage || `已写入服务器已上传的源代码：${task.applied_paths?.join('、')}`}
             </p>
           )}
 

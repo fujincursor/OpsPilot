@@ -17,6 +17,11 @@ interface WorkflowItem {
   sandbox_profile: string
   updated_at?: string | null
   current_agent?: string
+  codegen_task_id?: string | null
+  codegen_status?: string
+  codegen_error?: string
+  codegen_files?: string[]
+  code_review_id?: string | null
 }
 
 interface WorkflowBoard {
@@ -84,7 +89,7 @@ export default function Monitor() {
   ]
   const progressOf = (stage: string) => {
     const table: Record<string, number> = {
-      分析: 15, 方案: 35, 待审批: 55, 编码: 70, 测试: 85, 完成: 100, 已关闭: 100, 已暂停: 40,
+      分析: 15, 方案: 35, 待审批: 50, 编码: 70, 代码审批: 80, 测试: 90, 完成: 100, 已关闭: 100, 已暂停: 40,
     }
     return table[stage] ?? 10
   }

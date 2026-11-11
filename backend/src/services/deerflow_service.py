@@ -127,6 +127,10 @@ class DeerFlowService:
         if not agent_runtime.skill_enabled(parsed_project_id, "knowledge-retrieval"):
             return message, []
 
+        from .project_service import project_service
+
+        project_service.record_skill_use(parsed_project_id, "knowledge-retrieval")
+
         from .knowledge_service import knowledge_service
 
         hits = knowledge_service.search_knowledge(
@@ -282,21 +286,18 @@ class DeerFlowService:
             )
         
         try:
-            options = {"model_name": model_name} if model_name else {}
-            response = self._client.chat(
-                prepared,
-                thread_id=thread_id,
-                **options,
-            )
-            visible, parsed = self._extract_classification(response)
+            response = self.complete_text(prepared, model_name=model_name)
+            if not response.success:
+                raise RuntimeError(response.message or "模型没有生成回复")
+            visible, parsed = self._extract_classification(response.message)
             classification = self._classified(message, parsed)
             
             return AgentResponse(
                 success=True,
-                message=visible or response,
+                message=visible or response.message,
                 thread_id=thread_id,
                 data={
-                    "raw_response": response,
+                    "raw_response": response.message,
                     "project_id": project_id,
                     "knowledge_results": sources,
                     "classification": classification,
@@ -348,32 +349,18 @@ class DeerFlowService:
         model_name: Optional[str] = None,
         recursion_limit: Optional[int] = None,
     ) -> AgentResponse:
-        """直接让模型完成一项任务，不附加对话分类。"""
+        """直接让模型完成一项任务，不挂载搜索和网页抓取。"""
+        if recursion_limit is not None:
+            logger.info("忽略 recursion_limit=%s，本次不使用工具循环", recursion_limit)
         if not self.is_available:
             return AgentResponse(
                 success=False,
                 message="DeerFlow 未安装，当前无法生成代码",
                 thread_id=thread_id,
             )
-        try:
-            options = {}
-            if model_name:
-                options["model_name"] = model_name
-            if recursion_limit is not None:
-                options["recursion_limit"] = recursion_limit
-            response = self._client.chat(message, thread_id=thread_id, **options)
-            return AgentResponse(
-                success=True,
-                message=response or "",
-                thread_id=thread_id,
-            )
-        except Exception as e:
-            logger.error(f"DeerFlow 任务执行失败: {e}")
-            return AgentResponse(
-                success=False,
-                message=f"Agent 调用失败: {str(e)}",
-                thread_id=thread_id,
-            )
+        response = self.complete_text(message, model_name=model_name)
+        response.thread_id = thread_id
+        return response
 
     def complete_text(
         self,

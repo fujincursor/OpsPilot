@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ProjectCard, CreateProjectModal } from '../components/Projects'
-import type { Project, CreateProjectRequest } from '../types'
+import type { Project } from '../types'
 import { projectService } from '../services'
 
 export default function Projects() {
@@ -29,13 +29,12 @@ export default function Projects() {
     }
   }
 
-  const handleCreateProject = async (data: CreateProjectRequest) => {
-    try {
-      const newProject = await projectService.createProject(data)
-      setProjects((prev) => [newProject, ...prev])
-    } catch (error) {
-      console.error(error)
-    }
+  const rememberProject = (project: Project) => {
+    setProjects((prev) => {
+      const exists = prev.some((item) => item.id === project.id)
+      if (!exists) return [project, ...prev]
+      return prev.map((item) => (item.id === project.id ? project : item))
+    })
   }
 
   const handleProjectClick = (project: Project) => {
@@ -160,7 +159,7 @@ export default function Projects() {
       <CreateProjectModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSubmit={handleCreateProject}
+        onCreated={rememberProject}
       />
     </div>
   )

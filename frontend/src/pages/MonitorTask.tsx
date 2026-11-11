@@ -13,6 +13,11 @@ interface WorkflowItem {
   sandbox_profile: string
   updated_at?: string | null
   current_agent?: string
+  codegen_task_id?: string | null
+  codegen_status?: string
+  codegen_error?: string
+  codegen_files?: string[]
+  code_review_id?: string | null
 }
 
 interface WorkflowBoard {
@@ -24,11 +29,20 @@ const stages = ['分析', '方案', '方案审批', '编码', '代码审批', '�
 function activeIndex(stage: string): number {
   if (stage === '分析') return 0
   if (stage === '方案') return 1
-  if (stage === '待审批') return 2
+  if (stage === '待审批' || stage === '方案审批') return 2
   if (stage === '编码') return 3
+  if (stage === '代码审批') return 4
   if (stage === '测试') return 5
   if (stage === '完成' || stage === '已关闭') return 6
   return 0
+}
+
+const codegenStatusText: Record<string, string> = {
+  pending: '等待开始',
+  generating: '正在根据服务端源代码生成',
+  linting: '正在检查语法',
+  completed: '已完成',
+  failed: '失败',
 }
 
 export default function MonitorTask() {
@@ -43,13 +57,25 @@ export default function MonitorTask() {
       setError('请先选择项目')
       return
     }
-    api.get<WorkflowBoard>(`/projects/${projectId}/workflow`)
-      .then((response) => {
-        const found = response.data.items.find((entry) => entry.requirement_id === requirementId) || null
-        setItem(found)
-        if (!found) setError('没有找到这条流程')
-      })
-      .catch(() => setError('流程数据加载失败'))
+    let stopped = false
+    const load = () => {
+      api.get<WorkflowBoard>(`/projects/${projectId}/workflow`)
+        .then((response) => {
+          if (stopped) return
+          const found = response.data.items.find((entry) => entry.requirement_id === requirementId) || null
+          setItem(found)
+          setError(found ? '' : '没有找到这条流程')
+        })
+        .catch(() => {
+          if (!stopped) setError('流程数据加载失败')
+        })
+    }
+    load()
+    const timer = window.setInterval(load, 3000)
+    return () => {
+      stopped = true
+      window.clearInterval(timer)
+    }
   }, [requirementId])
 
   const current = item ? activeIndex(item.stage) : 0
@@ -57,11 +83,18 @@ export default function MonitorTask() {
     ? [
         `需求「${item.title}」当前阶段：${item.stage}`,
         `执行 Agent：${item.current_agent || 'Lead Agent'}`,
-        item.stage === '待审批' || item.stage === '方案' ? '节点标记：等待人工审批（HITL）' : '节点标记：自动阶段',
+        item.stage === '待审批' || item.stage === '方案审批' || item.stage === '代码审批' || item.stage === '方案' ? '节点标记：等待人工审批（HITL）' : '节点标记：自动阶段',
         item.auto_advance ? '自动推进：开启' : '自动推进：已暂停',
         item.sandbox_profile ? `执行环境：${item.sandbox_profile}` : '执行环境：未配置',
+        item.codegen_status
+          ? `代码生成：${codegenStatusText[item.codegen_status] || item.codegen_status}`
+          : '代码生成：还没有任务',
+        item.codegen_error ? `失败原因：${item.codegen_error}` : '',
+        item.codegen_files && item.codegen_files.length
+          ? `生成文件：${item.codegen_files.join('、')}`
+          : '',
         'Token / API 消耗：未采集',
-      ]
+      ].filter(Boolean)
     : []
 
   return (
@@ -100,11 +133,23 @@ export default function MonitorTask() {
               <div key={line}>$ {line}</div>
             ))}
           </div>
+          <div className="flex flex-wrap gap-2">
+          {item.codegen_task_id && (
+            <button type="button" onClick={() => navigate(`/codegen/${item.codegen_task_id}`)} className="rounded-md bg-primary px-3 py-2 text-sm text-white">
+              查看生成代码
+            </button>
+          )}
+          {item.code_review_id && (
+            <button type="button" onClick={() => navigate(`/reviews/${item.code_review_id}`)} className="rounded-md bg-gray-100 px-3 py-2 text-sm text-gray-700">
+              去审批代码
+            </button>
+          )}
           {item.session_id && (
-            <button type="button" onClick={() => navigate(`/chat/${item.session_id}`)} className="rounded-md bg-primary px-3 py-2 text-sm text-white">
+            <button type="button" onClick={() => navigate(`/chat/${item.session_id}`)} className="rounded-md bg-gray-100 px-3 py-2 text-sm text-gray-700">
               查看对话
             </button>
           )}
+          </div>
         </>
       )}
     </div>

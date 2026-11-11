@@ -19,6 +19,9 @@ from ..models.solution import SolutionStatus
 logger = logging.getLogger(__name__)
 
 COVERAGE_GATE = 80.0
+_background_tasks: set[asyncio.Task] = set()
+_codegen_started: set[UUID] = set()
+_test_started: set[UUID] = set()
 
 
 class WorkflowService:
@@ -85,6 +88,18 @@ class WorkflowService:
             return None
         return self._queue_solution_review(solution, requirement)
 
+    def schedule_approved(self, review: ReviewItem) -> None:
+        """审批结果先返回给页面，代码生成和测试在后台继续。"""
+        task = asyncio.create_task(self.on_approved(review))
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+
+    def schedule_revision(self, review: ReviewItem, comments: str) -> None:
+        """修改意见先返回给页面，方案或代码在后台重新生成。"""
+        task = asyncio.create_task(self.on_revision(review, comments))
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+
     async def on_approved(self, review: ReviewItem) -> None:
         """审批通过后进入代码生成或测试。"""
         requirement = self._requirement_for(review)
@@ -98,7 +113,8 @@ class WorkflowService:
             if review.item_type == ReviewItemType.SOLUTION:
                 await self._after_solution_approved(requirement, review)
             elif review.item_type == ReviewItemType.CODE:
-                await self._after_code_approved(requirement, review)
+                if self._claim_tests(review.item_id):
+                    await self._after_code_approved(requirement, review)
         except Exception:
             logger.exception("流程推进失败: %s", review.id)
             self._note(requirement, "审批已记录，但下一阶段执行失败。可在监控中恢复自动推进后重试。", "error")
@@ -217,13 +233,37 @@ class WorkflowService:
         return report is None or self._test_failed(report)
 
     def stage_label(self, requirement: Requirement) -> str:
-        """给监控页用的阶段名称。"""
+        """给监控页用的阶段名称。已通过的代码审批不再显示成方案审批。"""
         if requirement.status == RequirementStatus.CLOSED:
             return "已关闭"
         if requirement.status == RequirementStatus.COMPLETED:
             return "完成"
-        if requirement.status == RequirementStatus.REVIEWING:
-            return "待审批"
+        from .hitl_service import hitl_service
+
+        reviews = [
+            item for item in hitl_service._review_items.values()
+            if item.requirement_id == requirement.id
+        ]
+        pending = [
+            item for item in reviews
+            if item.status in {ReviewStatus.PENDING, ReviewStatus.IN_REVIEW}
+        ]
+        if any(item.item_type == ReviewItemType.CODE for item in pending):
+            return "代码审批"
+        if any(item.item_type == ReviewItemType.TEST for item in pending):
+            return "测试"
+        if any(item.item_type == ReviewItemType.SOLUTION for item in pending):
+            return "方案审批"
+        if any(
+            item.item_type == ReviewItemType.CODE and item.status == ReviewStatus.APPROVED
+            for item in reviews
+        ):
+            return "测试"
+        if any(
+            item.item_type == ReviewItemType.SOLUTION and item.status == ReviewStatus.APPROVED
+            for item in reviews
+        ) and requirement.status == RequirementStatus.REVIEWING:
+            return "编码"
         if not requirement.auto_advance:
             return "已暂停"
         labels = {
@@ -402,8 +442,25 @@ class WorkflowService:
             }:
                 solution_service.align_with_requirement(requirement.id)
                 continue
-            existing = hitl_service.find_by_item(ReviewItemType.SOLUTION, solution.id)
-            if existing is not None and existing.status in {ReviewStatus.PENDING, ReviewStatus.IN_REVIEW}:
+            related = [
+                item for item in hitl_service._review_items.values()
+                if item.item_type == ReviewItemType.SOLUTION and item.item_id == solution.id
+            ]
+            approved = [item for item in related if item.status == ReviewStatus.APPROVED]
+            if approved:
+                for item in related:
+                    if item.status in {ReviewStatus.PENDING, ReviewStatus.IN_REVIEW}:
+                        hitl_service.supersede(item.id, "方案已经通过，关闭重复的待审批")
+                latest = max(approved, key=lambda item: item.updated_at)
+                solution_service.update_solution_status(
+                    solution.id,
+                    SolutionStatus.APPROVED,
+                    reviewed_by=latest.reviewer,
+                )
+                if requirement is not None:
+                    self._continue_approved_solution(requirement, latest)
+                continue
+            if related:
                 continue
             requirement = requirement_service.get(solution.requirement_id)
             if requirement is None:
@@ -412,6 +469,23 @@ class WorkflowService:
                 self._queue_solution_review(solution, requirement)
             except Exception:
                 logger.exception("待审核方案没有进入 Review 列表: %s", solution.id)
+
+    def _continue_approved_solution(self, requirement: Requirement, review: ReviewItem) -> None:
+        """方案已通过但还没有代码任务时，在后台继续生成代码。"""
+        if requirement.type == RequirementType.QUESTION:
+            return
+        if not requirement.auto_advance or requirement.status == RequirementStatus.CLOSED:
+            return
+        from .codegen_service import codegen_service
+
+        if codegen_service.get_tasks_by_solution(review.item_id):
+            return
+        if review.item_id in _codegen_started:
+            return
+        _codegen_started.add(review.item_id)
+        task = asyncio.create_task(self._after_solution_approved(requirement, review))
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
 
     def submit_solution_for_requirement(self, requirement: Requirement) -> Optional[ReviewItem]:
         """需求进入审核中时，把最新草稿或待审核方案送回 Review。"""
@@ -428,6 +502,15 @@ class WorkflowService:
         existing = hitl_service.find_by_item(ReviewItemType.SOLUTION, target.id)
         if existing is not None and existing.status in {ReviewStatus.PENDING, ReviewStatus.IN_REVIEW}:
             solution_service.update_solution_status(target.id, SolutionStatus.PENDING_REVIEW)
+            return existing
+        if existing is not None and existing.status == ReviewStatus.APPROVED:
+            solution_service.update_solution_status(
+                target.id,
+                SolutionStatus.APPROVED,
+                reviewed_by=existing.reviewer,
+            )
+            return existing
+        if existing is not None:
             return existing
         return self._queue_solution_review(target, requirement)
 
@@ -561,13 +644,66 @@ class WorkflowService:
 
         return requirement_service.get(requirement_id)
 
+    def reconcile_approved_code(self) -> None:
+        """代码已经审批通过、需求仍停在审核中时，把阶段推进到测试。"""
+        from .codegen_service import codegen_service
+        from .hitl_service import hitl_service
+        from .requirement_service import requirement_service
+        from .test_service import test_service
+
+        for review in list(hitl_service._review_items.values()):
+            if review.item_type != ReviewItemType.CODE or review.status != ReviewStatus.APPROVED:
+                continue
+            requirement = self._requirement_for(review)
+            if requirement is None or not requirement.auto_advance:
+                continue
+            if requirement.status in {
+                RequirementStatus.CLOSED,
+                RequirementStatus.COMPLETED,
+                RequirementStatus.TESTING,
+            }:
+                continue
+            if any(
+                item.requirement_id == requirement.id
+                and item.status in {ReviewStatus.PENDING, ReviewStatus.IN_REVIEW}
+                for item in hitl_service._review_items.values()
+            ):
+                continue
+            task = codegen_service.get_task(review.item_id)
+            if task is None or task.status.value != "completed":
+                continue
+            if test_service.get_tasks_by_codegen(task.id):
+                requirement_service.update_status(requirement.id, RequirementStatus.TESTING)
+                continue
+            if not self._claim_tests(task.id):
+                requirement_service.update_status(requirement.id, RequirementStatus.TESTING)
+                continue
+            requirement_service.update_status(requirement.id, RequirementStatus.TESTING)
+            background = asyncio.create_task(self._after_code_approved(requirement, review))
+            _background_tasks.add(background)
+            background.add_done_callback(_background_tasks.discard)
+
+    def _claim_tests(self, task_id: UUID) -> bool:
+        if task_id in _test_started:
+            return False
+        _test_started.add(task_id)
+        return True
+
     def _approved_code_review(self, task_id: UUID) -> Optional[ReviewItem]:
         from .hitl_service import hitl_service
 
         review = hitl_service.find_by_item(ReviewItemType.CODE, task_id)
         if review and review.status == ReviewStatus.APPROVED:
             return review
-        return None
+        approved = [
+            item for item in hitl_service._review_items.values()
+            if item.item_type == ReviewItemType.CODE
+            and item.item_id == task_id
+            and item.status == ReviewStatus.APPROVED
+        ]
+        if not approved:
+            return None
+        return max(approved, key=lambda item: item.updated_at)
 
     def _sandbox_profile(self, project_id: UUID) -> str:
         from .project_service import project_service

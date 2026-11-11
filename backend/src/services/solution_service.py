@@ -28,16 +28,26 @@ if TYPE_CHECKING:
 
 _SECTION_HEADING = re.compile(r"^(#{2,4})\s+(.+?)\s*$", re.MULTILINE)
 _STEP_LINE = re.compile(r"^(?:[-*]|\d+[.)、])\s+(.+?)\s*$", re.MULTILINE)
+_FILE_EXTENSIONS = r"py|tsx|ts|jsx|js|vue|go|java|kt|sql|json|css|scss|html|md|yml|yaml|xml"
+_FILE_IN_TICKS = re.compile(rf"`([^`\n]*?\.(?:{_FILE_EXTENSIONS}))`")
+_FILE_BARE = re.compile(
+    rf"(?<![\w./-])((?:[\w.-]+/)+[\w.-]+\.(?:{_FILE_EXTENSIONS}))"
+)
 
 
 def _section_body(text: str, keywords: tuple[str, ...]) -> str:
-    """取出标题里包含指定词的那一节正文。"""
+    """取出标题里包含指定词的那一节，并保留它下面的子标题。"""
     matches = list(_SECTION_HEADING.finditer(text or ""))
     for index, match in enumerate(matches):
-        title = re.sub(r"^\d+[.、]\s*", "", match.group(2)).strip()
+        title = re.sub(r"^\d+(?:\.\d+)*[.、]?\s*", "", match.group(2)).strip()
         if not any(word in title for word in keywords):
             continue
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        level = len(match.group(1))
+        end = len(text)
+        for later in matches[index + 1:]:
+            if len(later.group(1)) <= level:
+                end = later.start()
+                break
         return text[match.end():end].strip()
     return ""
 
@@ -51,11 +61,105 @@ def _step_lines(section: str) -> List[str]:
     return steps
 
 
+def affected_files_from_content(content: str) -> List[str]:
+    """从方案正文里取出这条需求自己的文件路径。"""
+    found: List[str] = []
+    for pattern in (_FILE_IN_TICKS, _FILE_BARE):
+        for match in pattern.finditer(content or ""):
+            path = match.group(1).strip().strip("`").replace("\\", "/")
+            while path.startswith("./"):
+                path = path[2:]
+            if not path or path.startswith("http") or " " in path:
+                continue
+            if path not in found:
+                found.append(path)
+    covered = {
+        path.rsplit("/", 1)[-1]
+        for path in found
+        if "/" in path
+    }
+    return [
+        path for path in found
+        if "/" in path or path not in covered
+    ]
+
+
+def _strip_fences(text: str) -> str:
+    return re.sub(r"```[^\n]*\n.*?```", "", text or "", flags=re.S)
+
+
+def _generic_steps() -> set[str]:
+    canned = {
+        "收集完整的错误日志和上下文信息",
+        "分析错误发生的条件和频率",
+        "定位问题代码位置",
+        "制定修复方案并评审",
+        "实施修复并进行充分测试",
+    }
+    for items in bugfix_agent_service.FIX_TEMPLATES.values():
+        canned.update(items)
+    return canned
+
+
+def _is_generic_step(line: str) -> bool:
+    text = re.sub(r"^\d+[.、)\]]\s*", "", line or "").strip()
+    return text in _generic_steps() or any(text.endswith(item) for item in _generic_steps())
+
+
+def _child_sections(section: str) -> List[tuple[str, str]]:
+    matches = list(_SECTION_HEADING.finditer(section or ""))
+    if not matches:
+        return []
+    top = min(len(match.group(1)) for match in matches)
+    children: List[tuple[str, str]] = []
+    for index, match in enumerate(matches):
+        if len(match.group(1)) != top:
+            continue
+        end = len(section)
+        for later in matches[index + 1:]:
+            if len(later.group(1)) <= top:
+                end = later.start()
+                break
+        title = re.sub(r"^\d+(?:\.\d+)*[.、]?\s*", "", match.group(2)).strip()
+        children.append((title, section[match.end():end].strip()))
+    return children
+
+
+def _steps_in_section(section: str) -> List[str]:
+    body = _strip_fences(section)
+    children = _child_sections(body)
+    steps: List[str] = []
+    if children:
+        for title, child in children:
+            bullets = [line for line in _step_lines(child) if not _is_generic_step(line)]
+            file_line = re.search(r"\*\*文件\*\*[^\n]*", child)
+            files = re.findall(r"`([^`]+)`", file_line.group(0)) if file_line else []
+            label = title
+            if files:
+                label = f"{title}（{'、'.join(item.strip() for item in files)}）"
+            detail = "；".join(bullets)
+            text = f"{label}：{detail}" if detail else label
+            if text and not _is_generic_step(text):
+                steps.append(text)
+        return steps
+    return [line for line in _step_lines(body) if not _is_generic_step(line)]
+
+
+def fix_steps_from_content(content: str) -> List[str]:
+    """优先使用正文里针对这条需求写出的修改步骤。"""
+    candidates: List[List[str]] = []
+    for keywords in (("修复步骤",), ("修改建议", "修改点")):
+        section = _section_body(content, keywords)
+        steps = _steps_in_section(section) if section else []
+        if steps:
+            candidates.append(steps)
+    return candidates[0] if candidates else []
+
+
 def bugfix_details_from_content(content: str) -> tuple[str, List[str]]:
     """从方案正文中取出这条需求自己的根因和修复步骤。"""
     root = _section_body(content, ("根因",))
-    steps = _step_lines(_section_body(content, ("修复步骤", "修改建议", "修改点")))
-    return root, steps
+    return root, fix_steps_from_content(content)
 
 
 def _plain(text: str) -> str:
@@ -75,12 +179,99 @@ def _impact_level(text: str) -> ImpactLevel:
     return ImpactLevel.LOW
 
 
+_GENERIC_REGRESSION = (
+    "修改范围有限，建议进行基本功能验证",
+    "修改可能影响系统稳定性，建议进行针对性回归测试",
+    "修改涉及核心逻辑，建议进行完整回归测试，包括压力测试和边界条件测试",
+)
+
+
+def _labeled_block(text: str, label: str) -> str:
+    match = re.search(
+        rf"(?:^|\n)\s*(?:\*\*)?{re.escape(label)}(?:\*\*)?\s*[：:]\s*(.*?)(?=\n\s*(?:#{{2,4}}\s|\*\*[^*\n]+\*\*\s*[：:])|\Z)",
+        text or "",
+        re.S,
+    )
+    return match.group(1).strip() if match else ""
+
+
+def _table_risk_lines(section: str) -> tuple[List[str], str]:
+    """从影响范围表里取出中、高风险行，以及其中最高的风险等级。"""
+    lines: List[str] = []
+    rank = "low"
+    for raw in (section or "").splitlines():
+        if not raw.strip().startswith("|"):
+            continue
+        cells = [_plain(cell).strip() for cell in raw.strip().strip("|").split("|")]
+        if len(cells) < 3 or all(re.fullmatch(r"[-: ]+", cell) for cell in cells):
+            continue
+        if cells[0] in {"影响面", "模块", "范围"} or "风险" in cells[-1] and "影响" in cells[0]:
+            continue
+        risk_cell = cells[-1]
+        if risk_cell.startswith("高"):
+            rank = "high"
+        elif risk_cell.startswith("中") and rank != "high":
+            rank = "medium"
+        else:
+            continue
+        lines.append(f"{cells[0]}：{cells[1]}（{risk_cell}）")
+    return lines, rank
+
+
+def _regression_from_content(content: str) -> str:
+    """从方案正文中取出这条需求自己的回归风险，跳过固定套话。"""
+    parts: List[str] = []
+    rank = ""
+    direct = _section_body(content, ("回归风险", "回归评估"))
+    direct_plain = _plain(_strip_fences(direct))
+    if direct_plain and not any(marker in direct_plain for marker in _GENERIC_REGRESSION):
+        bullets = _step_lines(_strip_fences(direct))
+        parts.extend(bullets or [direct_plain[:800]])
+    else:
+        block = _labeled_block(content, "回归")
+        if block and not any(marker in block for marker in _GENERIC_REGRESSION):
+            parts.extend(_step_lines(block) or [_plain(block)])
+        table_lines, table_rank = _table_risk_lines(_section_body(content, ("影响范围", "影响分析")))
+        if table_rank == "high":
+            rank = "高风险"
+        elif table_rank == "medium":
+            rank = "中风险"
+        parts.extend(table_lines)
+    cleaned: List[str] = []
+    for part in parts:
+        text = _plain(part)
+        if not text or any(marker in text for marker in _GENERIC_REGRESSION):
+            continue
+        if text not in cleaned:
+            cleaned.append(text)
+    if not cleaned:
+        return ""
+    if not rank:
+        blob = " ".join(cleaned)
+        if "高风险" in blob or "高；" in blob:
+            rank = "高风险"
+        elif "中风险" in blob or "中；" in blob or "可能影响" in blob:
+            rank = "中风险"
+        else:
+            rank = "低风险"
+    areas: List[str] = []
+    for match in re.finditer(r"`([^`]+)`|([\w./-]+\.(?:py|tsx|ts|jsx|js))", "\n".join(cleaned)):
+        name = (match.group(1) or match.group(2) or "").strip()
+        short = name.rsplit("/", 1)[-1]
+        if short and re.search(r"\.(?:py|tsx|ts|jsx|js)$", short) and short not in areas:
+            areas.append(short)
+    body = "\n".join(f"- {item}" for item in cleaned)
+    area_line = f"\n\n可能影响{'、'.join(areas)}。" if areas else ""
+    return f"{rank}: \n{body}{area_line}"
+
+
 def bugfix_assessment_from_content(content: str) -> tuple[Optional[ImpactAnalysis], str]:
     """从方案正文中取出这条需求自己的影响分析和回归风险。"""
     section = _section_body(content, ("影响范围", "影响分析"))
     bullets = _step_lines(section)
     if not section and not bullets:
-        return None, ""
+        regression = _regression_from_content(content)
+        return None, regression
 
     scope_parts: List[str] = []
     risk_points: List[str] = []
@@ -102,6 +293,11 @@ def bugfix_assessment_from_content(content: str) -> tuple[Optional[ImpactAnalysi
 
     plain_scope = "；".join(scope_parts) if scope_parts else _plain(section)
     level = _impact_level(plain_scope)
+    _, table_rank = _table_risk_lines(section)
+    if table_rank == "high":
+        level = ImpactLevel.HIGH
+    elif table_rank == "medium" and level not in {ImpactLevel.HIGH, ImpactLevel.CRITICAL}:
+        level = ImpactLevel.MEDIUM
     scope = section.strip() or plain_scope
     impact = ImpactAnalysis(
         level=level,
@@ -109,8 +305,11 @@ def bugfix_assessment_from_content(content: str) -> tuple[Optional[ImpactAnalysi
         affected_modules=modules,
         risk_points=risk_points,
     )
-    if not regression:
+    regression = _regression_from_content(content) or regression
+    if not regression or any(marker in regression for marker in _GENERIC_REGRESSION):
         return impact, ""
+    if regression.startswith(("高风险", "中风险", "低风险")):
+        return impact, regression
     risk_level = _impact_level(regression)
     prefix = {ImpactLevel.HIGH: "高风险", ImpactLevel.MEDIUM: "中风险"}.get(risk_level, "低风险")
     return impact, f"{prefix}: {regression}"
@@ -222,15 +421,35 @@ class SolutionService:
             solution = self._generate_feature_solution(requirement, additional_context)
         model_error = ""
         knowledge_text = self._knowledge_for_prompt(requirement, additional_context)
+        from .workspace_service import workspace_service
+
+        source_text, source_paths = workspace_service.context_for_prompt(
+            requirement.project_id,
+            requirement.title,
+            requirement.description or "",
+            additional_context or "",
+        )
+        draft_text = (
+            "已导入本地源代码。草稿里的文件路径和通用步骤都不要采用。"
+            if source_paths
+            else solution.content
+        )
         try:
             rewritten = agent_runtime.advise(
                 agent,
                 "请按你的提示词，只针对下面这一条需求写出完整方案。"
-                "不要沿用草稿里的通用步骤，除非它确实能解释这一条需求。"
-                "方案里要写出这条需求自己的原因、修改点、影响范围、回归风险和验证方法。"
-                "如果下面的代码文档和这条需求对应，修改点要写到文档里的文件和函数。\n\n"
+                "修改哪个文件、改哪一个函数，只能依据「本地源代码」里摘出的内容。"
+                "这些代码是已经上传到服务器的项目源代码。代码调整只针对这份代码，不要修改运行服务的工作目录。"
+                "必须使用二级标题「修复步骤」，每一步写本地源码中的文件、函数和具体改法，"
+                "不要写「收集完整的错误日志和上下文信息」这类通用步骤。"
+                "必须使用二级标题「回归风险」，写出这次修改可能破坏的现有行为，"
+                "不要写「修改范围有限，建议进行基本功能验证」这类套话。"
+                "方案里还要写出这条需求自己的原因、影响范围和验证方法。"
+                "知识库文档只用来理解背景，不能据此补充本地源代码里没有的文件。"
+                "如果本地源代码写明还没有导入，不要编造文件路径，修复步骤只说明需要先导入代码。\n\n"
                 f"需求标题：{requirement.title}\n需求描述：{requirement.description}\n\n"
-                f"相关代码文档：\n{knowledge_text or '无'}\n\n草稿：\n{solution.content}",
+                f"本地源代码：\n{source_text}\n\n"
+                f"知识库背景：\n{knowledge_text or '无'}\n\n草稿：\n{draft_text}",
             )
         except RuntimeError as exc:
             model_error = _model_failure_text(exc)
@@ -238,6 +457,7 @@ class SolutionService:
         if rewritten:
             solution.content = rewritten
             self._sync_bugfix_sections(solution)
+        workspace_service.align_solution(requirement.project_id, solution, source_paths)
         solution.created_by_agent = agent.name
         solution.skill_key, solution.skill_name = _assigned_skill(requirement.project_id, agent_type)
 
@@ -264,6 +484,11 @@ class SolutionService:
         query = f"{requirement.title} {requirement.description or ''}"
         if additional_context:
             query += f" {additional_context}"
+        from .agent_runtime import agent_runtime
+        from .project_service import project_service
+
+        if agent_runtime.skill_enabled(requirement.project_id, "knowledge-retrieval"):
+            project_service.record_skill_use(requirement.project_id, "knowledge-retrieval")
         try:
             hits = self._knowledge_service.search_knowledge(
                 project_id=requirement.project_id,
@@ -411,13 +636,20 @@ class SolutionService:
         return self._sync_bugfix_sections(solution)
 
     def _sync_bugfix_sections(self, solution):
-        """用正文里的根因和修改点替换通用模板。"""
-        if getattr(solution, "type", None) != SolutionType.BUGFIX:
-            return solution
+        """用正文里的根因、修改点和文件替换通用模板。"""
         content = solution.content or ""
+        files = affected_files_from_content(content)
+        changed = False
+        if files and files != list(getattr(solution, "affected_files", None) or []):
+            solution.affected_files = files
+            changed = True
+        if getattr(solution, "type", None) != SolutionType.BUGFIX:
+            if changed:
+                solution.updated_at = datetime.utcnow()
+                self._solutions[solution.id] = solution
+            return solution
         root, steps = bugfix_details_from_content(content)
         impact, regression = bugfix_assessment_from_content(content)
-        changed = False
         if root and root != (solution.root_cause or "").strip():
             solution.root_cause = root
             changed = True

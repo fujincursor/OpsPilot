@@ -58,7 +58,7 @@ export default function ProjectCard({ project, onClick }: ProjectCardProps) {
       <div className="flex items-center justify-between text-xs text-gray-400">
         <div className="flex items-center gap-1 truncate max-w-[60%]">
           <span>🔗</span>
-          <span className="truncate">{project.repo_url || '未关联仓库'}</span>
+          <span className="truncate">{project.code_status === 'ready' ? '代码已导入' : '未导入源代码'}</span>
         </div>
         <span>创建于 {createdDate}</span>
       </div>

@@ -73,9 +73,15 @@ function normalizeRisk(value: unknown): RegressionRisk {
   }
   const text = String(value || '')
   const level = text.startsWith('高') ? 'high' : text.startsWith('低') ? 'low' : 'medium'
-  const description = text.replace(/^(高|中|低)风险[:：]\s*/, '')
-  const area = description.match(/可能影响([^，。]+)/)
-  return { level, description, affected_areas: area ? [area[1].trim()] : [] }
+  const area = text.match(/可能影响([^。；\n]+)/)
+  const description = text
+    .replace(/^(高|中|低)风险[:：]\s*/, '')
+    .replace(/\n*可能影响[^。]*。?\s*$/, '')
+    .trim()
+  const affected_areas = area
+    ? area[1].split(/[、,，]/).map((item) => item.trim()).filter(Boolean)
+    : []
+  return { level, description, affected_areas }
 }
 
 function normalizeArchitecture(value: unknown): ArchitectureDesign {

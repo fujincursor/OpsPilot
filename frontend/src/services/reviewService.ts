@@ -55,6 +55,53 @@ export const reviewService = {
     return response.data.items.map((item) => mapReview(item))
   },
 
+  async getReviews(): Promise<ReviewItem[]> {
+    const pageSize = 200
+    const items: ReviewItem[] = []
+    let page = 1
+    let total = 0
+    do {
+      const response = await api.get<ReviewListResponse>('/reviews', {
+        params: { page, page_size: pageSize },
+      })
+      total = response.data.total
+      const pageItems = response.data.items.map((item) => mapReview(item))
+      if (pageItems.length === 0) break
+      items.push(...pageItems)
+      page += 1
+    } while (items.length < total)
+    return items
+  },
+
+  async downloadApprovedCode(reviewId: string): Promise<void> {
+    let blob: Blob
+    try {
+      const response = await api.get(`/reviews/${reviewId}/changed-code`, { responseType: 'blob' })
+      blob = response.data as Blob
+    } catch (error) {
+      const data = (error as { response?: { data?: unknown } }).response?.data
+      if (data instanceof Blob) {
+        const text = await data.text()
+        let detail = ''
+        try {
+          detail = (JSON.parse(text) as { detail?: string }).detail || ''
+        } catch {
+          detail = ''
+        }
+        throw new Error(detail || '下载失败')
+      }
+      throw new Error('下载失败')
+    }
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `code-changes-${reviewId.slice(0, 8)}.zip`
+    document.body.appendChild(link)
+    link.click()
+    URL.revokeObjectURL(url)
+    link.remove()
+  },
+
   async getReviewDetail(reviewId: string): Promise<ReviewItem> {
     const response = await api.get<ReviewItem & { comments?: unknown[] }>(`/reviews/${reviewId}`)
     return mapReview(response.data)

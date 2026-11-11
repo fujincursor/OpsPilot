@@ -43,6 +43,12 @@ export interface Project {
   members?: ProjectMember[]
   prompt_template?: string
   toolchain?: string
+  code_origin?: 'none' | 'git' | 'upload' | string
+  code_status?: 'empty' | 'ready' | 'failed' | string
+  code_branch?: string
+  code_revision?: string
+  code_message?: string
+  code_updated_at?: string | null
   created_at: string
   updated_at: string
 }

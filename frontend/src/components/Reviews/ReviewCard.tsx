@@ -1,5 +1,7 @@
+import { useState, type MouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ReviewItem, ReviewItemType } from '../../types'
+import { reviewService } from '../../services'
 import ReviewStatusBadge from './ReviewStatusBadge'
 import { PriorityBadge } from '../Requirements'
 
@@ -36,6 +38,22 @@ export default function ReviewCard({ review }: ReviewCardProps) {
   const navigate = useNavigate()
   const typeInfo = typeConfig[review.item_type]
   const overdue = isOverdue(review.due_at)
+  const canDownload = review.item_type === 'code' && review.status === 'approved'
+  const [downloading, setDownloading] = useState(false)
+  const [downloadError, setDownloadError] = useState('')
+
+  const downloadCode = async (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    setDownloading(true)
+    setDownloadError('')
+    try {
+      await reviewService.downloadApprovedCode(review.id)
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : '下载失败')
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   return (
     <div
@@ -64,6 +82,20 @@ export default function ReviewCard({ review }: ReviewCardProps) {
       <p className="mt-2 text-xs text-gray-500 line-clamp-2">
         {review.description}
       </p>
+
+      {canDownload && (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={downloadCode}
+            disabled={downloading}
+            className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-60"
+          >
+            {downloading ? '打包中...' : '下载代码'}
+          </button>
+          {downloadError && <p className="mt-1 text-xs text-red-600">{downloadError}</p>}
+        </div>
+      )}
 
       <div className="mt-4 flex items-center justify-between text-xs text-gray-400">
         <div className="flex items-center gap-3">

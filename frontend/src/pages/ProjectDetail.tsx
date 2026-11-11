@@ -188,6 +188,9 @@ export default function ProjectDetail() {
                   {project.description || '暂无描述'}
                 </p>
                 <div className="flex items-center gap-6 text-sm text-gray-400">
+                  <span>
+                    {project.code_status === 'ready' ? '代码已导入' : '未导入源代码'}
+                  </span>
                   {project.repo_url && (
                     <a
                       href={project.repo_url}

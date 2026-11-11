@@ -86,7 +86,21 @@ class AgentRuntime:
             f"- 可使用的技能：{skills}"
         )
         sections.append(f"任务：\n{task}")
+        self._record_primary_skill(agent)
         return "\n\n".join(sections)
+
+    def _record_primary_skill(self, agent: AgentConfig) -> None:
+        from .project_service import project_service
+
+        kind = agent.agent_type
+        if not isinstance(kind, AgentType):
+            try:
+                kind = AgentType(str(kind))
+            except ValueError:
+                return
+        key = PRIMARY_SKILL.get(kind)
+        if key:
+            project_service.record_skill_use(agent.project_id, key)
 
     def complete(
         self,

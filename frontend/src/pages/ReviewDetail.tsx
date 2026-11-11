@@ -12,6 +12,8 @@ import {
   DecisionModal,
 } from '../components/Reviews'
 import { PriorityBadge } from '../components/Requirements'
+import DiffViewer from '../components/CodeGen/DiffViewer'
+import CodeViewer from '../components/CodeGen/CodeViewer'
 
 const typeConfig: Record<ReviewItemType, { icon: string; label: string }> = {
   solution: { icon: '📋', label: '方案审核' },
@@ -34,6 +36,89 @@ function isOverdue(dueAt?: string): boolean {
   return new Date(dueAt) < new Date()
 }
 
+const codeActionLabel: Record<string, string> = {
+  create: '新增',
+  modify: '修改',
+  delete: '删除',
+}
+
+function changedFiles(task: CodeGenTask) {
+  const changed = task.files.filter((file) => file.action !== 'view')
+  return {
+    created: changed.filter((file) => file.action === 'create'),
+    modified: changed.filter((file) => file.action === 'modify'),
+    deleted: changed.filter((file) => file.action === 'delete'),
+  }
+}
+
+function CodeChanges({
+  task,
+  selectedPath,
+  onSelect,
+}: {
+  task: CodeGenTask
+  selectedPath: string | null
+  onSelect: (path: string) => void
+}) {
+  const groups = changedFiles(task)
+  const ordered = [...groups.created, ...groups.modified, ...groups.deleted]
+  const selected = ordered.find((file) => file.path === selectedPath) || null
+
+  return (
+    <div className="mt-4 rounded-lg border border-gray-200 p-4 text-sm">
+      <p className="mb-2">语法检查：{task.lint_result ? (task.lint_result.passed ? '通过' : '未通过') : '尚未检查'}</p>
+      <p className="mb-2 text-gray-500">代码变更 · 新增 {groups.created.length} 个，修改 {groups.modified.length} 个，删除 {groups.deleted.length} 个</p>
+      {ordered.length === 0 ? (
+        <p className="text-xs text-gray-500">没有代码变更</p>
+      ) : (
+        <div className="space-y-3">
+          {([
+            ['新增文件', groups.created],
+            ['修改的文件', groups.modified],
+            ['删除的文件', groups.deleted],
+          ] as const).map(([title, files]) => files.length === 0 ? null : (
+            <div key={title}>
+              <p className="mb-1 text-xs font-medium text-gray-600">{title}</p>
+              <ul className="space-y-1">
+                {files.map((file) => {
+                  const active = file.path === selected?.path
+                  return (
+                    <li key={file.path}>
+                      <button
+                        type="button"
+                        onClick={() => onSelect(file.path)}
+                        className={`w-full rounded-md px-2 py-1.5 text-left font-mono text-xs ${
+                          active ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        {codeActionLabel[file.action] || file.action} {file.path}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+      {selected && selected.action !== 'delete' && (
+        <div className="mt-3">
+          <p className="mb-2 text-xs font-medium text-gray-600">
+            {selected.action === 'create' ? '新增的文件' : '变更后的文件'}
+          </p>
+          <CodeViewer file={selected} />
+        </div>
+      )}
+      {selected && (
+        <DiffViewer diff={selected.diff || []} fileName={selected.path} className="mt-3" />
+      )}
+      {(task.lint_result?.errors || []).map((error) => (
+        <p key={`${error.file}-${error.line}`} className="mt-2 text-xs text-red-600">{error.file}:{error.line} {error.message}</p>
+      ))}
+    </div>
+  )
+}
+
 export default function ReviewDetail() {
   const { reviewId } = useParams<{ reviewId: string }>()
   const navigate = useNavigate()
@@ -44,9 +129,12 @@ export default function ReviewDetail() {
   const [isCommentsLoading, setIsCommentsLoading] = useState(true)
   const [modalType, setModalType] = useState<'approve' | 'reject' | 'revision' | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [notice, setNotice] = useState('')
   const [solutionBody, setSolutionBody] = useState<BugFixSolution | FeatureDesignSolution | null>(null)
   const [codeBody, setCodeBody] = useState<CodeGenTask | null>(null)
   const [testBody, setTestBody] = useState<TestTask | null>(null)
+  const [selectedCodePath, setSelectedCodePath] = useState<string | null>(null)
+  const [downloadingCode, setDownloadingCode] = useState(false)
 
   useEffect(() => {
     if (reviewId) {
@@ -62,7 +150,14 @@ export default function ReviewDetail() {
     if (review.item_type === 'solution') {
       solutionService.getSolution(review.item_id).then(setSolutionBody).catch(() => setSolutionBody(null))
     } else if (review.item_type === 'code') {
-      codegenService.getTaskStatus(review.item_id).then(setCodeBody).catch(() => setCodeBody(null))
+      codegenService.getTaskStatus(review.item_id).then((task) => {
+        setCodeBody(task)
+        const { created, modified, deleted } = changedFiles(task)
+        const changed = [...created, ...modified, ...deleted]
+        setSelectedCodePath((current) =>
+          current && changed.some((file) => file.path === current) ? current : changed[0]?.path ?? null
+        )
+      }).catch(() => setCodeBody(null))
     } else {
       testService.getTestTask(review.item_id).then(setTestBody).catch(() => setTestBody(null))
     }
@@ -122,8 +217,22 @@ export default function ReviewDetail() {
         revision: 'revision_requested',
       } as const
       setReview((prev) => prev ? { ...prev, status: statusMap[modalType] } : null)
+      if (modalType === 'approve' && review?.item_type === 'solution') {
+        setNotice('已通过。代码生成在后台进行，可到监控查看进度。')
+      } else if (modalType === 'approve' && review?.item_type === 'code') {
+        setNotice('已通过。测试在后台进行，可到监控查看进度。')
+      } else if (modalType === 'revision' && review?.item_type === 'solution') {
+        setNotice('已要求修改。方案在后台重新生成，可到监控查看进度。')
+      } else if (modalType === 'revision' && review?.item_type === 'code') {
+        setNotice('已要求修改。代码在后台重新生成，可到监控查看进度。')
+      } else if (modalType === 'reject') {
+        setNotice('已拒绝，需求已关闭。')
+      } else {
+        setNotice('审批结果已提交。')
+      }
     } catch (error) {
       console.error(error)
+      setNotice('提交没有完成，请稍后重试。')
     } finally {
       setIsSubmitting(false)
       setModalType(null)
@@ -172,6 +281,9 @@ export default function ReviewDetail() {
           <span>←</span>
           返回审核列表
         </button>
+        {notice && (
+          <p className={`mb-4 rounded-lg border px-4 py-3 text-sm ${notice.includes('没有完成') ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-800'}`}>{notice}</p>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
@@ -211,6 +323,26 @@ export default function ReviewDetail() {
                   </button>
                 )}
               </div>
+              {review.item_type === 'code' && review.status === 'approved' && (
+                <button
+                  type="button"
+                  disabled={downloadingCode}
+                  onClick={async () => {
+                    setDownloadingCode(true)
+                    setNotice('')
+                    try {
+                      await reviewService.downloadApprovedCode(review.id)
+                    } catch (error) {
+                      setNotice(error instanceof Error ? error.message : '下载失败')
+                    } finally {
+                      setDownloadingCode(false)
+                    }
+                  }}
+                  className="mb-6 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                >
+                  {downloadingCode ? '打包中...' : '下载变更代码'}
+                </button>
+              )}
 
               <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 leading-relaxed">
                 <div className="markdown-body">
@@ -237,15 +369,11 @@ export default function ReviewDetail() {
                 </div>
               )}
               {review.item_type === 'code' && codeBody && (
-                <div className="mt-4 rounded-lg border border-gray-200 p-4 text-sm">
-                  <p className="mb-2">语法检查：{codeBody.lint_result ? (codeBody.lint_result.passed ? '通过' : '未通过') : '尚未检查'}</p>
-                  <ul className="space-y-1 font-mono text-xs text-gray-700">
-                    {codeBody.files.map((file) => <li key={file.path}>{file.action} {file.path}</li>)}
-                  </ul>
-                  {(codeBody.lint_result?.errors || []).map((error) => (
-                    <p key={`${error.file}-${error.line}`} className="mt-2 text-xs text-red-600">{error.file}:{error.line} {error.message}</p>
-                  ))}
-                </div>
+                <CodeChanges
+                  task={codeBody}
+                  selectedPath={selectedCodePath}
+                  onSelect={setSelectedCodePath}
+                />
               )}
               {review.item_type === 'test' && testBody && (
                 <div className="mt-4 rounded-lg border border-gray-200 p-4 text-sm">
