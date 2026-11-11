@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Optional
 from uuid import UUID
@@ -29,12 +30,10 @@ class WorkflowService:
         from .project_service import project_service
 
         status = knowledge_service.check_knowledge_ready(project_id)
-        profile_message = self._profile_gap(project_service.get(project_id))
-        if status.is_ready and not profile_message:
+        if status.is_ready:
             return None
-        parts = []
-        if not status.is_ready:
-            parts.append(status.message or "知识库尚未就绪")
+        profile_message = self._profile_gap(project_service.get(project_id))
+        parts = [status.message or "知识库尚未就绪"]
         if profile_message:
             parts.append(profile_message)
         status.is_ready = False
@@ -72,10 +71,15 @@ class WorkflowService:
 
         try:
             requirement_service.update_status(requirement.id, RequirementStatus.DESIGNING)
-            solution = solution_service.generate_solution(requirement.id)
-        except Exception:
+            solution = await asyncio.to_thread(solution_service.generate_solution, requirement.id)
+        except Exception as exc:
+            from .agent_runtime import AgentDisabledError
+
             logger.exception("方案生成失败: %s", requirement.id)
-            self._note(requirement, "方案生成失败，流程已停在方案阶段。可以在需求详情中重新生成。", "error")
+            reason = str(exc).strip() or "方案生成失败"
+            detail = reason if isinstance(exc, AgentDisabledError) else f"方案生成失败：{reason}"
+            requirement_service.set_failure_reason(requirement.id, detail)
+            self._note(requirement, detail, "error")
             return None
         if solution is None:
             return None
@@ -268,6 +272,9 @@ class WorkflowService:
             test_task.sandbox_profile = profile
             test_service._tasks[test_task.id] = test_task
         finished = await test_service.generate_and_run_tests(test_task.id)
+        if finished is not None and finished.error_message and "未启用" in finished.error_message:
+            self._note(requirement, finished.error_message, "error")
+            return
         report = test_service.get_test_report(finished.id) if finished else None
         if finished is None or report is None or self._test_failed(report):
             await self._rework_code(requirement, task.id, report)
@@ -309,14 +316,18 @@ class WorkflowService:
                 additional_instructions=instructions or "修复语法检查发现的问题",
             )
         if task is None or task.status.value != "completed":
-            self._note(requirement, "语法检查后代码仍未完成。", "error")
+            self._note(requirement, (task.error_message if task and task.error_message else "语法检查后代码仍未完成。"), "error")
             return
         self._queue_code_review(requirement, task)
 
     async def _revise_solution(self, requirement: Requirement, review: ReviewItem, comments: str) -> None:
         from .solution_service import solution_service
 
-        solution = solution_service.regenerate_solution(review.item_id, additional_context=comments)
+        solution = await asyncio.to_thread(
+            solution_service.regenerate_solution,
+            review.item_id,
+            comments,
+        )
         if solution is None:
             self._note(requirement, "方案重新生成失败。", "error")
             return
@@ -372,6 +383,53 @@ class WorkflowService:
         passed = getattr(report, "passed", 0)
         total = getattr(report, "total", 0)
         self._note(requirement, f"测试通过（{passed}/{total}）。知识已回写，流程完成。")
+
+    def sync_pending_solution_reviews(self) -> None:
+        """把已经标记为待审核、但没有审核项的方案补进 Review 列表。"""
+        from .hitl_service import hitl_service
+        from .requirement_service import requirement_service
+        from .solution_service import solution_service
+
+        solution_service.collapse_pending_solutions()
+        for solution in list(solution_service._solutions.values()):
+            if solution.status != SolutionStatus.PENDING_REVIEW:
+                continue
+            requirement = requirement_service.get(solution.requirement_id)
+            if requirement is not None and requirement.status in {
+                RequirementStatus.PENDING,
+                RequirementStatus.ANALYZING,
+                RequirementStatus.DESIGNING,
+            }:
+                solution_service.align_with_requirement(requirement.id)
+                continue
+            existing = hitl_service.find_by_item(ReviewItemType.SOLUTION, solution.id)
+            if existing is not None and existing.status in {ReviewStatus.PENDING, ReviewStatus.IN_REVIEW}:
+                continue
+            requirement = requirement_service.get(solution.requirement_id)
+            if requirement is None:
+                continue
+            try:
+                self._queue_solution_review(solution, requirement)
+            except Exception:
+                logger.exception("待审核方案没有进入 Review 列表: %s", solution.id)
+
+    def submit_solution_for_requirement(self, requirement: Requirement) -> Optional[ReviewItem]:
+        """需求进入审核中时，把最新草稿或待审核方案送回 Review。"""
+        from .hitl_service import hitl_service
+        from .solution_service import solution_service
+
+        candidates = [
+            item for item in solution_service._solutions_for(requirement.id)
+            if item.status in {SolutionStatus.DRAFT, SolutionStatus.PENDING_REVIEW}
+        ]
+        if not candidates:
+            return None
+        target = max(candidates, key=lambda item: item.created_at)
+        existing = hitl_service.find_by_item(ReviewItemType.SOLUTION, target.id)
+        if existing is not None and existing.status in {ReviewStatus.PENDING, ReviewStatus.IN_REVIEW}:
+            solution_service.update_solution_status(target.id, SolutionStatus.PENDING_REVIEW)
+            return existing
+        return self._queue_solution_review(target, requirement)
 
     def _queue_solution_review(self, solution, requirement: Requirement) -> ReviewItem:
         from .hitl_service import hitl_service

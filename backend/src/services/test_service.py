@@ -299,12 +299,38 @@ class TestService:
             task.updated_at = datetime.utcnow()
             return task
 
+        project_id = None
+        if self._requirement_service:
+            requirement = self._requirement_service.get(task.requirement_id)
+            if requirement is not None:
+                project_id = requirement.project_id
+        from ..models.agent import AgentType
+        from .agent_runtime import AgentDisabledError, agent_runtime
+
+        try:
+            test_agent = agent_runtime.require(project_id, AgentType.TEST_EXECUTION) if project_id else None
+        except AgentDisabledError as exc:
+            task.status = TestStatus.FAILED
+            task.error_message = str(exc)
+            return self._save_task(task)
+        if test_agent is None:
+            task.status = TestStatus.FAILED
+            task.error_message = "Test Agent 未启用，这一阶段不会执行"
+            return self._save_task(task)
+
         task.status = TestStatus.GENERATING
         self._save_task(task)
 
         try:
             files = self._files_under_test(codegen_task)
             test_cases = self._build_sandbox_cases(files)
+            focus = agent_runtime.advise(
+                test_agent,
+                "请按你的提示词说明这批代码应该如何测试，给出三到五条检查重点。\n"
+                + "\n".join(f"- {item.path}" for item in files),
+            )
+            if focus and test_cases:
+                test_cases[0].description = focus[:500]
             task.test_cases = test_cases
             self._save_task(task)
         except Exception as exc:

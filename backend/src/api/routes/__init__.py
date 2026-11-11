@@ -16,6 +16,7 @@ from .analytics import router as analytics_router
 from .deerflow import router as deerflow_router
 from .chat import router as chat_router
 from .workflow import router as workflow_router
+from .skills import router as skills_router
 
 api_router = APIRouter()
 api_router.include_router(health_router, tags=["health"])
@@ -32,3 +33,4 @@ api_router.include_router(analytics_router, tags=["analytics"])
 api_router.include_router(deerflow_router)
 api_router.include_router(chat_router)
 api_router.include_router(workflow_router, tags=["workflow"])
+api_router.include_router(skills_router, prefix="/skills", tags=["skills"])

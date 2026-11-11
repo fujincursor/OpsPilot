@@ -9,13 +9,13 @@ interface AgentConfigModalProps {
 }
 
 const modelOptions = [
+  { value: 'deepseek-v4', label: 'DeepSeek' },
   { value: 'gpt-4o', label: 'GPT-4o' },
   { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
   { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
   { value: 'claude-3-opus', label: 'Claude 3 Opus' },
   { value: 'claude-3-sonnet', label: 'Claude 3 Sonnet' },
   { value: 'claude-3-haiku', label: 'Claude 3 Haiku' },
-  { value: 'deepseek-chat', label: 'DeepSeek Chat' },
 ]
 
 const availableSkills = [
@@ -56,7 +56,8 @@ export default function AgentConfigModal({
         model_name: agent.model_name,
         temperature: agent.temperature,
         max_tokens: agent.max_tokens,
-        skills: [...agent.skills],
+        skills: [...(agent.skills || [])],
+        prompt: agent.prompt || '',
         enabled: agent.enabled,
       })
     }
@@ -89,6 +90,11 @@ export default function AgentConfigModal({
 
   if (!isOpen || !agent) return null
 
+  const modelChoices = modelOptions.some((option) => option.value === agent.model_name)
+    ? modelOptions
+    : [{ value: agent.model_name, label: agent.model_name }, ...modelOptions]
+  const skillChoices = Array.from(new Set([...(agent.skills || []), ...availableSkills]))
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
@@ -104,6 +110,20 @@ export default function AgentConfigModal({
           <div className="px-6 py-4 space-y-5 overflow-y-auto flex-1">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                提示词
+              </label>
+              <textarea
+                value={formData.prompt || ''}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, prompt: e.target.value }))
+                }
+                rows={8}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 模型选择
               </label>
               <select
@@ -113,7 +133,7 @@ export default function AgentConfigModal({
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               >
-                {modelOptions.map((option) => (
+                {modelChoices.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -173,7 +193,7 @@ export default function AgentConfigModal({
                 启用技能
               </label>
               <div className="grid grid-cols-2 gap-2">
-                {availableSkills.map((skill) => {
+                {skillChoices.map((skill) => {
                   const isSelected = formData.skills?.includes(skill)
                   return (
                     <button

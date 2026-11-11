@@ -136,6 +136,13 @@ export default function AgentCard({ agent, onToggle, onConfigure }: AgentCardPro
         </div>
       </div>
 
+      <div className="mb-4">
+        <span className="text-xs text-gray-500 mb-1 block">提示词</span>
+        <p className="max-h-28 overflow-y-auto whitespace-pre-wrap rounded-lg bg-white/70 px-2 py-1.5 text-xs leading-5 text-gray-700">
+          {agent.prompt || '暂无提示词'}
+        </p>
+      </div>
+
       {skills.length > 0 && (
         <div className="mb-4">
           <span className="text-xs text-gray-500 mb-2 block">技能</span>

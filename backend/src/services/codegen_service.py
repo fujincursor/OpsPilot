@@ -554,6 +554,20 @@ class CodeGenService:
         task.status = CodeGenStatus.GENERATING
         self._save_task(task)
 
+        from ..models.agent import AgentType
+        from .agent_runtime import AgentDisabledError, agent_runtime
+
+        try:
+            codegen_agent = agent_runtime.require(project_id, AgentType.CODE_GENERATION) if project_id else None
+        except AgentDisabledError as exc:
+            task.status = CodeGenStatus.FAILED
+            task.error_message = str(exc)
+            return self._save_task(task)
+        if codegen_agent is None:
+            task.status = CodeGenStatus.FAILED
+            task.error_message = "CodeGen Agent 未启用，这一阶段不会执行"
+            return self._save_task(task)
+
         previous: List[str] = []
         for step in task.steps:
             step.status = CodeGenStepStatus.RUNNING
@@ -579,8 +593,9 @@ class CodeGenService:
             )
             response = await asyncio.to_thread(
                 deerflow_service.complete,
-                prompt,
+                agent_runtime.render_task(codegen_agent, prompt),
                 f"codegen-{task.id}",
+                model_name=codegen_agent.model_name,
             )
             if not response.success:
                 step.status = CodeGenStepStatus.FAILED
@@ -593,8 +608,9 @@ class CodeGenService:
             if not files and self._must_write_files(step.title):
                 retry = await asyncio.to_thread(
                     deerflow_service.complete,
-                    self._retry_prompt(step, task.steps),
+                    agent_runtime.render_task(codegen_agent, self._retry_prompt(step, task.steps)),
                     f"codegen-{task.id}",
+                    model_name=codegen_agent.model_name,
                 )
                 if retry.success:
                     summary, files = self._parse_step_output(retry.message)

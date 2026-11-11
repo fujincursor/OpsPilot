@@ -19,9 +19,14 @@ function asText(value: unknown): string {
   if (typeof value === 'string') return value
   if (!value || typeof value !== 'object') return ''
   const record = value as Record<string, unknown>
+  const levelLabel = ({ low: '低', medium: '中', high: '高', critical: '严重' } as Record<string, string>)[String(record.level)] || String(record.level || '')
+  const scope = typeof record.scope === 'string' ? record.scope : ''
+  if (scope.includes('\n') || scope.includes('**') || /^\s*[-|]/m.test(scope)) {
+    return [`**影响级别：** ${levelLabel}`, scope].filter((line) => line && !line.endsWith('****')).join('\n\n')
+  }
   const lines = [
-    record.level ? `影响级别：${record.level}` : '',
-    record.scope ? `影响范围：${record.scope}` : '',
+    record.level ? `**影响级别：** ${levelLabel}` : '',
+    scope ? `**影响范围：** ${scope}` : '',
     Array.isArray(record.affected_modules) && record.affected_modules.length
       ? `受影响模块：${record.affected_modules.join('、')}`
       : '',
@@ -68,7 +73,9 @@ function normalizeRisk(value: unknown): RegressionRisk {
   }
   const text = String(value || '')
   const level = text.startsWith('高') ? 'high' : text.startsWith('低') ? 'low' : 'medium'
-  return { level, description: text, affected_areas: [] }
+  const description = text.replace(/^(高|中|低)风险[:：]\s*/, '')
+  const area = description.match(/可能影响([^，。]+)/)
+  return { level, description, affected_areas: area ? [area[1].trim()] : [] }
 }
 
 function normalizeArchitecture(value: unknown): ArchitectureDesign {
@@ -145,6 +152,8 @@ function normalizeSolution(raw: BugFixSolution | FeatureDesignSolution | Solutio
     impact_analysis: asText(record.impact_analysis),
     affected_files: Array.isArray(record.affected_files) ? record.affected_files.map(String) : [],
     created_by_agent: String(record.created_by_agent || 'Agent'),
+    skill_key: typeof record.skill_key === 'string' ? record.skill_key : '',
+    skill_name: typeof record.skill_name === 'string' ? record.skill_name : '',
   }
   if (type === 'bug_fix') {
     return {
@@ -168,7 +177,9 @@ function normalizeSolution(raw: BugFixSolution | FeatureDesignSolution | Solutio
 export const solutionService = {
   async generateSolution(reqId: string): Promise<Solution> {
     const response = await api.post<BugFixSolution | FeatureDesignSolution>(
-      `/requirements/${reqId}/solutions/generate`
+      `/requirements/${reqId}/solutions/generate`,
+      undefined,
+      { timeout: 180000 },
     )
     return normalizeSolution(response.data)
   },
@@ -192,7 +203,7 @@ export const solutionService = {
   },
 
   async regenerateSolution(solutionId: string): Promise<Solution> {
-    const response = await api.post<Solution>(`/solutions/${solutionId}/regenerate`)
+    const response = await api.post<Solution>(`/solutions/${solutionId}/regenerate`, undefined, { timeout: 180000 })
     return normalizeSolution(response.data)
   },
 }

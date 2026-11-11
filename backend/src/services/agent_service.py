@@ -12,6 +12,50 @@ from ..models.agent import (
     AgentType
 )
 
+DEFAULT_PROMPTS = {
+    AgentType.LEAD: """你是运维 Agent 生产系统的 Lead Agent。
+你的职责是理解用户提交的运维需求或 Bug，检索项目上下文，完成分类，并委派给合适的 Sub-Agent，最后整合结果。
+
+分类规则：
+- Bug：系统故障、错误、异常行为
+- 新需求：功能增强、新特性、优化建议
+
+输出时说明分类依据、委派对象，以及需要 Sub-Agent 完成的任务。""",
+    AgentType.BUG_FIX: """你是 Bug 修复专家 Agent。
+负责分析 Bug 根因，定位问题代码，并生成可执行的修复方案。
+
+修复方案必须包含：
+1. 问题定位
+2. 根因分析
+3. 具体修改建议
+4. 影响范围评估
+5. 测试与回滚建议""",
+    AgentType.FEATURE_DESIGN: """你是新需求设计专家 Agent。
+负责分析需求，设计技术方案，并定义接口和模块划分。
+
+设计方案必须包含：
+1. 功能概述和用户故事
+2. 功能范围
+3. 技术架构
+4. 接口与数据模型
+5. 实施计划与风险""",
+    AgentType.CODE_GENERATION: """你是代码生成专家 Agent。
+根据已通过的设计方案生成代码，并做语法检查。
+
+输出必须包含：
+1. 代码文件列表和内容
+2. 变更说明
+3. 语法与质量检查结果""",
+    AgentType.TEST_EXECUTION: """你是测试执行专家 Agent。
+负责生成测试用例，在沙箱中执行测试，并给出测试报告。
+
+输出必须包含：
+1. 测试结果汇总
+2. 失败用例分析
+3. 覆盖率
+4. 建议的下一步""",
+}
+
 
 class AgentService:
     """Agent 配置管理服务。配置保存在数据库中。"""
@@ -19,8 +63,11 @@ class AgentService:
     def __init__(self):
         self._agents: Dict[UUID, AgentConfig] = DocumentDict("agents", model=AgentConfig)
         self._project_agents: Dict[UUID, List[UUID]] = {}
-        for agent in self._agents.values():
+        for agent in list(self._agents.values()):
             self._project_agents.setdefault(agent.project_id, []).append(agent.id)
+            if not (agent.prompt or "").strip():
+                agent.prompt = DEFAULT_PROMPTS.get(agent.agent_type, "")
+                self._agents[agent.id] = agent
 
     def get_agents_by_project(self, project_id: UUID) -> List[AgentConfig]:
         """获取项目的所有 Agent 配置"""
@@ -44,10 +91,11 @@ class AgentService:
             name=data.name,
             agent_type=data.agent_type,
             description=data.description,
-            model_name=data.model_name or "gpt-4",
+            model_name=data.model_name or "deepseek-v4",
             temperature=data.temperature if data.temperature is not None else 0.7,
             max_tokens=data.max_tokens or 4096,
             skills=data.skills or [],
+            prompt=(data.prompt or "").strip() or DEFAULT_PROMPTS.get(data.agent_type, ""),
             enabled=data.enabled if data.enabled is not None else True
         )
 
@@ -114,7 +162,7 @@ class AgentService:
                 name="Lead Agent",
                 agent_type=AgentType.LEAD,
                 description="主控 Agent，负责任务分解、协调和监督整个运维流程",
-                model_name="gpt-4",
+                model_name="deepseek-v4",
                 temperature=0.3,
                 max_tokens=8192,
                 skills=["task_planning", "coordination", "decision_making"],
@@ -124,7 +172,7 @@ class AgentService:
                 name="BugFix Agent",
                 agent_type=AgentType.BUG_FIX,
                 description="Bug 修复专家，负责分析和修复代码缺陷",
-                model_name="gpt-4",
+                model_name="deepseek-v4",
                 temperature=0.2,
                 max_tokens=4096,
                 skills=["code_analysis", "debugging", "patch_generation"],
@@ -134,7 +182,7 @@ class AgentService:
                 name="Feature Design Agent",
                 agent_type=AgentType.FEATURE_DESIGN,
                 description="功能设计专家，负责需求分析和方案设计",
-                model_name="gpt-4",
+                model_name="deepseek-v4",
                 temperature=0.5,
                 max_tokens=8192,
                 skills=["requirement_analysis", "architecture_design", "documentation"],
@@ -144,7 +192,7 @@ class AgentService:
                 name="CodeGen Agent",
                 agent_type=AgentType.CODE_GENERATION,
                 description="代码生成专家，负责编写和优化代码",
-                model_name="gpt-4",
+                model_name="deepseek-v4",
                 temperature=0.2,
                 max_tokens=4096,
                 skills=["code_generation", "refactoring", "optimization"],
@@ -154,7 +202,7 @@ class AgentService:
                 name="Test Agent",
                 agent_type=AgentType.TEST_EXECUTION,
                 description="测试执行专家，负责测试用例生成和执行",
-                model_name="gpt-4",
+                model_name="deepseek-v4",
                 temperature=0.1,
                 max_tokens=4096,
                 skills=["test_generation", "test_execution", "coverage_analysis"],

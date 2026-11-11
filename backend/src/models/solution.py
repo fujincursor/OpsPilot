@@ -79,6 +79,8 @@ class Solution(SolutionBase):
     affected_files: List[str] = Field(default_factory=list, description="受影响文件")
     status: SolutionStatus = Field(default=SolutionStatus.DRAFT, description="方案状态")
     created_by_agent: str = Field(default="", description="创建方案的 Agent")
+    skill_key: str = Field(default="", description="生成方案使用的技能键")
+    skill_name: str = Field(default="", description="生成方案使用的技能名称")
     reviewed_by: Optional[str] = Field(None, description="审核人")
     review_comment: Optional[str] = Field(None, description="审核意见")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="创建时间")

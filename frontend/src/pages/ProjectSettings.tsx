@@ -1,7 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { projectService } from '../services'
-import type { Project, ProjectMember, ProjectSkill, SandboxSettings } from '../types'
+import { AgentCard, AgentConfigModal } from '../components/Agents'
+import SkillContentModal from '../components/Skills/SkillContentModal'
+import { agentService, projectService } from '../services'
+import type { AgentConfig, Project, ProjectMember, ProjectSkill, SandboxSettings, UpdateAgentConfigRequest } from '../types'
 
 const tabs = ['基本信息', 'Agent', 'Skills', 'Sandbox', '成员', '高级'] as const
 
@@ -29,10 +31,13 @@ export default function ProjectSettings() {
   const [sandbox, setSandbox] = useState<SandboxSettings>(emptySandbox())
   const [domains, setDomains] = useState('')
   const [members, setMembers] = useState<ProjectMember[]>([])
+  const [agents, setAgents] = useState<AgentConfig[]>([])
+  const [selectedAgent, setSelectedAgent] = useState<AgentConfig | null>(null)
   const [memberName, setMemberName] = useState('')
   const [memberRole, setMemberRole] = useState('developer')
   const [skillName, setSkillName] = useState('')
   const [showSkill, setShowSkill] = useState(false)
+  const [viewingSkill, setViewingSkill] = useState<ProjectSkill | null>(null)
   const [message, setMessage] = useState('')
   const [sandboxResult, setSandboxResult] = useState('')
 
@@ -50,7 +55,23 @@ export default function ProjectSettings() {
       setDomains((data.sandbox?.allowed_domains || []).join('\n'))
       setMembers(data.members || [])
     }).catch(() => setProject(null))
+    agentService.getAgentConfigs(id).then(setAgents).catch(() => setAgents([]))
   }, [id])
+
+  const handleToggleAgent = async (agent: AgentConfig) => {
+    try {
+      const updatedAgent = await agentService.toggleAgent(agent.project_id, agent.id, !agent.enabled)
+      setAgents((current) => current.map((item) => (item.id === updatedAgent.id ? updatedAgent : item)))
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  const handleUpdateAgentConfig = async (agentId: string, data: UpdateAgentConfigRequest) => {
+    if (!id) return
+    const updatedAgent = await agentService.updateAgentConfig(id, agentId, data)
+    setAgents((current) => current.map((item) => (item.id === updatedAgent.id ? updatedAgent : item)))
+  }
 
   const save = async (event?: FormEvent) => {
     event?.preventDefault()
@@ -85,7 +106,7 @@ export default function ProjectSettings() {
 
   return (
     <div className="p-6 bg-gray-50 min-h-full">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <button type="button" onClick={() => navigate(`/projects/${id}`)} className="mb-4 text-sm text-gray-600">← 返回项目</button>
         <h1 className="text-2xl font-semibold text-gray-800 mb-4">项目设置</h1>
         <div className="mb-4 flex flex-wrap gap-2">
@@ -100,6 +121,30 @@ export default function ProjectSettings() {
             </button>
           ))}
         </div>
+        {tab === 'Agent' && (
+          <div className="mb-4">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">Agent 配置</h2>
+              <p className="text-sm text-gray-500">
+                已启用 {agents.filter((agent) => agent.enabled).length}/{agents.length} 个 Agent，与项目详情页使用同一份配置
+              </p>
+            </div>
+            {agents.length === 0 ? (
+              <p className="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-400">还没有 Agent 配置</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {agents.map((agent) => (
+                  <AgentCard
+                    key={agent.id}
+                    agent={agent}
+                    onToggle={handleToggleAgent}
+                    onConfigure={setSelectedAgent}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <form onSubmit={save} className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
           {tab === '基本信息' && (
             <>
@@ -116,6 +161,7 @@ export default function ProjectSettings() {
           )}
           {tab === 'Agent' && (
             <>
+              <h2 className="text-sm font-semibold text-gray-800">项目级 Prompt 与工具链</h2>
               <label className="block text-sm text-gray-600">Prompt 模板
                 <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm" rows={6} />
               </label>
@@ -127,19 +173,24 @@ export default function ProjectSettings() {
           {tab === 'Skills' && (
             <>
               {skills.map((skill) => (
-                <label key={skill.key} className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 px-3 py-2 text-sm">
-                  <span>
+                <div key={skill.key} className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 px-3 py-2 text-sm">
+                  <label className="flex min-w-0 flex-1 items-center gap-2">
                     <input
                       type="checkbox"
                       checked={skill.enabled}
                       onChange={(event) => setSkills((current) => current.map((item) => item.key === skill.key ? { ...item, enabled: event.target.checked } : item))}
-                      className="mr-2"
                     />
-                    {skill.name}
-                    <span className="ml-2 text-xs text-gray-400">使用 {skill.usage_count || 0} 次</span>
-                  </span>
-                  <span className="text-xs text-gray-400">{skill.description}</span>
-                </label>
+                    <span className="min-w-0">
+                      {skill.name}
+                      {skill.agent && <span className="ml-2 text-xs text-gray-400">{skill.agent}</span>}
+                      <span className="ml-2 text-xs text-gray-400">使用 {skill.usage_count || 0} 次</span>
+                      <span className="mt-0.5 block text-xs text-gray-400">{skill.description}</span>
+                    </span>
+                  </label>
+                  <button type="button" onClick={() => setViewingSkill(skill)} className="shrink-0 rounded-lg bg-gray-100 px-3 py-1.5 text-xs text-gray-700">
+                    查看
+                  </button>
+                </div>
               ))}
               <button type="button" onClick={() => setShowSkill(true)} className="rounded-lg bg-gray-100 px-3 py-2 text-sm">添加技能</button>
             </>
@@ -165,8 +216,23 @@ export default function ProjectSettings() {
                   <input type="number" value={sandbox.timeout_seconds} onChange={(event) => setSandbox({ ...sandbox, timeout_seconds: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2" />
                 </label>
               </div>
+              <label className="block text-sm text-gray-600">网络策略
+                <select value={sandbox.network_policy} onChange={(event) => setSandbox({ ...sandbox, network_policy: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2">
+                  <option value="disabled">禁用网络</option>
+                  <option value="allowlist">白名单</option>
+                  <option value="open">允许所有</option>
+                </select>
+              </label>
               <label className="block text-sm text-gray-600">允许域名，一行一个
                 <textarea value={domains} onChange={(event) => setDomains(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2" rows={3} />
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={sandbox.run_as_non_root}
+                  onChange={(event) => setSandbox({ ...sandbox, run_as_non_root: event.target.checked })}
+                />
+                非 root 运行
               </label>
               <button type="button" onClick={testSandbox} className="rounded-lg bg-gray-800 px-3 py-2 text-sm text-white">连通性测试</button>
               {sandboxResult && <p className="text-sm text-gray-600">{sandboxResult}</p>}
@@ -224,6 +290,13 @@ export default function ProjectSettings() {
           )}
           {message && <p className="text-sm text-green-600">{message}</p>}
         </form>
+        <AgentConfigModal
+          isOpen={selectedAgent !== null}
+          agent={selectedAgent}
+          onClose={() => setSelectedAgent(null)}
+          onSubmit={handleUpdateAgentConfig}
+        />
+        <SkillContentModal skill={viewingSkill} onClose={() => setViewingSkill(null)} />
         {showSkill && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
             <div className="w-full max-w-sm rounded-xl bg-white p-5">

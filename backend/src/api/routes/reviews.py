@@ -110,6 +110,7 @@ async def list_pending_reviews(
     - **priority**: 优先级筛选 (low/medium/high/urgent)
     - **reviewer**: 审核人（可选）
     """
+    workflow_service.sync_pending_solution_reviews()
     filters = ReviewFilters(
         item_type=item_type,
         priority=priority,

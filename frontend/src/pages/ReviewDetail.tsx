@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import type { BugFixSolution, CodeGenTask, FeatureDesignSolution, ReviewItem, ReviewComment, ReviewDecision, ReviewItemType, TestTask } from '../types'
 import { codegenService, reviewService, solutionService, testService } from '../services'
 import {
@@ -210,16 +212,22 @@ export default function ReviewDetail() {
                 )}
               </div>
 
-              <div className="prose prose-sm max-w-none">
-                <div className="bg-gray-50 rounded-lg p-4 whitespace-pre-wrap text-sm text-gray-700 leading-relaxed">
-                  {review.description}
+              <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 leading-relaxed">
+                <div className="markdown-body">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {review.item_type === 'solution' && solutionBody?.content
+                      ? solutionBody.content
+                      : review.description}
+                  </ReactMarkdown>
                 </div>
               </div>
 
               {review.item_type === 'solution' && solutionBody && (
                 <div className="mt-4 rounded-lg border border-gray-200 p-4 text-sm">
                   {'root_cause' in solutionBody && solutionBody.root_cause && (
-                    <p className="mb-2 text-gray-700">根因：{solutionBody.root_cause}</p>
+                    <div className="markdown-body mb-3 text-gray-700">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{solutionBody.root_cause}</ReactMarkdown>
+                    </div>
                   )}
                   <p className="mb-2 text-gray-500">涉及文件</p>
                   <ul className="space-y-1 font-mono text-xs text-gray-700">

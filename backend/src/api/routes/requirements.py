@@ -171,9 +171,20 @@ async def update_requirement_status(
         RequirementStatus.TESTING,
     }:
         raise HTTPException(status_code=400, detail="咨询类需求不进入方案、编码或测试")
+    previous = current.status
     requirement = requirement_service.update_status(requirement_id, data.status)
     if not requirement:
         raise HTTPException(status_code=404, detail="Requirement not found")
+    if data.status in {
+        RequirementStatus.PENDING,
+        RequirementStatus.ANALYZING,
+        RequirementStatus.DESIGNING,
+    }:
+        from ...services.solution_service import solution_service
+
+        solution_service.align_with_requirement(requirement_id)
+    elif data.status == RequirementStatus.REVIEWING and previous != RequirementStatus.REVIEWING:
+        workflow_service.submit_solution_for_requirement(requirement)
     return requirement
 
 
@@ -208,4 +219,9 @@ async def analyze_requirement_text(data: RequirementAnalyzeRequest) -> Requireme
     直接调用 Lead Agent 分析文本，返回识别的类型、建议的优先级和提取的关键词。
     可用于测试和调试 AI 分析功能。
     """
+    if data.project_id:
+        analysis = requirement_service._analyze_with_lead(data.project_id, data.text)
+        if analysis is None:
+            raise HTTPException(status_code=409, detail="Lead Agent 未启用，这一阶段不会执行")
+        return analysis
     return lead_agent_service.analyze_requirement(data.text)

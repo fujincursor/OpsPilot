@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { AgentCard, AgentConfigModal } from '../components/Agents'
+import SkillContentModal from '../components/Skills/SkillContentModal'
 import type { Project, AgentConfig, KnowledgeBase, UpdateAgentConfigRequest, ProjectSkill, SandboxSettings } from '../types'
 import { projectService, agentService, knowledgeService, requirementService } from '../services'
 import type { RequirementStatistics } from '../services/requirementService'
@@ -24,6 +25,7 @@ export default function ProjectDetail() {
   const [skills, setSkills] = useState<ProjectSkill[]>([])
   const [sandbox, setSandbox] = useState<SandboxSettings | null>(null)
   const [configMessage, setConfigMessage] = useState('')
+  const [viewingSkill, setViewingSkill] = useState<ProjectSkill | null>(null)
 
   useEffect(() => {
     if (id) {
@@ -394,22 +396,34 @@ export default function ProjectDetail() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-2">
               {skills.map((skill) => (
-                <label key={skill.key} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                  <input
-                    type="checkbox"
-                    checked={skill.enabled}
-                    onChange={(event) => {
-                      const enabled = event.target.checked
-                      setSkills((current) => current.map((item) => (
-                        item.key === skill.key ? { ...item, enabled } : item
-                      )))
-                    }}
-                  />
-                  <span>
-                    <span className="block text-sm font-medium text-gray-800">{skill.name}</span>
-                    <span className="block text-xs text-gray-500">{skill.description}</span>
-                  </span>
-                </label>
+                <div key={skill.key} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                  <label className="flex min-w-0 flex-1 items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={skill.enabled}
+                      onChange={(event) => {
+                        const enabled = event.target.checked
+                        setSkills((current) => current.map((item) => (
+                          item.key === skill.key ? { ...item, enabled } : item
+                        )))
+                      }}
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-gray-800">
+                        {skill.name}
+                        {skill.agent ? ` · ${skill.agent}` : ''}
+                      </span>
+                      <span className="block text-xs text-gray-500">{skill.description}</span>
+                    </span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setViewingSkill(skill)}
+                    className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs text-gray-700 border border-gray-200"
+                  >
+                    查看
+                  </button>
+                </div>
               ))}
             </div>
             {sandbox && (
@@ -493,6 +507,7 @@ export default function ProjectDetail() {
         </div>
       </div>
 
+      <SkillContentModal skill={viewingSkill} onClose={() => setViewingSkill(null)} />
       <AgentConfigModal
         isOpen={isConfigModalOpen}
         agent={selectedAgent}

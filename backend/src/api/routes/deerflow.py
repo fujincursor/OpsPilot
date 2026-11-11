@@ -132,35 +132,12 @@ async def chat(request: ChatRequest):
     elif project_id:
         thread_id = str(uuid4())
 
+    blocked = None
     if project_id:
         try:
             blocked = workflow_service.knowledge_block(UUID(project_id))
         except ValueError:
             blocked = None
-        if blocked is not None:
-            message = f"知识库未就绪：{blocked.message}。请先补齐项目知识库后再提交需求。"
-            saved_id = thread_id
-            if thread_id:
-                try:
-                    saved = chat_service.append_exchange(
-                        session_id=UUID(thread_id),
-                        project_id=UUID(project_id),
-                        user_content=request.message,
-                        user_sender=request.sender or "我",
-                        agent_content=message,
-                        agent_status="error",
-                        knowledge_results=[],
-                        knowledge_blocked=True,
-                    )
-                    saved_id = str(saved.id)
-                except ValueError:
-                    saved_id = thread_id
-            return AgentResponseModel(
-                success=False,
-                message=message,
-                data={"knowledge_ready": False, "project_id": project_id},
-                thread_id=saved_id,
-            )
 
     response = deerflow_service.chat(
         message=request.message,
@@ -170,7 +147,18 @@ async def chat(request: ChatRequest):
     )
 
     classification = response.data.get("classification")
-    if isinstance(classification, dict) and project_id and classification.get("type") in {"bug", "feature"}:
+    knowledge_blocked = False
+    if (
+        blocked is not None
+        and isinstance(classification, dict)
+        and classification.get("type") in {"bug", "feature"}
+    ):
+        knowledge_blocked = True
+        created_requirement = None
+        response.data["knowledge_ready"] = False
+        gate = f"知识库未就绪：{blocked.message}。语义分类已完成，补齐项目资料和知识库后才能提交需求。"
+        response.message = f"{response.message}\n\n{gate}".strip()
+    elif isinstance(classification, dict) and project_id and classification.get("type") in {"bug", "feature"}:
         try:
             title = str(classification.get("title") or "").strip() or request.message.strip()[:40]
             priority = str(classification.get("priority") or "medium")
@@ -203,6 +191,7 @@ async def chat(request: ChatRequest):
                 agent_status="complete" if response.success else "error",
                 knowledge_results=response.data.get("knowledge_results") or [],
                 classification=classification if isinstance(classification, dict) else None,
+                knowledge_blocked=knowledge_blocked,
             )
             thread_id = str(saved.id)
         except ValueError:

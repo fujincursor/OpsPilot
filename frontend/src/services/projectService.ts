@@ -35,6 +35,11 @@ export const projectService = {
     await api.delete(`/projects/${id}`)
   },
 
+  async getSkillContent(key: string): Promise<{ key: string; name: string; description: string; content: string }> {
+    const response = await api.get<{ key: string; name: string; description: string; content: string }>(`/skills/${encodeURIComponent(key)}`)
+    return response.data
+  },
+
   async testSandbox(id: string): Promise<{ ok: boolean; message: string }> {
     const response = await api.post<{ ok: boolean; message: string }>(`/projects/${id}/sandbox/test`)
     return response.data

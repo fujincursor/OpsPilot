@@ -84,6 +84,7 @@ class RequirementAnalysis(BaseModel):
 class RequirementAnalyzeRequest(BaseModel):
     """需求分析请求模型"""
     text: str = Field(..., min_length=1, max_length=5000, description="需求文本")
+    project_id: Optional[UUID] = Field(None, description="所属项目 ID，传入后使用该项目的 Lead Agent")
 
 
 class Requirement(RequirementBase):
@@ -100,6 +101,7 @@ class Requirement(RequirementBase):
     session_id: Optional[UUID] = Field(None, description="来源对话会话")
     auto_advance: bool = Field(default=True, description="是否允许流程自动推进")
     rework_count: int = Field(default=0, description="测试失败后自动回到代码生成的次数")
+    failure_reason: Optional[str] = Field(None, description="最近一次方案生成失败原因")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="创建时间")
     updated_at: datetime = Field(default_factory=datetime.utcnow, description="更新时间")
 

@@ -1,9 +1,13 @@
 """方案管理 API"""
 
+import asyncio
+import logging
 from typing import Optional, Union
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
+
+logger = logging.getLogger(__name__)
 
 from ...models.solution import (
     Solution,
@@ -21,6 +25,10 @@ from ...services.solution_service import solution_service
 from ...services.requirement_service import requirement_service
 
 router = APIRouter()
+
+
+def _remember_failure(requirement_id: UUID, message: str) -> None:
+    requirement_service.set_failure_reason(requirement_id, message)
 
 
 @router.post(
@@ -51,18 +59,36 @@ async def generate_solution(
 
     force_regenerate = data.force_regenerate if data else False
     additional_context = data.additional_context if data else None
-
-    solution = solution_service.generate_solution(
-        requirement_id=requirement_id,
-        force_regenerate=force_regenerate,
-        additional_context=additional_context,
-    )
-
-    if not solution:
+    if not force_regenerate and solution_service.has_pending_solution(requirement_id):
         raise HTTPException(
-            status_code=500, detail="Failed to generate solution"
+            status_code=409,
+            detail="这条需求已有待审核方案。请使用重新生成，之前的方案会作废。",
         )
 
+    from ...services.agent_runtime import AgentDisabledError
+
+    try:
+        solution = await asyncio.to_thread(
+            solution_service.generate_solution,
+            requirement_id,
+            force_regenerate,
+            additional_context,
+        )
+    except AgentDisabledError as exc:
+        _remember_failure(requirement_id, str(exc))
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("方案生成失败: %s", requirement_id)
+        message = str(exc).strip() or "方案生成失败"
+        _remember_failure(requirement_id, message)
+        raise HTTPException(status_code=500, detail=message) from exc
+
+    if not solution:
+        message = "没有生成方案。需求不存在，或这个类型不进入方案阶段。"
+        _remember_failure(requirement_id, message)
+        raise HTTPException(status_code=500, detail=message)
+
+    _submit_solution_review(solution)
     return solution
 
 
@@ -191,6 +217,8 @@ async def update_solution_status(
     if not solution:
         raise HTTPException(status_code=404, detail="Solution not found")
 
+    if data.status == SolutionStatus.PENDING_REVIEW:
+        _submit_solution_review(solution)
     return solution
 
 
@@ -218,17 +246,39 @@ async def regenerate_solution(
 
     additional_context = data.additional_context if data else None
 
-    new_solution = solution_service.regenerate_solution(
-        solution_id=solution_id,
-        additional_context=additional_context,
-    )
+    from ...services.agent_runtime import AgentDisabledError
+
+    try:
+        new_solution = await asyncio.to_thread(
+            solution_service.regenerate_solution,
+            solution_id,
+            additional_context,
+        )
+    except AgentDisabledError as exc:
+        _remember_failure(old_solution.requirement_id, str(exc))
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("方案重新生成失败: %s", solution_id)
+        message = str(exc).strip() or "方案重新生成失败"
+        _remember_failure(old_solution.requirement_id, message)
+        raise HTTPException(status_code=500, detail=message) from exc
 
     if not new_solution:
-        raise HTTPException(
-            status_code=500, detail="Failed to regenerate solution"
-        )
+        message = "没有重新生成方案。"
+        _remember_failure(old_solution.requirement_id, message)
+        raise HTTPException(status_code=500, detail=message)
 
+    _submit_solution_review(new_solution)
     return new_solution
+
+
+def _submit_solution_review(solution) -> None:
+    from ...services.workflow_service import workflow_service
+
+    requirement = requirement_service.get(solution.requirement_id)
+    if requirement is None:
+        return
+    workflow_service._queue_solution_review(solution, requirement)
 
 
 @router.delete("/solutions/{solution_id}", status_code=204)

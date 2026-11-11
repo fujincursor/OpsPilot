@@ -1,3 +1,5 @@
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import type { BugFixSolution } from '../../types'
 
 interface BugFixViewProps {
@@ -37,9 +39,9 @@ export default function BugFixView({ solution }: BugFixViewProps) {
           </div>
         </div>
         <div className="p-4">
-          <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-            {solution.root_cause}
-          </p>
+          <div className="markdown-body text-sm text-gray-700">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{solution.root_cause}</ReactMarkdown>
+          </div>
         </div>
       </div>
 

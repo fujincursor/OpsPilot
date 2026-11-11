@@ -1,10 +1,12 @@
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+
 interface ImpactAnalysisProps {
   analysis: string
 }
 
 export default function ImpactAnalysis({ analysis }: ImpactAnalysisProps) {
   const text = typeof analysis === 'string' ? analysis : ''
-  const sections = text.split('\n\n').filter(Boolean)
 
   return (
     <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-200 overflow-hidden">
@@ -15,18 +17,12 @@ export default function ImpactAnalysis({ analysis }: ImpactAnalysisProps) {
         </div>
       </div>
       <div className="p-4">
-        {sections.length > 1 ? (
-          <div className="space-y-3">
-            {sections.map((section, index) => (
-              <div key={index} className="p-3 bg-white/60 rounded-lg">
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{section}</p>
-              </div>
-            ))}
+        {text ? (
+          <div className="markdown-body text-sm text-gray-700">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
           </div>
         ) : (
-          <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-            {text || '暂无影响分析'}
-          </p>
+          <p className="text-sm text-gray-700">暂无影响分析</p>
         )}
       </div>
     </div>

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import type { Requirement, RequirementStatus, StatusHistoryItem, Solution } from '../types'
-import { requirementService, solutionService, authService } from '../services'
+import type { AgentConfig, ProjectSkill, Requirement, RequirementStatus, StatusHistoryItem, Solution } from '../types'
+import { agentService, projectService, requirementService, solutionService, authService } from '../services'
+import { readApiError } from '../services/apiError'
 import {
   TypeIcon,
   PriorityBadge,
@@ -28,12 +29,36 @@ export default function RequirementDetail() {
   const [isLoadingSolutions, setIsLoadingSolutions] = useState(false)
   const [solutionError, setSolutionError] = useState<string | null>(null)
   const [generateError, setGenerateError] = useState('')
+  const [agents, setAgents] = useState<AgentConfig[]>([])
+  const [projectSkills, setProjectSkills] = useState<ProjectSkill[]>([])
 
   useEffect(() => {
     authService.listUsers()
       .then((users) => setTeamMembers(users.map((user) => user.username)))
       .catch(() => setTeamMembers([]))
   }, [])
+
+  useEffect(() => {
+    if (!requirement?.project_id) return
+    agentService.getAgentConfigs(requirement.project_id)
+      .then(setAgents)
+      .catch(() => setAgents([]))
+    projectService.getProject(requirement.project_id)
+      .then((project) => setProjectSkills(project.skills || []))
+      .catch(() => setProjectSkills([]))
+  }, [requirement?.project_id])
+
+  const solutionActors = (() => {
+    if (!requirement || requirement.type === 'question') return null
+    const bug = requirement.type === 'bug'
+    const skillKey = bug ? 'bugfix-solution' : 'feature-design'
+    const agent = agents.find((item) => item.agent_type === (bug ? 'bugfix' : 'feature'))
+    const skill = projectSkills.find((item) => item.key === skillKey)
+    return {
+      agent: agent?.name || (bug ? 'BugFix Agent' : 'Feature Design Agent'),
+      skill: skill?.name || (bug ? 'Bug 修复方案' : '功能设计'),
+    }
+  })()
 
   useEffect(() => {
     if (reqId) {
@@ -84,14 +109,16 @@ export default function RequirementDetail() {
     setGenerateError('')
     try {
       const newSolution = await solutionService.generateSolution(reqId)
-      setSolutions((prev) => [newSolution, ...prev])
+      const refreshed = await requirementService.getRequirement(reqId)
+      setSolutions((prev) => [newSolution, ...prev.filter((item) => item.id !== newSolution.id)])
+      setRequirement(refreshed)
+      setGenerateError(refreshed.failure_reason || '')
       setSolutionError(null)
     } catch (error) {
       console.error(error)
-      const detail = typeof error === 'object' && error && 'response' in error
-        ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
-        : ''
-      setGenerateError(detail || '方案生成失败，请查看原因后重试')
+      const detail = readApiError(error, '方案生成失败')
+      setGenerateError(detail)
+      setRequirement((current) => current ? { ...current, failure_reason: detail } : current)
     } finally {
       setIsGeneratingSolution(false)
     }
@@ -103,6 +130,7 @@ export default function RequirementDetail() {
     try {
       const updated = await requirementService.updateStatus(reqId, newStatus)
       setRequirement(updated)
+      await loadSolutions(reqId)
       setHistory((prev) => [
         ...prev,
         {
@@ -267,7 +295,8 @@ export default function RequirementDetail() {
             <p className="text-sm text-gray-600">
               {requirement.type === 'question' && '咨询只回答，不生成方案或代码。'}
               {requirement.type !== 'question' && requirement.status === 'reviewing' && '方案或代码正在等待人工审批。'}
-              {requirement.type !== 'question' && (requirement.status === 'pending' || requirement.status === 'analyzing' || requirement.status === 'designing') && '生成方案后进入审批。'}
+              {requirement.type !== 'question' && (requirement.status === 'pending' || requirement.status === 'analyzing' || requirement.status === 'designing') && solutions.some((item) => item.status === 'draft') && '方案已回到草稿，不再待审核。再次把需求改为审核中后，会重新提交这份方案。'}
+              {requirement.type !== 'question' && (requirement.status === 'pending' || requirement.status === 'analyzing' || requirement.status === 'designing') && !solutions.some((item) => item.status === 'draft') && '生成方案后进入审批。'}
               {requirement.type !== 'question' && requirement.status === 'coding' && '代码生成和语法检查进行中，随后进入代码审批。'}
               {requirement.type !== 'question' && requirement.status === 'testing' && '测试作为质量门禁自动执行。'}
               {requirement.status === 'completed' && '流程已完成。'}
@@ -296,15 +325,35 @@ export default function RequirementDetail() {
             <GenerateButton
               onClick={handleGenerateSolution}
               isLoading={isGeneratingSolution}
+              disabled={solutions.some((item) => item.status === 'pending_review')}
               label="生成方案"
             />
           </div>
-
-          {isGeneratingSolution && (
-            <FlowStateBanner mode="running" title="正在生成方案" detail="生成完成后会出现在下方，并进入审批。" />
+          {solutionActors && (
+            <p className="mb-4 text-sm text-gray-500">
+              生成方案使用 {solutionActors.agent}，技能「{solutionActors.skill}」
+            </p>
           )}
-          {generateError && (
-            <FlowStateBanner mode="failed" title="方案生成失败" detail={generateError} onRetry={handleGenerateSolution} />
+          {solutions.some((item) => item.status === 'pending_review') && (
+            <p className="mb-4 text-sm text-amber-700">
+              已有待审核方案。若要重新生成，请打开该方案；重新生成后，之前的方案会作废。
+            </p>
+          )}
+
+          {isGeneratingSolution && solutionActors && (
+            <FlowStateBanner
+              mode="running"
+              title="正在生成方案"
+              detail={`正在使用 ${solutionActors.agent}，技能「${solutionActors.skill}」。完成后会出现在下方，并进入审批。`}
+            />
+          )}
+          {(generateError || requirement.failure_reason) && (
+            <FlowStateBanner
+              mode="failed"
+              title="方案生成失败"
+              detail={generateError || requirement.failure_reason}
+              onRetry={handleGenerateSolution}
+            />
           )}
           {solutionError ? (
             <div className="bg-white rounded-xl border border-red-200 p-8 text-center">

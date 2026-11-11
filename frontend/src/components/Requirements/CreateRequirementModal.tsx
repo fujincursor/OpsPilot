@@ -19,11 +19,10 @@ interface CreateRequirementModalProps {
 
 export default function CreateRequirementModal({
   isOpen,
-  projectId: _projectId,
+  projectId,
   onClose,
   onSubmit,
 }: CreateRequirementModalProps) {
-  void _projectId
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [source, setSource] = useState('')
@@ -42,7 +41,7 @@ export default function CreateRequirementModal({
 
     setIsAnalyzing(true)
     try {
-      const result = await requirementService.analyzeText(text)
+      const result = await requirementService.analyzeText(text, projectId)
       setAnalysisResult(result)
       if (useAiSuggestion) {
         setType(result.type)
@@ -54,7 +53,7 @@ export default function CreateRequirementModal({
     } finally {
       setIsAnalyzing(false)
     }
-  }, [useAiSuggestion])
+  }, [projectId, useAiSuggestion])
 
   useEffect(() => {
     const timer = setTimeout(() => {

@@ -122,6 +122,11 @@ class DeerFlowService:
         except ValueError:
             return message, []
 
+        from .agent_runtime import agent_runtime
+
+        if not agent_runtime.skill_enabled(parsed_project_id, "knowledge-retrieval"):
+            return message, []
+
         from .knowledge_service import knowledge_service
 
         hits = knowledge_service.search_knowledge(
@@ -251,24 +256,40 @@ class DeerFlowService:
         Returns:
             AgentResponse: Agent 响应
         """
-        if not self.is_available:
+        grounded_message, sources = self._retrieve_project_knowledge(message, project_id)
+        prepared, model_name, lead_error = self._lead_turn(
+            self._with_classification_instruction(grounded_message),
+            project_id,
+        )
+        if lead_error:
             return AgentResponse(
                 success=False,
-                message="DeerFlow 未安装，当前无法生成回复",
+                message=lead_error,
                 thread_id=thread_id,
+                data={"project_id": project_id, "knowledge_results": sources},
+            )
+        classification = self._classified(message, None)
+        if not self.is_available:
+            return AgentResponse(
+                success=True,
+                message="已完成语义分类。DeerFlow 当前不可用，暂时无法生成进一步说明。",
+                thread_id=thread_id,
+                data={
+                    "project_id": project_id,
+                    "knowledge_results": sources,
+                    "classification": classification,
+                },
             )
         
         try:
-            grounded_message, sources = self._retrieve_project_knowledge(message, project_id)
+            options = {"model_name": model_name} if model_name else {}
             response = self._client.chat(
-                self._with_classification_instruction(grounded_message),
+                prepared,
                 thread_id=thread_id,
+                **options,
             )
-            visible, classification = self._extract_classification(response)
-            if classification is None:
-                classification = self._fallback_classification(message)
-            if not classification.get("title"):
-                classification["title"] = " ".join(message.split())[:40]
+            visible, parsed = self._extract_classification(response)
+            classification = self._classified(message, parsed)
             
             return AgentResponse(
                 success=True,
@@ -285,15 +306,47 @@ class DeerFlowService:
         except Exception as e:
             logger.error(f"DeerFlow chat 失败: {e}")
             return AgentResponse(
-                success=False,
-                message=f"Agent 调用失败: {str(e)}",
-                thread_id=thread_id
+                success=True,
+                message=f"已完成语义分类。生成详细回复失败：{e}",
+                thread_id=thread_id,
+                data={
+                    "project_id": project_id,
+                    "knowledge_results": sources,
+                    "classification": classification,
+                },
             )
+
+    def _classified(self, message: str, parsed: Optional[Dict[str, str]]) -> Dict[str, str]:
+        """保证每条对话都有语义分类。模型没给出时使用本地判断。"""
+        classification = parsed or self._fallback_classification(message)
+        if not classification.get("title"):
+            classification["title"] = " ".join(message.split())[:40]
+        return classification
+
+    def _lead_turn(self, message: str, project_id: Optional[str]) -> Tuple[str, Optional[str], Optional[str]]:
+        """用项目的 Lead Agent 包装任务。返回文本、模型名和禁用原因。"""
+        if not project_id:
+            return message, None, None
+        try:
+            parsed_project_id = UUID(str(project_id))
+        except ValueError:
+            return message, None, None
+        from ..models.agent import AgentType
+        from .agent_runtime import AgentDisabledError, agent_runtime
+
+        try:
+            agent = agent_runtime.require(parsed_project_id, AgentType.LEAD)
+        except AgentDisabledError as exc:
+            return message, None, str(exc)
+        return agent_runtime.render_task(agent, message), agent.model_name, None
 
     def complete(
         self,
         message: str,
         thread_id: Optional[str] = None,
+        *,
+        model_name: Optional[str] = None,
+        recursion_limit: Optional[int] = None,
     ) -> AgentResponse:
         """直接让模型完成一项任务，不附加对话分类。"""
         if not self.is_available:
@@ -303,7 +356,12 @@ class DeerFlowService:
                 thread_id=thread_id,
             )
         try:
-            response = self._client.chat(message, thread_id=thread_id)
+            options = {}
+            if model_name:
+                options["model_name"] = model_name
+            if recursion_limit is not None:
+                options["recursion_limit"] = recursion_limit
+            response = self._client.chat(message, thread_id=thread_id, **options)
             return AgentResponse(
                 success=True,
                 message=response or "",
@@ -316,6 +374,54 @@ class DeerFlowService:
                 message=f"Agent 调用失败: {str(e)}",
                 thread_id=thread_id,
             )
+
+    def complete_text(
+        self,
+        message: str,
+        *,
+        model_name: Optional[str] = None,
+    ) -> AgentResponse:
+        """直接调用配置中的模型生成正文，不挂载搜索、抓取或其他工具。"""
+        if not self.is_available:
+            return AgentResponse(
+                success=False,
+                message="DeerFlow 未安装，当前无法生成方案",
+            )
+        try:
+            from langchain_core.messages import HumanMessage
+            from deerflow.models.factory import create_chat_model
+
+            model = create_chat_model(
+                name=model_name,
+                thinking_enabled=False,
+                attach_tracing=False,
+            )
+            result = model.invoke([HumanMessage(content=message)])
+            text = self._message_text(result)
+            if not text:
+                return AgentResponse(success=False, message="模型没有返回方案正文")
+            return AgentResponse(success=True, message=text)
+        except Exception as e:
+            logger.error(f"模型直接生成失败: {e}")
+            return AgentResponse(
+                success=False,
+                message=f"Agent 调用失败: {str(e)}",
+            )
+
+    @staticmethod
+    def _message_text(message: Any) -> str:
+        content = getattr(message, "content", "")
+        if isinstance(content, str):
+            return content.strip()
+        if isinstance(content, list):
+            parts: List[str] = []
+            for block in content:
+                if isinstance(block, str):
+                    parts.append(block)
+                elif isinstance(block, dict):
+                    parts.append(str(block.get("text") or ""))
+            return "\n".join(part.strip() for part in parts if part and part.strip()).strip()
+        return str(content or "").strip()
     
     def stream(
         self,
@@ -343,9 +449,14 @@ class DeerFlowService:
         
         try:
             grounded_message, sources = self._retrieve_project_knowledge(message, project_id)
+            prepared, model_name, lead_error = self._lead_turn(grounded_message, project_id)
+            if lead_error:
+                yield {"type": "error", "data": {"error": lead_error}}
+                return
             if sources:
                 yield {"type": "knowledge", "data": {"results": sources, "project_id": project_id}}
-            for event in self._client.stream(grounded_message, thread_id=thread_id):
+            options = {"model_name": model_name} if model_name else {}
+            for event in self._client.stream(prepared, thread_id=thread_id, **options):
                 yield {
                     "type": event.type,
                     "data": event.data

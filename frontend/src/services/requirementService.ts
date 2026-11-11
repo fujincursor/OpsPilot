@@ -52,8 +52,8 @@ export const requirementService = {
     return response.data
   },
 
-  async analyzeText(text: string): Promise<AnalysisResult> {
-    const response = await api.post<AnalysisResult>('/requirements/analyze', { text })
+  async analyzeText(text: string, projectId?: string): Promise<AnalysisResult> {
+    const response = await api.post<AnalysisResult>('/requirements/analyze', { text, project_id: projectId })
     return response.data
   },
 

@@ -37,7 +37,21 @@ class WorkflowBoard(BaseModel):
     items: List[WorkflowItem] = Field(default_factory=list)
 
 
-def _current_agent(stage: str) -> str:
+def _current_agent(stage: str, requirement_type: str, project_id: UUID) -> str:
+    from ...models.agent import AgentType
+    from ...services.agent_runtime import agent_runtime
+
+    agent_type = {
+        "分析": AgentType.LEAD,
+        "编码": AgentType.CODE_GENERATION,
+        "测试": AgentType.TEST_EXECUTION,
+    }.get(stage)
+    if stage == "方案":
+        agent_type = AgentType.BUG_FIX if requirement_type == "bug" else AgentType.FEATURE_DESIGN
+    if agent_type is not None:
+        agent = agent_runtime.get(project_id, agent_type)
+        if agent is not None:
+            return agent.name if agent.enabled else f"{agent.name}（未启用）"
     return {
         "分析": "需求分析",
         "方案": "方案设计",
@@ -64,7 +78,7 @@ def _board(project_id: UUID) -> WorkflowBoard:
             session_id=item.session_id,
             sandbox_profile=profile,
             updated_at=item.updated_at.isoformat() if item.updated_at else None,
-            current_agent=_current_agent(workflow_service.stage_label(item)),
+            current_agent=_current_agent(workflow_service.stage_label(item), item.type.value, project_id),
         )
         for item in requirements
     ]

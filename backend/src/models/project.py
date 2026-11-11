@@ -20,6 +20,7 @@ class ProjectSkill(BaseModel):
     key: str
     name: str
     description: str = ""
+    agent: str = ""
     enabled: bool = True
     usage_count: int = 0
 
@@ -52,13 +53,14 @@ class SandboxSettings(BaseModel):
 
 
 def default_project_skills() -> List[ProjectSkill]:
-    """内置技能。自定义 Webhook 技能不在本次范围。"""
+    """与 skills/opspilot 和五个 Agent 对应的内置技能。"""
     return [
-        ProjectSkill(key="demand-analysis", name="需求分析", description="识别 Bug、新需求和咨询"),
-        ProjectSkill(key="knowledge-search", name="知识检索", description="检索项目文档和代码索引"),
-        ProjectSkill(key="code-generation", name="代码生成", description="按已通过的方案生成代码"),
-        ProjectSkill(key="lint", name="语法检查", description="在沙箱中做静态检查"),
-        ProjectSkill(key="test-execution", name="测试执行", description="生成并执行测试"),
+        ProjectSkill(key="requirement-analysis", name="需求分析", description="识别 Bug、新需求和咨询", agent="Lead Agent"),
+        ProjectSkill(key="knowledge-retrieval", name="知识检索", description="检索项目文档和代码索引", agent="Lead Agent"),
+        ProjectSkill(key="bugfix-solution", name="Bug 修复方案", description="分析根因并生成修复方案", agent="BugFix Agent"),
+        ProjectSkill(key="feature-design", name="功能设计", description="设计范围、架构和接口", agent="Feature Design Agent"),
+        ProjectSkill(key="code-generation", name="代码生成", description="按已通过的方案生成代码", agent="CodeGen Agent"),
+        ProjectSkill(key="test-execution", name="测试执行", description="生成并执行测试", agent="Test Agent"),
     ]
 
 

@@ -202,6 +202,25 @@ class HITLService:
 
         return review_item
 
+    def supersede(self, review_id: UUID, reason: str) -> Optional[ReviewItem]:
+        """作废仍在审核中的方案，不关闭需求。"""
+        review_item = self._review_items.get(review_id)
+        if not review_item:
+            return None
+        if review_item.status not in [ReviewStatus.PENDING, ReviewStatus.IN_REVIEW]:
+            return review_item
+
+        review_item.status = ReviewStatus.REJECTED
+        review_item.updated_at = datetime.utcnow()
+        self._review_items[review_item.id] = review_item
+        self._add_history_entry(
+            review_id,
+            action="superseded",
+            actor="system",
+            details=reason,
+        )
+        return review_item
+
     def reject(
         self,
         review_id: UUID,

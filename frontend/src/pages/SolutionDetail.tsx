@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import type { BugFixSolution, FeatureDesignSolution, SolutionStatus, CodeGenTaskSummary } from '../types'
 import { solutionService, codegenService } from '../services'
+import { readApiError } from '../services/apiError'
 import {
   SolutionStatusBadge,
   BugFixView,
@@ -27,6 +30,7 @@ export default function SolutionDetail() {
   const [isGeneratingCode, setIsGeneratingCode] = useState(false)
   const [isLoadingTasks, setIsLoadingTasks] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false)
 
   useEffect(() => {
     if (solutionId) {
@@ -97,8 +101,8 @@ export default function SolutionDetail() {
     try {
       const newSolution = await solutionService.regenerateSolution(solutionId)
       setSolution(newSolution as SolutionData)
-    } catch {
-      setActionError('方案重新生成失败')
+    } catch (error) {
+      setActionError(readApiError(error, '方案重新生成失败'))
     } finally {
       setIsRegenerating(false)
     }
@@ -162,14 +166,20 @@ export default function SolutionDetail() {
           返回需求详情
         </button>
 
-        {isRegenerating && <FlowStateBanner mode="running" title="正在重新生成方案" />}
+        {isRegenerating && (
+          <FlowStateBanner
+            mode="running"
+            title="正在重新生成方案"
+            detail={`正在使用 ${solution.created_by_agent || 'Agent'}，技能「${solution.skill_name || (solution.type === 'bug_fix' ? 'Bug 修复方案' : '功能设计')}」。`}
+          />
+        )}
         {isGeneratingCode && <FlowStateBanner mode="running" title="正在生成代码" detail="完成后会进入代码页。" />}
-        {actionError && <FlowStateBanner mode="failed" title="操作失败" detail={actionError} onRetry={handleRegenerate} />}
+        {actionError && <FlowStateBanner mode="failed" title="操作失败" detail={actionError} onRetry={() => setConfirmRegenerate(true)} />}
         {solution.status === 'rejected' && (
-          <FlowStateBanner mode="failed" title="方案未通过" detail="可以按审批意见重新生成。" onRetry={handleRegenerate} retryLabel="重新生成" />
+          <FlowStateBanner mode="failed" title="方案未通过" detail="可以按审批意见重新生成。重新生成后，之前的方案会作废。" onRetry={() => setConfirmRegenerate(true)} retryLabel="重新生成" />
         )}
         {!solution.content && !isRegenerating && (
-          <FlowStateBanner mode="failed" title="方案内容为空" detail="重新生成后再进入审批。" onRetry={handleRegenerate} retryLabel="重新生成" />
+          <FlowStateBanner mode="failed" title="方案内容为空" detail="重新生成后再进入审批。" onRetry={() => setConfirmRegenerate(true)} retryLabel="重新生成" />
         )}
 
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
@@ -197,7 +207,7 @@ export default function SolutionDetail() {
                 </button>
               )}
               <button
-                onClick={handleRegenerate}
+                onClick={() => setConfirmRegenerate(true)}
                 disabled={isRegenerating}
                 className="px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
               >
@@ -226,8 +236,9 @@ export default function SolutionDetail() {
           <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
             <span className="flex items-center gap-1.5">
               <span>🤖</span>
-              {solution.created_by_agent}
+              {solution.created_by_agent || 'Agent'}
             </span>
+            <span>技能「{solution.skill_name || (solution.type === 'bug_fix' ? 'Bug 修复方案' : '功能设计')}」</span>
             <span className="flex items-center gap-1.5">
               <span>📅</span>
               {formatDate(solution.created_at)}
@@ -240,8 +251,10 @@ export default function SolutionDetail() {
             )}
           </div>
 
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <p className="text-gray-700 whitespace-pre-wrap">{solution.content}</p>
+          <div className="p-4 bg-gray-50 rounded-lg text-sm text-gray-700">
+            <div className="markdown-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{solution.content}</ReactMarkdown>
+            </div>
           </div>
         </div>
 
@@ -376,6 +389,37 @@ export default function SolutionDetail() {
             >
               取消
             </button>
+          </div>
+        </div>
+      )}
+      {confirmRegenerate && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">重新生成方案</h3>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              重新生成后，当前方案会作废。同一需求下其他待审核方案也会一并作废，Review 工作台不再保留它们。
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmRegenerate(false)}
+                disabled={isRegenerating}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmRegenerate(false)
+                  handleRegenerate()
+                }}
+                disabled={isRegenerating}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-lg"
+              >
+                确认重新生成
+              </button>
+            </div>
           </div>
         </div>
       )}

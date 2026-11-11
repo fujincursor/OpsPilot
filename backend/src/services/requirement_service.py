@@ -14,7 +14,6 @@ from ..models.requirement import (
     RequirementFilters,
 )
 from ..db import DocumentDict
-from .lead_agent_service import lead_agent_service
 
 if TYPE_CHECKING:
     from .project_service import ProjectService
@@ -62,10 +61,10 @@ class RequirementService:
             Requirement: 创建的需求
         """
         full_text = f"{data.title} {data.description}"
-        analysis = lead_agent_service.analyze_requirement(full_text)
+        analysis = self._analyze_with_lead(project_id, full_text)
 
-        req_type = data.type if data.type else analysis.type
-        priority = data.priority if data.priority else analysis.priority
+        req_type = data.type if data.type else (analysis.type if analysis else RequirementType.FEATURE)
+        priority = data.priority if data.priority else (analysis.priority if analysis else RequirementPriority.MEDIUM)
 
         requirement = Requirement(
             project_id=project_id,
@@ -76,8 +75,8 @@ class RequirementService:
             priority=priority,
             status=RequirementStatus.PENDING,
             created_by=created_by,
-            keywords=analysis.keywords,
-            analysis_confidence=analysis.confidence,
+            keywords=analysis.keywords if analysis else [],
+            analysis_confidence=analysis.confidence if analysis else 0.0,
         )
 
         self._requirements[requirement.id] = requirement
@@ -192,15 +191,37 @@ class RequirementService:
 
         if need_reanalyze:
             full_text = f"{requirement.title} {requirement.description}"
-            analysis = lead_agent_service.analyze_requirement(full_text)
-            requirement.keywords = analysis.keywords
-            requirement.analysis_confidence = analysis.confidence
+            analysis = self._analyze_with_lead(requirement.project_id, full_text)
+            if analysis is not None:
+                requirement.keywords = analysis.keywords
+                requirement.analysis_confidence = analysis.confidence
+                if "type" not in update_data:
+                    requirement.type = analysis.type
+                if "priority" not in update_data:
+                    requirement.priority = analysis.priority
 
-            if "type" not in update_data:
-                requirement.type = analysis.type
-            if "priority" not in update_data:
-                requirement.priority = analysis.priority
+        requirement.updated_at = datetime.utcnow()
+        self._requirements[requirement.id] = requirement
+        return requirement
 
+    def _analyze_with_lead(self, project_id: UUID, text: str):
+        """Lead Agent 启用时才分析。模型可用时使用它的提示词，否则用本地规则。"""
+        from ..models.agent import AgentType
+        from .agent_runtime import AgentDisabledError, agent_runtime
+
+        try:
+            agent = agent_runtime.require(project_id, AgentType.LEAD)
+        except AgentDisabledError:
+            return None
+        return agent_runtime.analyze_requirement(agent, text)
+
+    def set_failure_reason(self, requirement_id: UUID, reason: Optional[str]) -> Optional[Requirement]:
+        """记录或清除方案生成失败原因，刷新页面后仍然能看到。"""
+        requirement = self._requirements.get(requirement_id)
+        if not requirement:
+            return None
+        text = (reason or "").strip()
+        requirement.failure_reason = text[:1000] or None
         requirement.updated_at = datetime.utcnow()
         self._requirements[requirement.id] = requirement
         return requirement

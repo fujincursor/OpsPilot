@@ -59,9 +59,15 @@ export default function SolutionCard({ solution }: SolutionCardProps) {
         <h4 className="font-semibold text-gray-800 mb-2 line-clamp-1">{solution.title}</h4>
         <p className="text-sm text-gray-600 line-clamp-2 mb-3">{solution.content}</p>
         <div className="flex items-center justify-between text-xs text-gray-500">
-          <div className="flex items-center gap-1.5">
-            <span>🤖</span>
-            <span>{solution.created_by_agent}</span>
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5">
+              <span>🤖</span>
+              <span>{solution.created_by_agent || 'Agent'}</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span>技能</span>
+              <span>{solution.skill_name || (solution.type === 'bug_fix' ? 'Bug 修复方案' : '功能设计')}</span>
+            </span>
           </div>
           <span>{formatDate(solution.created_at)}</span>
         </div>

@@ -22,10 +22,11 @@ class AgentConfigBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="Agent 名称")
     agent_type: AgentType = Field(..., description="Agent 类型")
     description: Optional[str] = Field(None, max_length=500, description="Agent 描述")
-    model_name: str = Field(default="gpt-4", description="使用的模型名称")
+    model_name: str = Field(default="deepseek-v4", description="使用的模型名称")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="模型温度参数")
     max_tokens: int = Field(default=4096, ge=1, le=128000, description="最大 token 数")
     skills: List[str] = Field(default_factory=list, description="Agent 技能列表")
+    prompt: str = Field(default="", description="Agent 提示词")
     enabled: bool = Field(default=True, description="是否启用")
 
 
@@ -34,10 +35,11 @@ class AgentConfigCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="Agent 名称")
     agent_type: AgentType = Field(..., description="Agent 类型")
     description: Optional[str] = Field(None, max_length=500, description="Agent 描述")
-    model_name: Optional[str] = Field(default="gpt-4", description="使用的模型名称")
+    model_name: Optional[str] = Field(default="deepseek-v4", description="使用的模型名称")
     temperature: Optional[float] = Field(default=0.7, ge=0.0, le=2.0, description="模型温度参数")
     max_tokens: Optional[int] = Field(default=4096, ge=1, le=128000, description="最大 token 数")
     skills: Optional[List[str]] = Field(default_factory=list, description="Agent 技能列表")
+    prompt: Optional[str] = Field(default="", description="Agent 提示词")
     enabled: Optional[bool] = Field(default=True, description="是否启用")
 
 
@@ -49,6 +51,7 @@ class AgentConfigUpdate(BaseModel):
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="模型温度参数")
     max_tokens: Optional[int] = Field(None, ge=1, le=128000, description="最大 token 数")
     skills: Optional[List[str]] = Field(None, description="Agent 技能列表")
+    prompt: Optional[str] = Field(None, description="Agent 提示词")
     enabled: Optional[bool] = Field(None, description="是否启用")
 
 

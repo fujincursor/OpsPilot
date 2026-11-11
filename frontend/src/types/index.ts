@@ -2,6 +2,7 @@ export interface ProjectSkill {
   key: string
   name: string
   description: string
+  agent?: string
   enabled: boolean
   usage_count?: number
 }
@@ -56,6 +57,7 @@ export interface AgentConfig {
   temperature: number
   max_tokens: number
   skills: string[]
+  prompt?: string
   enabled: boolean
 }
 
@@ -90,6 +92,7 @@ export interface UpdateAgentConfigRequest {
   temperature?: number
   max_tokens?: number
   skills?: string[]
+  prompt?: string
   enabled?: boolean
 }
 
@@ -183,6 +186,7 @@ export interface Requirement {
   status: RequirementStatus
   assignee?: string
   created_by: string
+  failure_reason?: string
   analysis_result?: AnalysisResult
   created_at: string
   updated_at?: string
@@ -231,6 +235,8 @@ export interface Solution {
   affected_files: string[]
   status: SolutionStatus
   created_by_agent: string
+  skill_key?: string
+  skill_name?: string
   reviewed_by?: string
   created_at: string
 }

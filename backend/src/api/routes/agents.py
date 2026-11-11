@@ -49,7 +49,7 @@ async def create_agent(project_id: UUID, data: AgentConfigCreate) -> AgentConfig
     - **name**: Agent 名称 (必填, 1-100字符)
     - **agent_type**: Agent 类型 (lead/bugfix/feature/codegen/test)
     - **description**: Agent 描述 (可选)
-    - **model_name**: 使用的模型名称 (默认: gpt-4)
+    - **model_name**: 使用的模型名称 (默认: deepseek-v4)
     - **temperature**: 模型温度参数 (0.0-2.0, 默认: 0.7)
     - **max_tokens**: 最大 token 数 (默认: 4096)
     - **skills**: 技能列表
