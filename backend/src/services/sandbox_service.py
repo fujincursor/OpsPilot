@@ -4,6 +4,8 @@
 - 代码运行和测试
 - Lint 检查
 - 文件操作
+
+文件先写在本机临时目录，命令通过 docker run 在 opspilot-sandbox 容器里执行。
 """
 
 import asyncio
@@ -13,7 +15,9 @@ import subprocess
 import sys
 import tempfile
 import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID, uuid4
 
@@ -26,16 +30,29 @@ from ..models.codegen import (
 )
 
 
+@dataclass
+class SandboxRuntime:
+    """一次沙箱执行要传给 docker run 的限制。"""
+
+    image: str = "opspilot-sandbox"
+    memory_mb: int = 512
+    cpu: float = 1.0
+    network_policy: str = "disabled"
+    run_as_non_root: bool = True
+    read_only_root: bool = True
+    disable_privileged: bool = True
+
+
 class SandboxService:
     """Sandbox 环境服务
 
-    提供安全隔离的代码执行环境。
-    当前使用本地临时目录模拟沙箱，后续可替换为 Docker 容器或远程沙箱服务。
+    工作文件放在本机临时目录，执行时挂载进 opspilot-sandbox 容器。
     """
 
     DEFAULT_TIMEOUT = 30
     MAX_TIMEOUT = 300
     SANDBOX_EXPIRY_HOURS = 24
+    CONTAINER_IMAGE = "opspilot-sandbox"
 
     LINTER_COMMANDS = {
         "python": ["python", "-m", "py_compile"],
@@ -51,6 +68,7 @@ class SandboxService:
 
     def __init__(self):
         self._sandboxes: Dict[str, SandboxInfo] = {}
+        self._runtimes: Dict[str, SandboxRuntime] = {}
         self._base_temp_dir = tempfile.gettempdir()
         self._sandbox_prefix = "opspilot_sandbox_"
 
@@ -87,8 +105,34 @@ class SandboxService:
         )
 
         self._sandboxes[sandbox_id] = sandbox_info
-
+        self._runtimes[sandbox_id] = self._runtime_for(project_id)
         return sandbox_info
+
+    def seed_workspace(self, sandbox_id: str, source: Optional[Path] = None) -> int:
+        """把已导入的项目工作区整份复制进沙箱。变更文件随后再覆盖同路径。"""
+        sandbox = self.get_sandbox(sandbox_id)
+        if sandbox is None:
+            return 0
+        if source is None:
+            from .workspace_service import workspace_service
+
+            if not workspace_service.is_ready(sandbox.project_id):
+                return 0
+            source = workspace_service.directory(sandbox.project_id)
+        root = Path(source)
+        if not root.is_dir():
+            return 0
+        destination = Path(sandbox.working_directory)
+        copied = 0
+        for path in root.rglob("*"):
+            if not path.is_file():
+                continue
+            relative = path.relative_to(root)
+            target = destination / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, target)
+            copied += 1
+        return copied
 
     def get_sandbox(self, sandbox_id: str) -> Optional[SandboxInfo]:
         """获取沙箱信息
@@ -127,7 +171,7 @@ class SandboxService:
             SandboxExecuteResult: 执行结果
         """
         sandbox = self.get_sandbox(sandbox_id)
-        if not sandbox:
+        if not sandbox or sandbox.status != "active":
             return SandboxExecuteResult(
                 success=False,
                 exit_code=-1,
@@ -136,56 +180,12 @@ class SandboxService:
                 duration_ms=0,
             )
 
-        timeout = min(timeout, self.MAX_TIMEOUT)
-
-        cwd = sandbox.working_directory
-        if working_directory:
-            cwd = os.path.join(sandbox.working_directory, working_directory.lstrip('/'))
-            if not os.path.exists(cwd):
-                os.makedirs(cwd, exist_ok=True)
-
-        start_time = time.time()
-
-        try:
-            result = subprocess.run(
-                command,
-                shell=True,
-                cwd=cwd,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                env=self._get_sandbox_env(),
-            )
-
-            duration_ms = int((time.time() - start_time) * 1000)
-
-            return SandboxExecuteResult(
-                success=result.returncode == 0,
-                exit_code=result.returncode,
-                stdout=result.stdout[:10000],
-                stderr=result.stderr[:10000],
-                duration_ms=duration_ms,
-            )
-
-        except subprocess.TimeoutExpired:
-            duration_ms = int((time.time() - start_time) * 1000)
-            return SandboxExecuteResult(
-                success=False,
-                exit_code=-1,
-                stdout="",
-                stderr=f"Command timed out after {timeout} seconds",
-                duration_ms=duration_ms,
-            )
-
-        except Exception as e:
-            duration_ms = int((time.time() - start_time) * 1000)
-            return SandboxExecuteResult(
-                success=False,
-                exit_code=-1,
-                stdout="",
-                stderr=str(e),
-                duration_ms=duration_ms,
-            )
+        return self._run_container(
+            sandbox,
+            ["sh", "-c", command],
+            timeout,
+            relative_workdir=working_directory,
+        )
 
     async def execute_in_sandbox_async(
         self,
@@ -205,71 +205,13 @@ class SandboxService:
         Returns:
             SandboxExecuteResult: 执行结果
         """
-        sandbox = self.get_sandbox(sandbox_id)
-        if not sandbox:
-            return SandboxExecuteResult(
-                success=False,
-                exit_code=-1,
-                stdout="",
-                stderr=f"Sandbox {sandbox_id} not found or expired",
-                duration_ms=0,
-            )
-
-        timeout = min(timeout, self.MAX_TIMEOUT)
-
-        cwd = sandbox.working_directory
-        if working_directory:
-            cwd = os.path.join(sandbox.working_directory, working_directory.lstrip('/'))
-            if not os.path.exists(cwd):
-                os.makedirs(cwd, exist_ok=True)
-
-        start_time = time.time()
-
-        try:
-            process = await asyncio.create_subprocess_shell(
-                command,
-                cwd=cwd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=self._get_sandbox_env(),
-            )
-
-            try:
-                stdout, stderr = await asyncio.wait_for(
-                    process.communicate(),
-                    timeout=timeout,
-                )
-            except asyncio.TimeoutError:
-                process.kill()
-                await process.wait()
-                duration_ms = int((time.time() - start_time) * 1000)
-                return SandboxExecuteResult(
-                    success=False,
-                    exit_code=-1,
-                    stdout="",
-                    stderr=f"Command timed out after {timeout} seconds",
-                    duration_ms=duration_ms,
-                )
-
-            duration_ms = int((time.time() - start_time) * 1000)
-
-            return SandboxExecuteResult(
-                success=process.returncode == 0,
-                exit_code=process.returncode or 0,
-                stdout=stdout.decode('utf-8', errors='replace')[:10000],
-                stderr=stderr.decode('utf-8', errors='replace')[:10000],
-                duration_ms=duration_ms,
-            )
-
-        except Exception as e:
-            duration_ms = int((time.time() - start_time) * 1000)
-            return SandboxExecuteResult(
-                success=False,
-                exit_code=-1,
-                stdout="",
-                stderr=str(e),
-                duration_ms=duration_ms,
-            )
+        return await asyncio.to_thread(
+            self.execute_in_sandbox,
+            sandbox_id,
+            command,
+            timeout,
+            working_directory,
+        )
 
     def write_file(
         self,
@@ -459,41 +401,25 @@ class SandboxService:
         errors = []
         warnings = []
 
-        file_path = os.path.join(sandbox.working_directory, file.path.lstrip('/'))
-
-        try:
-            result = subprocess.run(
-                [self.python_executable(), "-m", "py_compile", file_path],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-
-            if result.returncode != 0:
-                error_output = result.stderr or result.stdout
-                error = self._parse_python_error(file.path, error_output)
-                if error:
-                    errors.append(error)
-
-        except subprocess.TimeoutExpired:
+        relative = file.path.lstrip("/\\").replace("\\", "/")
+        result = self.execute_command(
+            sandbox.sandbox_id,
+            [self.python_executable(), "-m", "py_compile", relative],
+            timeout=10,
+        )
+        if result.success:
+            return errors, warnings
+        if result.exit_code == -1 and "timed out" in (result.stderr or ""):
             warnings.append(LintError(
                 file=file.path,
                 line=0,
                 message="Lint check timed out",
                 severity="warning",
             ))
-
-        except FileNotFoundError:
-            pass
-
-        except Exception as e:
-            warnings.append(LintError(
-                file=file.path,
-                line=0,
-                message=f"Lint check failed: {str(e)}",
-                severity="warning",
-            ))
-
+            return errors, warnings
+        error = self._parse_python_error(file.path, result.stderr or result.stdout)
+        if error:
+            errors.append(error)
         return errors, warnings
 
     def _parse_python_error(self, file_path: str, error_output: str) -> Optional[LintError]:
@@ -532,36 +458,29 @@ class SandboxService:
         errors = []
         warnings = []
 
-        file_path = os.path.join(sandbox.working_directory, file.path.lstrip('/'))
-
-        try:
-            result = subprocess.run(
-                ["node", "--check", file_path],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-
-            if result.returncode != 0:
-                errors.append(LintError(
-                    file=file.path,
-                    line=0,
-                    code="SyntaxError",
-                    message=result.stderr[:500] if result.stderr else "Syntax error",
-                    severity="error",
-                ))
-
-        except FileNotFoundError:
-            pass
-
-        except Exception as e:
+        relative = file.path.lstrip("/\\").replace("\\", "/")
+        result = self.execute_command(
+            sandbox.sandbox_id,
+            ["node", "--check", relative],
+            timeout=10,
+        )
+        if result.success:
+            return errors, warnings
+        if result.exit_code == -1 and "timed out" in (result.stderr or ""):
             warnings.append(LintError(
                 file=file.path,
                 line=0,
-                message=f"Lint check failed: {str(e)}",
+                message="Lint check timed out",
                 severity="warning",
             ))
-
+            return errors, warnings
+        errors.append(LintError(
+            file=file.path,
+            line=0,
+            code="SyntaxError",
+            message=(result.stderr or result.stdout or "Syntax error")[:500],
+            severity="error",
+        ))
         return errors, warnings
 
     def cleanup_sandbox(self, sandbox_id: str) -> bool:
@@ -578,12 +497,14 @@ class SandboxService:
             return False
 
         sandbox_path = os.path.join(self._base_temp_dir, sandbox_id)
+        self._remove_container(sandbox_id)
 
         try:
             if os.path.exists(sandbox_path):
                 shutil.rmtree(sandbox_path)
 
             sandbox.status = "destroyed"
+            self._runtimes.pop(sandbox_id, None)
             return True
 
         except Exception:
@@ -631,21 +552,44 @@ class SandboxService:
 
         return sandboxes
 
-    def _get_sandbox_env(self) -> Dict[str, str]:
-        """获取沙箱环境变量"""
-        env = os.environ.copy()
-
-        env['SANDBOX'] = '1'
-        env['PYTHONIOENCODING'] = 'utf-8'
-        env['PYTHONUTF8'] = '1'
-        env['LC_ALL'] = 'C.UTF-8'
-        env['LANG'] = 'C.UTF-8'
-
-        return env
-
     def python_executable(self) -> str:
-        """沙箱里的 Python 使用当前服务的解释器，避免系统 PATH 里没有 python。"""
-        return sys.executable
+        """容器里的 Python 使用镜像自带的 python。"""
+        return "python"
+
+    def probe_execution(
+        self,
+        memory_mb: int,
+        cpu: float,
+        network_policy: str,
+        run_as_non_root: bool,
+    ) -> Tuple[bool, str]:
+        """用一次短命容器确认镜像能按当前限制启动。"""
+        runtime = SandboxRuntime(
+            memory_mb=memory_mb or 512,
+            cpu=cpu or 1,
+            network_policy=network_policy or "disabled",
+            run_as_non_root=run_as_non_root,
+            read_only_root=True,
+            disable_privileged=True,
+        )
+        docker = self._docker_bin()
+        if docker is None:
+            return False, "未找到 docker，无法创建容器"
+        command = self._docker_argv(runtime, None, ["python", "--version"], "/tmp")
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                encoding="utf-8",
+                errors="replace",
+            )
+        except subprocess.TimeoutExpired:
+            return False, "沙箱容器启动超时"
+        text = (completed.stdout or completed.stderr or "").strip()
+        first = text.splitlines()[0][:300] if text else "无输出"
+        return completed.returncode == 0, first
 
     def execute_command(
         self,
@@ -653,9 +597,9 @@ class SandboxService:
         args: List[str],
         timeout: int = DEFAULT_TIMEOUT,
     ) -> SandboxExecuteResult:
-        """在沙箱目录中执行参数列表，不经过 shell。"""
+        """在容器中执行参数列表，不经过宿主机 shell。"""
         sandbox = self.get_sandbox(sandbox_id)
-        if not sandbox:
+        if not sandbox or sandbox.status != "active":
             return SandboxExecuteResult(
                 success=False,
                 exit_code=-1,
@@ -663,46 +607,205 @@ class SandboxService:
                 stderr=f"Sandbox {sandbox_id} not found or expired",
                 duration_ms=0,
             )
+        return self._run_container(sandbox, args, timeout)
 
-        timeout = min(timeout, self.MAX_TIMEOUT)
-        start_time = time.time()
+    def _runtime_for(self, project_id: UUID) -> SandboxRuntime:
+        runtime = SandboxRuntime(image=self.CONTAINER_IMAGE)
         try:
-            result = subprocess.run(
-                args,
-                cwd=sandbox.working_directory,
+            from .project_service import project_service
+
+            project = project_service.get(project_id)
+        except Exception:
+            project = None
+        sandbox = getattr(project, "sandbox", None) if project else None
+        if sandbox is None:
+            return runtime
+
+        def field(name: str, default):
+            if isinstance(sandbox, dict):
+                return sandbox.get(name, default)
+            return getattr(sandbox, name, default)
+
+        try:
+            runtime.memory_mb = max(int(field("memory_mb", 512) or 512), 64)
+        except (TypeError, ValueError):
+            runtime.memory_mb = 512
+        try:
+            runtime.cpu = float(field("cpu", 1) or 1)
+        except (TypeError, ValueError):
+            runtime.cpu = 1
+        if runtime.cpu <= 0:
+            runtime.cpu = 1
+        runtime.network_policy = str(field("network_policy", "disabled") or "disabled")
+        runtime.run_as_non_root = bool(field("run_as_non_root", True))
+        runtime.read_only_root = bool(field("read_only_root", True))
+        runtime.disable_privileged = bool(field("disable_privileged", True))
+        return runtime
+
+    def _docker_bin(self) -> Optional[str]:
+        found = shutil.which("docker")
+        if found:
+            return found
+        candidate = os.path.join(
+            os.environ.get("ProgramFiles", r"C:\Program Files"),
+            "Docker",
+            "Docker",
+            "resources",
+            "bin",
+            "docker.exe",
+        )
+        if os.path.isfile(candidate):
+            return candidate
+        return None
+
+    def _container_workdir(self, sandbox: SandboxInfo, relative_workdir: Optional[str]) -> str:
+        if not relative_workdir:
+            return "/workspace"
+        host_sub = os.path.join(sandbox.working_directory, relative_workdir.lstrip("/\\"))
+        os.makedirs(host_sub, exist_ok=True)
+        relative = relative_workdir.strip("/\\").replace("\\", "/")
+        return f"/workspace/{relative}"
+
+    def _container_args(self, sandbox: SandboxInfo, args: List[str]) -> List[str]:
+        root = os.path.normcase(os.path.abspath(sandbox.working_directory))
+        converted: List[str] = []
+        for arg in args:
+            if arg == sys.executable:
+                converted.append("python")
+                continue
+            if os.path.isabs(arg):
+                absolute = os.path.normcase(os.path.abspath(arg))
+                if absolute == root or absolute.startswith(root + os.sep):
+                    relative = os.path.relpath(arg, sandbox.working_directory).replace("\\", "/")
+                    converted.append("/workspace" if relative == "." else relative)
+                    continue
+            converted.append(arg)
+        return converted
+
+    def _docker_argv(
+        self,
+        runtime: SandboxRuntime,
+        sandbox: Optional[SandboxInfo],
+        args: List[str],
+        workdir: str,
+    ) -> List[str]:
+        docker = self._docker_bin()
+        command = [
+            docker or "docker",
+            "run",
+            "--rm",
+            "--pull",
+            "never",
+            "--entrypoint",
+            "",
+            "--memory",
+            f"{runtime.memory_mb}m",
+            "--cpus",
+            str(runtime.cpu),
+            "-e",
+            "SANDBOX=1",
+            "-e",
+            "PYTHONIOENCODING=utf-8",
+            "-e",
+            "PYTHONUTF8=1",
+            "-e",
+            "LC_ALL=C.UTF-8",
+            "-e",
+            "LANG=C.UTF-8",
+            "-e",
+            "PYTHONDONTWRITEBYTECODE=1",
+        ]
+        if sandbox is not None:
+            command.extend(["--name", sandbox.sandbox_id])
+            command.extend(["-v", f"{os.path.abspath(sandbox.working_directory)}:/workspace"])
+        command.extend(["-w", workdir])
+        if runtime.network_policy == "disabled":
+            command.extend(["--network", "none"])
+        if runtime.run_as_non_root:
+            command.extend(["--user", "65534:65534"])
+        if runtime.read_only_root:
+            command.extend(["--read-only", "--tmpfs", "/tmp:rw,nosuid,size=64m"])
+        if runtime.disable_privileged:
+            command.extend(["--cap-drop", "ALL", "--security-opt", "no-new-privileges"])
+        command.append(runtime.image)
+        if sandbox is None:
+            command.extend(args)
+        else:
+            command.extend(self._container_args(sandbox, args))
+        return command
+
+    def _remove_container(self, sandbox_id: str) -> None:
+        docker = self._docker_bin()
+        if docker is None:
+            return
+        try:
+            subprocess.run(
+                [docker, "rm", "-f", sandbox_id],
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+        except (subprocess.TimeoutExpired, OSError):
+            return
+
+    def _failed(self, started: float, message: str) -> SandboxExecuteResult:
+        return SandboxExecuteResult(
+            success=False,
+            exit_code=-1,
+            stdout="",
+            stderr=message,
+            duration_ms=int((time.time() - started) * 1000),
+        )
+
+    def _run_container(
+        self,
+        sandbox: SandboxInfo,
+        args: List[str],
+        timeout: int,
+        relative_workdir: Optional[str] = None,
+    ) -> SandboxExecuteResult:
+        started = time.time()
+        timeout = min(timeout, self.MAX_TIMEOUT)
+        docker = self._docker_bin()
+        if docker is None:
+            return self._failed(started, "未找到 docker，无法在容器中执行")
+        self._remove_container(sandbox.sandbox_id)
+        runtime = self._runtimes.get(sandbox.sandbox_id) or SandboxRuntime(image=self.CONTAINER_IMAGE)
+        workdir = self._container_workdir(sandbox, relative_workdir)
+        command = self._docker_argv(runtime, sandbox, args, workdir)
+        try:
+            completed = subprocess.run(
+                command,
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                env=self._get_sandbox_env(),
                 encoding="utf-8",
                 errors="replace",
             )
-            duration_ms = int((time.time() - start_time) * 1000)
-            return SandboxExecuteResult(
-                success=result.returncode == 0,
-                exit_code=result.returncode,
-                stdout=(result.stdout or "")[:10000],
-                stderr=(result.stderr or "")[:10000],
-                duration_ms=duration_ms,
-            )
-        except subprocess.TimeoutExpired:
-            duration_ms = int((time.time() - start_time) * 1000)
+        except subprocess.TimeoutExpired as exc:
+            self._remove_container(sandbox.sandbox_id)
+            stdout = exc.stdout or ""
+            stderr = exc.stderr or ""
+            if isinstance(stdout, bytes):
+                stdout = stdout.decode("utf-8", errors="replace")
+            if isinstance(stderr, bytes):
+                stderr = stderr.decode("utf-8", errors="replace")
             return SandboxExecuteResult(
                 success=False,
                 exit_code=-1,
-                stdout="",
-                stderr=f"Command timed out after {timeout} seconds",
-                duration_ms=duration_ms,
+                stdout=(stdout or "")[:10000],
+                stderr=((stderr or "") + f"\nCommand timed out after {timeout} seconds")[:10000],
+                duration_ms=int((time.time() - started) * 1000),
             )
-        except Exception as exc:
-            duration_ms = int((time.time() - start_time) * 1000)
-            return SandboxExecuteResult(
-                success=False,
-                exit_code=-1,
-                stdout="",
-                stderr=str(exc),
-                duration_ms=duration_ms,
-            )
+        except OSError as exc:
+            return self._failed(started, str(exc))
+        return SandboxExecuteResult(
+            success=completed.returncode == 0,
+            exit_code=completed.returncode,
+            stdout=(completed.stdout or "")[:10000],
+            stderr=(completed.stderr or "")[:10000],
+            duration_ms=int((time.time() - started) * 1000),
+        )
 
 
 sandbox_service = SandboxService()

@@ -103,7 +103,7 @@ async def list_reviews(
     reviewer: Optional[str] = Query(None, description="审核人"),
 ) -> ReviewItemResponse:
     """返回全部审核项，包含已通过、已拒绝和要求修改。"""
-    workflow_service.sync_pending_solution_reviews()
+    workflow_service.schedule_pending_solution_sync()
     filters = ReviewFilters(
         item_type=item_type,
         status=status,
@@ -155,7 +155,7 @@ async def list_pending_reviews(
     - **priority**: 优先级筛选 (low/medium/high/urgent)
     - **reviewer**: 审核人（可选）
     """
-    workflow_service.sync_pending_solution_reviews()
+    workflow_service.schedule_pending_solution_sync()
     filters = ReviewFilters(
         item_type=item_type,
         priority=priority,
@@ -184,7 +184,7 @@ async def list_pending_reviews(
 
 @router.get("/reviews/{review_id}/changed-code")
 async def download_changed_code(review_id: UUID) -> Response:
-    """下载审批通过的代码变更，压缩包内保留原目录结构。"""
+    """下载审批通过的代码。已写回的文件取服务器上的当前内容。"""
     review = hitl_service.get_review_item(review_id)
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")

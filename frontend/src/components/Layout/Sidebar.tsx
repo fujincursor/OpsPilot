@@ -7,9 +7,11 @@ import type { Project } from '../../types'
 interface Session {
   id: string
   title: string
+  projectName: string
   status: 'running' | 'pending' | 'complete' | 'error'
   time: string
   date: string
+  updatedAt: number
 }
 
 interface SidebarProps {
@@ -28,14 +30,17 @@ function formatSessionDate(value: string): { date: string; time: string } {
   return { date, time }
 }
 
-function toSidebarSession(item: ChatSessionSummary): Session {
+function toSidebarSession(item: ChatSessionSummary, projectName: string): Session {
   const { date, time } = formatSessionDate(item.updated_at)
+  const updatedAt = new Date(item.updated_at).getTime()
   return {
     id: item.id,
     title: item.title,
+    projectName,
     status: item.status,
     time,
     date,
+    updatedAt: Number.isNaN(updatedAt) ? 0 : updatedAt,
   }
 }
 
@@ -89,14 +94,30 @@ export default function Sidebar({ currentProject }: SidebarProps) {
   }, [currentProject])
 
   useEffect(() => {
-    if (!projectId) {
-      setSessions([])
-      return
+    const onProject = (event: Event) => {
+      const project = (event as CustomEvent<Project>).detail
+      if (!project?.id) return
+      setProjectId(project.id)
+      setProjectName(project.name)
     }
-    chatService.listSessions(projectId)
-      .then((items) => setSessions(items.map(toSidebarSession)))
-      .catch(() => setSessions([]))
-  }, [projectId, location.pathname])
+    window.addEventListener('opspilot-project', onProject)
+    return () => window.removeEventListener('opspilot-project', onProject)
+  }, [])
+
+  useEffect(() => {
+    if (projects.length === 0) return
+    let active = true
+    Promise.all(projects.map((project) =>
+      chatService.listSessions(project.id)
+        .then((items) => items.map((item) => toSidebarSession(item, project.name)))
+        .catch(() => [] as Session[])
+    )).then((groups) => {
+      if (active) setSessions(groups.flat())
+    })
+    return () => {
+      active = false
+    }
+  }, [projects, location.pathname])
 
   const loadPendingReviewCount = async () => {
     try {
@@ -115,9 +136,9 @@ export default function Sidebar({ currentProject }: SidebarProps) {
     error: { className: 'bg-red-100 text-red-600', text: '未完成' },
   }
 
-  const visibleSessions = sessions.filter((session) =>
-    session.title.toLowerCase().includes(sessionQuery.trim().toLowerCase())
-  )
+  const visibleSessions = sessions
+    .filter((session) => session.title.toLowerCase().includes(sessionQuery.trim().toLowerCase()))
+    .sort((left, right) => right.updatedAt - left.updatedAt)
   const groupedSessions = visibleSessions.reduce((acc, session) => {
     if (!acc[session.date]) {
       acc[session.date] = []
@@ -240,10 +261,11 @@ export default function Sidebar({ currentProject }: SidebarProps) {
               📌 {date}
             </div>
             {dateSessions.map((session) => (
-              <div
+              <button
                 key={session.id}
+                type="button"
                 onClick={() => handleSessionClick(session.id)}
-                className={`p-3 rounded-md cursor-pointer transition-colors mb-0.5 ${
+                className={`block w-full p-3 rounded-md cursor-pointer text-left transition-colors mb-0.5 ${
                   isActive(session.id)
                     ? 'bg-primary-light'
                     : 'hover:bg-gray-50'
@@ -252,13 +274,14 @@ export default function Sidebar({ currentProject }: SidebarProps) {
                 <div className="text-sm font-medium text-gray-800 truncate">
                   {session.title}
                 </div>
+                <div className="mt-1 truncate text-[11px] text-gray-400">{session.projectName}</div>
                 <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${statusConfig[session.status].className}`}>
                     {statusConfig[session.status].text}
                   </span>
                   <span>{session.time}</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         ))}

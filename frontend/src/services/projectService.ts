@@ -1,6 +1,6 @@
 import api from './api'
 import axios from 'axios'
-import type { Project, CreateProjectRequest, UpdateProjectRequest } from '../types'
+import type { Project, CreateProjectRequest, SandboxTestResult, UpdateProjectRequest } from '../types'
 
 interface ListResponse<T> {
   items: T[]
@@ -41,8 +41,8 @@ export const projectService = {
     return response.data
   },
 
-  async testSandbox(id: string): Promise<{ ok: boolean; message: string }> {
-    const response = await api.post<{ ok: boolean; message: string }>(`/projects/${id}/sandbox/test`)
+  async testSandbox(id: string): Promise<SandboxTestResult> {
+    const response = await api.post<SandboxTestResult>(`/projects/${id}/sandbox/test`)
     return response.data
   },
 

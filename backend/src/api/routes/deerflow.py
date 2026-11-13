@@ -154,11 +154,13 @@ async def chat(request: ChatRequest):
         and classification.get("type") in {"bug", "feature"}
     ):
         knowledge_blocked = True
-        created_requirement = None
         response.data["knowledge_ready"] = False
-        gate = f"知识库未就绪：{blocked.message}。语义分类已完成，补齐项目资料和知识库后才能提交需求。"
+        gate = (
+            f"知识库未就绪：{blocked.message}。"
+            "需求已提交到 Review 工作台，补齐项目资料后方案会更准确。"
+        )
         response.message = f"{response.message}\n\n{gate}".strip()
-    elif isinstance(classification, dict) and project_id and classification.get("type") in {"bug", "feature"}:
+    if isinstance(classification, dict) and project_id and classification.get("type") in {"bug", "feature"}:
         try:
             title = str(classification.get("title") or "").strip() or request.message.strip()[:40]
             priority = str(classification.get("priority") or "medium")

@@ -32,15 +32,10 @@ class RequirementService:
             model=Requirement,
         )
         self._project_service: Optional["ProjectService"] = None
-        self._init_demo_data()
 
     def set_project_service(self, project_service: "ProjectService"):
         """设置项目服务引用（避免循环导入）"""
         self._project_service = project_service
-
-    def _init_demo_data(self):
-        """初始化演示数据"""
-        pass
 
     def create(
         self,
@@ -77,6 +72,7 @@ class RequirementService:
             created_by=created_by,
             keywords=analysis.keywords if analysis else [],
             analysis_confidence=analysis.confidence if analysis else 0.0,
+            session_id=data.session_id,
         )
 
         self._requirements[requirement.id] = requirement

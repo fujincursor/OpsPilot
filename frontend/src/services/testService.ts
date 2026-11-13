@@ -53,7 +53,9 @@ export const testService = {
   },
 
   async submitForReview(taskId: string): Promise<TestTask> {
-    const response = await api.post<TestTask>(`/tests/${taskId}/submit-review`)
+    const response = await api.post<TestTask>(`/tests/${taskId}/submit-review`, {
+      approve_with_failures: true,
+    })
     return response.data
   },
 

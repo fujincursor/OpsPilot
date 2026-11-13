@@ -120,7 +120,7 @@ export default function TestDetail() {
 
   const canSubmitForReview = () => {
     if (!task || !report) return false
-    return task.status === 'completed' && report.failed === 0 && report.coverage_percent >= 60
+    return task.status === 'completed'
   }
 
   if (isLoading) {
@@ -164,7 +164,7 @@ export default function TestDetail() {
         </button>
 
         {(task.status === 'pending' || task.status === 'generating' || task.status === 'running' || isRerunning) && (
-          <FlowStateBanner mode="running" title={task.status === 'running' ? '正在执行测试' : '正在生成测试'} detail="失败用例会留在这一页，通过质量门禁后流程继续。" />
+          <FlowStateBanner mode="running" title={task.status === 'running' ? '正在沙箱中执行修改后的代码' : '正在按修改后的代码生成用例'} detail="执行结束后生成测试报告，并进入人工评审。通过评审后需求才完成。" />
         )}
         {task.status === 'failed' && (
           <FlowStateBanner
@@ -226,7 +226,7 @@ export default function TestDetail() {
                           提交中...
                         </>
                       ) : (
-                        <>📤 提交审核</>
+                        <>📤 提交测试评审</>
                       )}
                     </button>
                   )}

@@ -132,13 +132,17 @@ class DeerFlowService:
         project_service.record_skill_use(parsed_project_id, "knowledge-retrieval")
 
         from .knowledge_service import knowledge_service
+        from .vector_store import VectorStoreUnavailable
 
-        hits = knowledge_service.search_knowledge(
-            parsed_project_id,
-            message,
-            top_k=5,
-            snippet_chars=1000,
-        )
+        try:
+            hits = knowledge_service.search_knowledge(
+                parsed_project_id,
+                message,
+                top_k=5,
+                snippet_chars=1000,
+            )
+        except VectorStoreUnavailable:
+            return message, []
         sources: List[Dict[str, Any]] = []
         sections: List[str] = []
         for index, hit in enumerate(hits, start=1):

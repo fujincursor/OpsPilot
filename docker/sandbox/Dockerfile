@@ -12,8 +12,16 @@ LABEL description="OpsPilot Sandbox Execution Environment"
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-RUN groupadd --gid 65534 sandbox \
-    && useradd --uid 65534 --gid sandbox --shell /bin/false --no-create-home sandbox
+RUN if getent group 65534 >/dev/null; then \
+      groupmod -n sandbox "$(getent group 65534 | cut -d: -f1)"; \
+    else \
+      groupadd --gid 65534 sandbox; \
+    fi \
+ && if getent passwd 65534 >/dev/null; then \
+      usermod -l sandbox -g sandbox -s /bin/false "$(getent passwd 65534 | cut -d: -f1)"; \
+    else \
+      useradd --uid 65534 --gid sandbox --shell /bin/false --no-create-home sandbox; \
+    fi
 
 WORKDIR /app
 

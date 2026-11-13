@@ -12,10 +12,121 @@ interface Activity {
   icon: string
 }
 
+interface WorkflowNode {
+  id: string
+  label: string
+  status: 'done' | 'active' | 'pending'
+  next?: string[]
+}
+
 function formatTime(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   return date.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+const workflowNodes: WorkflowNode[] = [
+  { id: 'prepare', label: '知识库与项目资料已就绪？', status: 'active' },
+  { id: 'require', label: '需求输入 → 分析分类', status: 'pending' },
+  { id: 'branch', label: 'Bug / 新需求 / 咨询', status: 'pending' },
+  { id: 'design', label: '方案设计', status: 'pending' },
+  { id: 'review', label: '人工 Review 通过？', status: 'pending' },
+  { id: 'codegen', label: '代码生成 → 语法检查', status: 'pending' },
+  { id: 'codeReview', label: '代码 Review', status: 'pending' },
+  { id: 'test', label: '测试执行 → 质量门禁', status: 'pending' },
+  { id: 'complete', label: '知识回写 → 完成', status: 'pending' },
+]
+
+const workflowEdges: Array<{ from: string; to: string; label?: string }> = [
+  { from: 'prepare', to: 'require' },
+  { from: 'require', to: 'branch' },
+  { from: 'branch', to: 'design' },
+  { from: 'design', to: 'review' },
+  { from: 'review', to: 'codegen', label: '通过' },
+  { from: 'review', to: 'design', label: '不通过' },
+  { from: 'codegen', to: 'codeReview' },
+  { from: 'codeReview', to: 'test' },
+  { from: 'test', to: 'complete' },
+]
+
+function nodePosition(node: WorkflowNode, index: number): { x: number; y: number } {
+  const column = Math.floor(index / 4)
+  const row = index % 4
+  return { x: column * 260 + 40, y: row * 104 + 48 }
+}
+
+function edgePath(from: { x: number; y: number }, to: { x: number; y: number }): string {
+  const offset = 24
+  return `M ${from.x + 180} ${from.y + 36} C ${from.x + 180 + offset} ${from.y + 36}, ${to.x - offset} ${to.y + 36}, ${to.x} ${to.y + 36}`
+}
+
+function WorkflowFlowChart() {
+  const positions = workflowNodes.map((node, index) => ({ node, ...nodePosition(node, index) }))
+  return (
+    <div className="overflow-x-auto">
+      <svg
+        width="100%"
+        viewBox="0 0 820 440"
+        className="min-w-[720px]"
+        role="img"
+        aria-label="整体业务流程图"
+      >
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#6B7280" />
+          </marker>
+        </defs>
+        {workflowEdges.map((edge) => {
+          const from = positions.find((item) => item.node.id === edge.from)
+          const to = positions.find((item) => item.node.id === edge.to)
+          if (!from || !to) return null
+          const path = edgePath(from, to)
+          return (
+            <g key={`${edge.from}-${edge.to}`}>
+              <path d={path} fill="none" stroke="#9CA3AF" strokeWidth="1.5" markerEnd="url(#arrowhead)" />
+              {edge.label && (
+                <text x={to.x + 8} y={to.y + 24} className="fill-gray-500" fontSize="11">
+                  {edge.label}
+                </text>
+              )}
+            </g>
+          )
+        })}
+        {positions.map(({ node, x, y }) => (
+          <g key={node.id}>
+            <rect
+              x={x}
+              y={y}
+              width="180"
+              height="72"
+              rx="10"
+              fill={node.status === 'active' ? '#FEF3C7' : node.status === 'done' ? '#D1FAE5' : '#F9FAFB'}
+              stroke={node.status === 'active' ? '#F59E0B' : '#D1D5DB'}
+              strokeWidth="1.5"
+            />
+            <text
+              x={x + 90}
+              y={y + 30}
+              textAnchor="middle"
+              fontSize="12"
+              className="fill-gray-800"
+            >
+              {node.label.length > 14 ? `${node.label.slice(0, 14)}…` : node.label}
+            </text>
+            <text
+              x={x + 90}
+              y={y + 52}
+              textAnchor="middle"
+              fontSize="10"
+              className={node.status === 'active' ? 'fill-amber-600' : 'fill-gray-400'}
+            >
+              {node.status === 'active' ? '当前' : node.status === 'done' ? '已完成' : '待执行'}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  )
 }
 
 export default function Home() {
@@ -33,10 +144,9 @@ export default function Home() {
       setLoading(true)
       setError('')
       try {
-        const [globalStats, projects, reviews] = await Promise.all([
+        const [globalStats, projects] = await Promise.all([
           analyticsService.getGlobalStats(),
           projectService.getProjects(),
-          reviewService.getPendingReviews(),
         ])
         setStats(globalStats)
         setProjectId(projects[0]?.id ?? null)
@@ -47,6 +157,9 @@ export default function Home() {
           time: formatTime(project.updated_at || project.created_at),
           icon: '📁',
         }))
+        setActivities(projectActivities)
+        setLoading(false)
+        const reviews = await reviewService.getPendingReviews().catch(() => [])
         const reviewActivities: Activity[] = reviews.slice(0, 4).map((review) => ({
           id: `review-${review.id}`,
           action: '待审核',
@@ -74,16 +187,6 @@ export default function Home() {
       ]
     : []
 
-  const flowSteps = [
-    '知识库与项目资料已就绪？',
-    '需求输入 → 分析分类（Bug / 新需求 / 咨询）',
-    '方案设计',
-    '人工 Review 通过？',
-    '代码生成 → 语法检查',
-    '代码 Review',
-    '测试执行 → 质量门禁',
-    '知识回写 → 完成',
-  ]
   const modules = [
     { id: 'M1', title: '多项目与 Agent', description: '项目、成员、Prompt 和工具链', path: '/projects' },
     { id: 'M2', title: '项目信息', description: '概述、架构、目录和 Runbook', path: projectId ? `/projects/${projectId}/profile` : '/projects' },
@@ -147,16 +250,7 @@ export default function Home() {
           <div className="lg:col-span-2">
             {tab === 'flow' ? (
               <div className="bg-white rounded-xl border border-gray-200 p-6">
-                <div className="flex flex-col items-start gap-2">
-                  {flowSteps.map((step, index) => (
-                    <div key={step} className="w-full">
-                      <div className={`rounded-lg border px-4 py-3 text-sm text-gray-800 ${index % 3 === 0 ? 'border-amber-200 bg-amber-50' : 'border-gray-200'}`}>
-                        {step}
-                      </div>
-                      {index < flowSteps.length - 1 && <div className="ml-6 h-4 border-l border-gray-300" />}
-                    </div>
-                  ))}
-                </div>
+                <WorkflowFlowChart />
                 <p className="mt-4 text-xs text-gray-400">未通过的环节会退回上一阶段；咨询只回答，不进入编码。</p>
               </div>
             ) : (

@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
-from .db import flush_registered
+from .db import flush_dirty
 from .api.routes import api_router
 from .api.routes.health import router as health_router
 from .api.middleware import JWTAuthMiddleware, ProjectContextMiddleware
@@ -32,10 +32,15 @@ app.add_middleware(
 
 @app.middleware("http")
 async def persist_request_changes(request, call_next):
-    """写操作结束后把内存中的修改同步到数据库。"""
+    """写操作结束后把内存中的修改同步到数据库。登录只签发令牌，不重写全部集合。"""
     response = await call_next(request)
-    if request.method not in {"GET", "HEAD", "OPTIONS"}:
-        flush_registered()
+    path = request.url.path
+    skip_flush = path in {
+        f"{settings.api_v1_prefix}/auth/login",
+        f"{settings.api_v1_prefix}/auth/refresh",
+    }
+    if request.method not in {"GET", "HEAD", "OPTIONS"} and not skip_flush:
+        flush_dirty()
     return response
 
 

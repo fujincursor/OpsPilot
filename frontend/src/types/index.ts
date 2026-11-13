@@ -23,12 +23,39 @@ export interface ProjectMember {
 
 export interface SandboxSettings {
   backend: string
+  image: string
   memory_mb: number
   cpu: number
   timeout_seconds: number
+  disk_gb: number
   network_policy: string
   allowed_domains: string[]
+  python_requirements: string
+  system_tools: string[]
   run_as_non_root: boolean
+  disable_privileged: boolean
+  read_only_root: boolean
+  disable_setuid: boolean
+  seccomp: boolean
+  kubeconfig_mode: string
+  kubeconfig: string
+  namespace: string
+  service_account: string
+  e2b_api_key: string
+  e2b_template: string
+}
+
+export interface SandboxTestCheck {
+  name: string
+  ok: boolean
+  detail: string
+}
+
+export interface SandboxTestResult {
+  ok: boolean
+  message: string
+  checks: SandboxTestCheck[]
+  output: string
 }
 
 export interface Project {
@@ -464,6 +491,8 @@ export interface TestCase {
   type: TestCaseType
   code: string
   expected_result: string
+  file_path?: string
+  target_function?: string | null
 }
 
 export interface TestResult {
@@ -489,6 +518,20 @@ export interface CIPipeline {
   stages: CIStage[]
 }
 
+export interface CoverageFile {
+  lines_total?: number
+  lines_covered?: number
+  lines_percent?: number
+  uncovered?: number[]
+}
+
+export interface CoverageInfo {
+  lines_total: number
+  lines_covered: number
+  lines_percent: number
+  files?: Record<string, CoverageFile>
+}
+
 export interface TestReport {
   task_id: string
   total: number
@@ -496,6 +539,9 @@ export interface TestReport {
   failed: number
   skipped: number
   coverage_percent: number
+  coverage_info?: CoverageInfo | null
+  summary?: string
+  failed_cases?: string[]
   duration?: number
   duration_ms?: number
 }
@@ -507,7 +553,7 @@ export interface TestTask {
   status: TestStatus
   test_cases: TestCase[]
   results: TestResult[]
-  coverage: number
+  coverage: number | CoverageInfo | null
   sandbox_profile?: string
   created_at: string
 }

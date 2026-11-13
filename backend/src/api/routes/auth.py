@@ -1,5 +1,7 @@
 """认证路由"""
 
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from ...config import get_settings
@@ -29,12 +31,18 @@ async def login(request: LoginRequest) -> Token:
     - operator / operator123 (开发者)
     - viewer / viewer123 (需求方，只读)
     """
-    user = UserService.authenticate(request.username, request.password)
+    user = await asyncio.to_thread(UserService.authenticate, request.username, request.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is disabled",
         )
 
     access_token = create_access_token(subject=user.id)

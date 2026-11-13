@@ -49,16 +49,19 @@ async def create_requirement(
         raise HTTPException(status_code=404, detail="Project not found")
 
     blocked = workflow_service.knowledge_block(project_id)
-    if blocked:
-        raise HTTPException(
-            status_code=428,
-            detail={
-                "message": blocked.message,
-                "project_id": str(project_id),
-            },
-        )
+    if blocked is not None:
+        note = f"知识库未就绪：{blocked.message}"
+        if note not in data.description:
+            data = data.model_copy(update={"description": f"{data.description}\n\n{note}"[:5000]})
 
     requirement = requirement_service.create(project_id, data)
+    if data.session_id:
+        from ...services.chat_service import chat_service
+
+        chat_service.record_ticket(
+            data.session_id,
+            f"REQ-{str(requirement.id).split('-')[0].upper()}",
+        )
     if requirement.type != RequirementType.QUESTION:
         try:
             await workflow_service.open_solution_review(requirement)

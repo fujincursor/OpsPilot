@@ -115,6 +115,8 @@ class WorkflowService:
             elif review.item_type == ReviewItemType.CODE:
                 if self._claim_tests(review.item_id):
                     await self._after_code_approved(requirement, review)
+            elif review.item_type == ReviewItemType.TEST:
+                await self._after_test_approved(requirement, review)
         except Exception:
             logger.exception("流程推进失败: %s", review.id)
             self._note(requirement, "审批已记录，但下一阶段执行失败。可在监控中恢复自动推进后重试。", "error")
@@ -148,6 +150,8 @@ class WorkflowService:
                 await self._revise_solution(requirement, review, comments)
             elif review.item_type == ReviewItemType.CODE:
                 await self._revise_code(requirement, review, comments)
+            elif review.item_type == ReviewItemType.TEST:
+                await self._revise_after_test(requirement, review, comments)
         except Exception:
             logger.exception("驳回重做失败: %s", review.id)
             self._note(requirement, "已记录修改意见，但重新生成失败。", "error")
@@ -196,16 +200,31 @@ class WorkflowService:
         if approved_code:
             review = max(approved_code, key=lambda item: item.updated_at)
             tests = test_service.get_tasks_by_codegen(review.item_id)
-            passed = [
-                task for task in tests
-                if task.status.value == "completed" and not self._needs_rework(task.id)
+            test_ids = {task.id for task in tests}
+            test_reviews = [
+                item for item in reviews
+                if item.item_type == ReviewItemType.TEST and item.item_id in test_ids
             ]
-            if passed:
+            approved_test = [
+                item for item in test_reviews if item.status == ReviewStatus.APPROVED
+            ]
+            if approved_test:
                 if requirement.status != RequirementStatus.COMPLETED:
-                    report = test_service.get_test_report(passed[-1].id)
+                    chosen = max(approved_test, key=lambda item: item.updated_at)
+                    report = test_service.get_test_report(chosen.item_id)
                     task = codegen_service.get_task(review.item_id)
-                    if report is not None and task is not None:
+                    if task is not None:
                         await self._complete(requirement, task.id, report)
+                return
+            completed = [task for task in tests if task.status.value == "completed"]
+            if completed:
+                latest = max(completed, key=lambda item: item.updated_at)
+                test_service.submit_test_review(
+                    latest.id,
+                    reviewer_notes="测试已在沙箱中执行，请评审报告。通过后需求才完成。",
+                    approve_with_failures=True,
+                )
+                self._note(requirement, "测试已经完成，请进行测试评审。通过后流程才结束。")
                 return
             await self._after_code_approved(requirement, review)
             return
@@ -251,7 +270,7 @@ class WorkflowService:
         if any(item.item_type == ReviewItemType.CODE for item in pending):
             return "代码审批"
         if any(item.item_type == ReviewItemType.TEST for item in pending):
-            return "测试"
+            return "测试审批"
         if any(item.item_type == ReviewItemType.SOLUTION for item in pending):
             return "方案审批"
         if any(
@@ -315,11 +334,66 @@ class WorkflowService:
         if finished is not None and finished.error_message and "未启用" in finished.error_message:
             self._note(requirement, finished.error_message, "error")
             return
-        report = test_service.get_test_report(finished.id) if finished else None
-        if finished is None or report is None or self._test_failed(report):
-            await self._rework_code(requirement, task.id, report)
+        if finished is None or finished.status.value != "completed":
+            self._note(requirement, "测试没有完成，不能进入评审。", "error")
             return
-        await self._complete(requirement, task.id, report)
+        queued = test_service.submit_test_review(
+            finished.id,
+            reviewer_notes="测试已在沙箱中执行，请评审报告。通过后需求才完成。",
+            approve_with_failures=True,
+        )
+        if queued is None:
+            self._note(requirement, "测试报告已生成，但测试评审没有创建。", "error")
+            return
+        report = test_service.get_test_report(finished.id)
+        self._publish_test_review(requirement, finished.id, report)
+
+    def _publish_test_review(self, requirement: Requirement, test_task_id: UUID, report) -> None:
+        from .hitl_service import hitl_service
+
+        review = hitl_service.find_by_item(ReviewItemType.TEST, test_task_id)
+        if review is None:
+            return
+        passed = getattr(report, "passed", 0) if report else 0
+        total = getattr(report, "total", 0) if report else 0
+        coverage = float(getattr(report, "coverage_percent", 0) or 0) if report else 0
+        summary = getattr(report, "summary", "") if report else ""
+        self._publish_card(
+            requirement,
+            review,
+            "测试已完成，请评审报告。通过后需求才结束。",
+            summary or f"通过 {passed}/{total}，覆盖率 {coverage:.0f}%。",
+        )
+        self._note(
+            requirement,
+            f"测试已完成（通过 {passed}/{total}，覆盖率 {coverage:.0f}%）。请进行测试评审，通过后流程才结束。",
+        )
+
+    async def _after_test_approved(self, requirement: Requirement, review: ReviewItem) -> None:
+        from .test_service import test_service
+
+        test_task = test_service.get_task(review.item_id)
+        if test_task is None:
+            self._note(requirement, "测试任务不存在，不能完成需求。", "error")
+            return
+        report = test_service.get_test_report(test_task.id)
+        await self._complete(requirement, test_task.codegen_task_id, report)
+
+    async def _revise_after_test(self, requirement: Requirement, review: ReviewItem, comments: str) -> None:
+        from .codegen_service import codegen_service
+        from .test_service import test_service
+
+        test_task = test_service.get_task(review.item_id)
+        if test_task is None:
+            return
+        task = codegen_service.get_task(test_task.codegen_task_id)
+        if task is None:
+            return
+        report = test_service.get_test_report(test_task.id)
+        summary = self._failure_summary(report)
+        instructions = f"{summary}\n评审意见：{comments}"
+        self._note(requirement, f"{summary} 将按评审意见重新生成代码，并再次进入代码审批。")
+        await self._run_codegen(requirement, task.solution_id, instructions)
 
     async def _run_codegen(
         self,
@@ -423,6 +497,24 @@ class WorkflowService:
         passed = getattr(report, "passed", 0)
         total = getattr(report, "total", 0)
         self._note(requirement, f"测试通过（{passed}/{total}）。知识已回写，流程完成。")
+
+    def schedule_pending_solution_sync(self) -> None:
+        """待审列表先返回。方案补齐延后执行，避免挡住登录后的主页请求。"""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self.sync_pending_solution_reviews()
+            return
+
+        def start() -> None:
+            task = loop.create_task(self._sync_pending_solution_reviews_later())
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
+
+        loop.call_later(0.5, start)
+
+    async def _sync_pending_solution_reviews_later(self) -> None:
+        self.sync_pending_solution_reviews()
 
     def sync_pending_solution_reviews(self) -> None:
         """把已经标记为待审核、但没有审核项的方案补进 Review 列表。"""
@@ -575,7 +667,7 @@ class WorkflowService:
         self._publish_card(
             requirement,
             review,
-            "代码已生成，请审批。通过后会自动执行测试。",
+            "代码已生成，请审批。通过后会自动测试，测试结束后进入测试评审。",
             description,
             files=[item for item in files if item],
             due_at=review.due_at.isoformat() if review.due_at else None,
@@ -637,6 +729,12 @@ class WorkflowService:
             task = codegen_service.get_task(review.item_id)
             if task:
                 return requirement_service.get(task.requirement_id)
+        if review.item_type == ReviewItemType.TEST:
+            from .test_service import test_service
+
+            test_task = test_service.get_task(review.item_id)
+            if test_task:
+                return requirement_service.get(test_task.requirement_id)
         return None
 
     def _reload(self, requirement_id: UUID) -> Optional[Requirement]:

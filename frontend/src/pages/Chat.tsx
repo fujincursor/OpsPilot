@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChatWindow } from '../components/Chat'
-import { projectService } from '../services'
+import { chatService, projectService } from '../services'
 
 export default function Chat() {
   const { sessionId } = useParams<{ sessionId: string }>()
@@ -10,17 +10,43 @@ export default function Chat() {
   const [projectId, setProjectId] = useState<string>()
 
   useEffect(() => {
+    let active = true
+    const applySaved = (projects: Awaited<ReturnType<typeof projectService.getProjects>>) => {
+      const savedId = localStorage.getItem('opspilot.currentProjectId')
+      const project = projects.find((item) => item.id === savedId) || projects[0]
+      if (!project || !active) return
+      setProjectId(project.id)
+      setProjectName(project.name)
+      localStorage.setItem('opspilot.currentProjectId', project.id)
+    }
     projectService.getProjects()
-      .then((projects) => {
-        const savedId = localStorage.getItem('opspilot.currentProjectId')
-        const project = projects.find((item) => item.id === savedId) || projects[0]
-        if (!project) return
-        setProjectId(project.id)
-        setProjectName(project.name)
-        localStorage.setItem('opspilot.currentProjectId', project.id)
+      .then(async (projects) => {
+        if (!active) return
+        if (!sessionId) {
+          applySaved(projects)
+          return
+        }
+        try {
+          const session = await chatService.getSession(sessionId)
+          const project = projects.find((item) => item.id === session.project_id)
+          if (!active) return
+          if (project) {
+            setProjectId(project.id)
+            setProjectName(project.name)
+            return
+          }
+        } catch {
+          /* 会话读取失败时继续使用当前项目 */
+        }
+        applySaved(projects)
       })
-      .catch(() => setProjectName('未选择项目'))
-  }, [])
+      .catch(() => {
+        if (active) setProjectName('未选择项目')
+      })
+    return () => {
+      active = false
+    }
+  }, [sessionId])
 
   return (
     <div className="h-[calc(100vh-56px)] bg-gray-50">

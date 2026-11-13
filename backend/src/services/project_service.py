@@ -5,7 +5,8 @@ from typing import Dict, List, Optional, TYPE_CHECKING
 from uuid import UUID
 
 from ..db import DocumentDict
-from ..models.project import Project, ProjectCreate, ProjectSkill, ProjectUpdate, ProjectStatus
+from ..models.project import Project, ProjectCreate, ProjectSkill, ProjectUpdate, ProjectStatus, default_project_skills
+from ..store import list_skill_catalog
 
 if TYPE_CHECKING:
     from .agent_service import AgentService
@@ -21,30 +22,6 @@ class ProjectService:
     def set_agent_service(self, agent_service: "AgentService"):
         """设置 Agent 服务引用（避免循环导入）"""
         self._agent_service = agent_service
-
-    def _init_demo_data(self):
-        """初始化演示数据（不初始化 Agent，稍后由服务注入后初始化）"""
-        demo_projects = [
-            ProjectCreate(
-                name="OpsPilot Demo",
-                description="运维领航演示项目",
-                repo_url="https://github.com/example/opspilot-demo"
-            ),
-            ProjectCreate(
-                name="微服务监控平台",
-                description="用于监控微服务架构的运维平台",
-                repo_url="https://github.com/example/microservice-monitor"
-            ),
-        ]
-        for project_data in demo_projects:
-            self.create(project_data, init_agents=False)
-
-    def init_demo_agents(self):
-        """为演示项目初始化 Agent 配置（在 agent_service 注入后调用）"""
-        if self._agent_service:
-            for project_id in self._projects.keys():
-                if not self._agent_service.get_agents_by_project(project_id):
-                    self._agent_service.initialize_default_agents(project_id)
 
     def list(
         self,
@@ -78,6 +55,7 @@ class ProjectService:
             init_agents: 是否初始化默认 Agent 配置
         """
         project = Project(**data.model_dump())
+        project.skills = self._skills_from_catalog()
         self._projects[project.id] = project
 
         if init_agents and self._agent_service:
@@ -118,6 +96,22 @@ class ProjectService:
         self._projects[project.id] = project
 
     @staticmethod
+    def _skills_from_catalog() -> List[ProjectSkill]:
+        """新项目的技能开关从技能目录复制。目录为空时使用内置清单。"""
+        rows = list_skill_catalog()
+        if not rows:
+            return default_project_skills()
+        return [
+            ProjectSkill(
+                key=row["key"],
+                name=row["name"],
+                description=row["description"],
+                agent=row["agent"],
+            )
+            for row in rows
+        ]
+
+    @staticmethod
     def _keep_skill_usage(project: Project, incoming) -> list:
         """保存项目设置时保留已经累计的使用次数。"""
         previous = {item.key: int(item.usage_count or 0) for item in project.skills}
@@ -133,6 +127,10 @@ class ProjectService:
         if project_id in self._projects:
             if self._agent_service:
                 self._agent_service.delete_agents_by_project(project_id)
+            from .knowledge_service import knowledge_service
+
+            for kb_id in [item.id for item in knowledge_service.get_knowledge_bases(project_id)]:
+                knowledge_service.delete_knowledge_base(kb_id)
             from .workspace_service import workspace_service
 
             workspace_service.remove(project_id)

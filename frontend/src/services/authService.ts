@@ -34,9 +34,18 @@ export const authService = {
     })
     localStorage.setItem(TOKEN_KEY, data.access_token)
     localStorage.setItem(REFRESH_KEY, data.refresh_token)
-    const me = await api.get<AuthUser>('/auth/me')
-    localStorage.setItem(USER_KEY, JSON.stringify(me.data))
-    return me.data
+    const placeholderUser: AuthUser = {
+      id: '',
+      username,
+      email: '',
+      role: '',
+      is_active: true,
+    }
+    localStorage.setItem(USER_KEY, JSON.stringify(placeholderUser))
+    api.get<AuthUser>('/auth/me', { timeout: 3000 }).then((me) => {
+      localStorage.setItem(USER_KEY, JSON.stringify(me.data))
+    }).catch(() => undefined)
+    return placeholderUser
   },
 
   logout() {

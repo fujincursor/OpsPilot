@@ -18,6 +18,7 @@ from ...models.knowledge import (
     KnowledgeSearchResponse,
 )
 from ...services.knowledge_service import knowledge_service
+from ...services.vector_store import VectorStoreUnavailable
 
 router = APIRouter()
 
@@ -199,12 +200,15 @@ async def search_knowledge(
     - **top_k**: 返回结果数量 (默认5, 最大20)
     - **knowledge_base_ids**: 指定知识库 ID 列表 (可选)
     """
-    results = knowledge_service.search_knowledge(
-        project_id=project_id,
-        query=query.query,
-        top_k=query.top_k,
-        knowledge_base_ids=query.knowledge_base_ids
-    )
+    try:
+        results = knowledge_service.search_knowledge(
+            project_id=project_id,
+            query=query.query,
+            top_k=query.top_k,
+            knowledge_base_ids=query.knowledge_base_ids
+        )
+    except VectorStoreUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return KnowledgeSearchResponse(
         query=query.query,
         results=results,

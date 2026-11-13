@@ -1277,10 +1277,16 @@ class CodeGenService:
         return task.files
 
     def changed_code_zip(self, task_id: UUID) -> Optional[bytes]:
-        """把新增和修改的文件按原目录打成压缩包。没有变更时返回空字节。"""
+        """把变更文件按原目录打成压缩包。没有变更时返回空字节。
+
+        已经写回服务器的文件，下载服务器上的当前内容。
+        还没写回的修改，下载生成结果，不使用服务器上修改前的文件。
+        """
         task = self.get_task(task_id)
         if task is None:
             return None
+        root = self._task_root(task)
+        written_back = task.applied_at is not None
         buffer = io.BytesIO()
         written = 0
         notes: List[str] = []
@@ -1296,9 +1302,17 @@ class CodeGenService:
                 if item.action == FileAction.DELETE:
                     notes.append(f"删除 {safe}")
                     continue
-                archive.writestr(safe, item.content)
+                server_content = self._read_repo_file(safe, root) if written_back else ""
+                if server_content:
+                    payload = server_content
+                    label = "服务器当前文件"
+                else:
+                    payload = item.content
+                    label = "新增" if item.action == FileAction.CREATE else "修改"
+                if not payload.strip():
+                    continue
+                archive.writestr(safe, payload)
                 written += 1
-                label = "新增" if item.action == FileAction.CREATE else "修改"
                 notes.append(f"{label} {safe}")
             if written == 0 and not notes:
                 return b""

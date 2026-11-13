@@ -5,7 +5,7 @@ from typing import Optional
 from uuid import uuid4
 
 from ..db import DocumentDict
-from ..models.user import User, UserCreate, UserRole
+from ..models.user import User, UserCreate
 from ..api.middleware.auth import get_password_hash, verify_password
 
 
@@ -17,61 +17,10 @@ class UserService:
 
     @classmethod
     def _init_default_users(cls) -> None:
-        """从数据库加载用户，并补齐缺失的默认账号。"""
+        """从关系库加载用户。测试账号在空库初始化时写入，这里不再补插。"""
         if cls._initialized:
             return
-
         cls._users = DocumentDict("users", model=User, key_type=str)
-        existing_names = {user.username for user in cls._users.values()}
-
-        admin_user = User(
-            id="admin-001",
-            username="admin",
-            email="admin@opspilot.example.com",
-            role=UserRole.ADMIN,
-            hashed_password=get_password_hash("admin123"),
-            is_active=True,
-            created_at=datetime.utcnow(),
-        )
-        if admin_user.username not in existing_names:
-            cls._users[admin_user.id] = admin_user
-
-        operator_user = User(
-            id="operator-001",
-            username="operator",
-            email="operator@opspilot.example.com",
-            role=UserRole.OPERATOR,
-            hashed_password=get_password_hash("operator123"),
-            is_active=True,
-            created_at=datetime.utcnow(),
-        )
-        if operator_user.username not in existing_names:
-            cls._users[operator_user.id] = operator_user
-
-        viewer_user = User(
-            id="viewer-001",
-            username="viewer",
-            email="viewer@opspilot.example.com",
-            role=UserRole.VIEWER,
-            hashed_password=get_password_hash("viewer123"),
-            is_active=True,
-            created_at=datetime.utcnow(),
-        )
-        if viewer_user.username not in existing_names:
-            cls._users[viewer_user.id] = viewer_user
-
-        reviewer_user = User(
-            id="reviewer-001",
-            username="reviewer",
-            email="reviewer@opspilot.example.com",
-            role=UserRole.REVIEWER,
-            hashed_password=get_password_hash("reviewer123"),
-            is_active=True,
-            created_at=datetime.utcnow(),
-        )
-        if reviewer_user.username not in existing_names:
-            cls._users[reviewer_user.id] = reviewer_user
-
         cls._initialized = True
 
     @classmethod

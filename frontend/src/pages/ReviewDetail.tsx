@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { BugFixSolution, CodeGenTask, FeatureDesignSolution, ReviewItem, ReviewComment, ReviewDecision, ReviewItemType, TestTask } from '../types'
+import type { BugFixSolution, CodeGenTask, CoverageInfo, FeatureDesignSolution, ReviewItem, ReviewComment, ReviewDecision, ReviewItemType, TestReport, TestTask } from '../types'
 import { codegenService, reviewService, solutionService, testService } from '../services'
 import {
   ReviewStatusBadge,
@@ -13,6 +13,7 @@ import {
 } from '../components/Reviews'
 import { PriorityBadge } from '../components/Requirements'
 import DiffViewer from '../components/CodeGen/DiffViewer'
+import { MarkdownBlock } from '../components/Tests/TestResultItem'
 import CodeViewer from '../components/CodeGen/CodeViewer'
 
 const typeConfig: Record<ReviewItemType, { icon: string; label: string }> = {
@@ -40,6 +41,18 @@ const codeActionLabel: Record<string, string> = {
   create: '新增',
   modify: '修改',
   delete: '删除',
+}
+
+function coveragePercent(coverage: TestTask['coverage'], report?: TestReport | null): number {
+  if (report && typeof report.coverage_percent === 'number') return report.coverage_percent
+  if (typeof coverage === 'number') return coverage
+  return coverage?.lines_percent || 0
+}
+
+function coverageFiles(coverage: TestTask['coverage'], report?: TestReport | null): CoverageInfo['files'] {
+  if (report?.coverage_info?.files) return report.coverage_info.files
+  if (coverage && typeof coverage === 'object') return coverage.files
+  return undefined
 }
 
 function changedFiles(task: CodeGenTask) {
@@ -133,6 +146,7 @@ export default function ReviewDetail() {
   const [solutionBody, setSolutionBody] = useState<BugFixSolution | FeatureDesignSolution | null>(null)
   const [codeBody, setCodeBody] = useState<CodeGenTask | null>(null)
   const [testBody, setTestBody] = useState<TestTask | null>(null)
+  const [testReport, setTestReport] = useState<TestReport | null>(null)
   const [selectedCodePath, setSelectedCodePath] = useState<string | null>(null)
   const [downloadingCode, setDownloadingCode] = useState(false)
 
@@ -147,6 +161,7 @@ export default function ReviewDetail() {
     setSolutionBody(null)
     setCodeBody(null)
     setTestBody(null)
+    setTestReport(null)
     if (review.item_type === 'solution') {
       solutionService.getSolution(review.item_id).then(setSolutionBody).catch(() => setSolutionBody(null))
     } else if (review.item_type === 'code') {
@@ -160,6 +175,7 @@ export default function ReviewDetail() {
       }).catch(() => setCodeBody(null))
     } else {
       testService.getTestTask(review.item_id).then(setTestBody).catch(() => setTestBody(null))
+      testService.getTestReport(review.item_id).then(setTestReport).catch(() => setTestReport(null))
     }
   }, [review])
 
@@ -377,11 +393,47 @@ export default function ReviewDetail() {
               )}
               {review.item_type === 'test' && testBody && (
                 <div className="mt-4 rounded-lg border border-gray-200 p-4 text-sm">
-                  <p className="mb-2 text-gray-600">测试结果按质量门禁展示，不额外等待人工审批。</p>
-                  <p>通过 {testBody.results.filter((item) => item.status === 'passed').length} / {testBody.results.length || testBody.test_cases.length}，覆盖率 {testBody.coverage}%</p>
-                  {testBody.results.filter((item) => item.status === 'failed').map((item) => (
-                    <p key={item.test_case_id} className="mt-2 text-xs text-red-600">{item.test_case_id} {item.error_message || '失败'}</p>
-                  ))}
+                  <p className="mb-2 text-gray-800">测试已在沙箱中执行修改后的代码。请评审这份报告，通过后需求才完成。</p>
+                  {testReport?.summary && (
+                    <p className="mb-3 whitespace-pre-wrap text-gray-600">{testReport.summary}</p>
+                  )}
+                  <p>
+                    通过 {testReport?.passed ?? testBody.results.filter((item) => item.status === 'passed').length}
+                    {' / '}
+                    {testReport?.total ?? (testBody.results.length || testBody.test_cases.length)}
+                    ，失败 {testReport?.failed ?? testBody.results.filter((item) => item.status === 'failed').length}
+                    ，覆盖率 {coveragePercent(testBody.coverage, testReport).toFixed(0)}%
+                  </p>
+                  <ul className="mt-3 space-y-2">
+                    {testBody.test_cases.map((item) => {
+                      const result = testBody.results.find((entry) => entry.test_case_id === item.id)
+                      const failed = result?.status === 'failed'
+                      return (
+                        <li key={item.id} className="rounded-md bg-gray-50 px-3 py-2">
+                          <p className={failed ? 'text-red-700' : 'text-gray-800'}>
+                            {result?.status === 'passed' ? '通过' : failed ? '失败' : '未执行'} {item.name}
+                          </p>
+                          {item.description && (
+                            <div className="mt-2">
+                              <MarkdownBlock text={item.description} />
+                            </div>
+                          )}
+                          {item.target_function && <p className="mt-1 font-mono text-xs text-gray-500">{item.target_function}</p>}
+                          {failed && <p className="mt-1 text-xs text-red-600">{result?.error_message || '失败'}</p>}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                  {Object.entries(coverageFiles(testBody.coverage, testReport) || {}).length > 0 && (
+                    <div className="mt-3">
+                      <p className="mb-1 text-xs text-gray-500">文件覆盖率</p>
+                      <ul className="space-y-1 font-mono text-xs text-gray-700">
+                        {Object.entries(coverageFiles(testBody.coverage, testReport) || {}).map(([path, info]) => (
+                          <li key={path}>{path} {Number(info.lines_percent || 0).toFixed(0)}%</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -53,6 +53,7 @@ class RequirementCreate(RequirementBase):
     """创建需求请求模型"""
     type: Optional[RequirementType] = Field(None, description="需求类型（可选，不填则自动分析）")
     priority: Optional[RequirementPriority] = Field(None, description="优先级（可选，不填则自动分析）")
+    session_id: Optional[UUID] = Field(None, description="来源对话会话")
 
 
 class RequirementUpdate(BaseModel):

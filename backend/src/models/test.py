@@ -89,6 +89,7 @@ class TestReport(BaseModel):
     coverage_info: Optional[CoverageInfo] = Field(None, description="详细覆盖率信息")
     duration_ms: int = Field(default=0, description="总执行耗时（毫秒）")
     failed_cases: List[str] = Field(default_factory=list, description="失败用例名称列表")
+    summary: str = Field(default="", description="报告摘要")
     generated_at: datetime = Field(default_factory=datetime.utcnow, description="生成时间")
 
     class Config:

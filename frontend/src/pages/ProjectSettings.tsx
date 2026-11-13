@@ -1,28 +1,50 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AgentCard, AgentConfigModal } from '../components/Agents'
+import SandboxConfigPanel from '../components/Sandbox/SandboxConfigPanel'
 import SkillContentModal from '../components/Skills/SkillContentModal'
 import { agentService, projectService } from '../services'
 import { projectErrorMessage } from '../services/projectService'
-import type { AgentConfig, Project, ProjectMember, ProjectSkill, SandboxSettings, UpdateAgentConfigRequest } from '../types'
+import type { AgentConfig, Project, ProjectMember, ProjectSkill, SandboxSettings, SandboxTestResult, UpdateAgentConfigRequest } from '../types'
 
-const tabs = ['基本信息', 'Agent', 'Skills', 'Sandbox', '成员', '高级'] as const
+const tabs = [
+  { id: 'basic', label: '基本信息' },
+  { id: 'agent', label: 'Agent 配置' },
+  { id: 'skills', label: 'Skills 配置' },
+  { id: 'sandbox', label: 'Sandbox 配置' },
+  { id: 'members', label: '成员管理' },
+  { id: 'advanced', label: '高级' },
+] as const
 
 const emptySandbox = (): SandboxSettings => ({
   backend: 'local',
+  image: 'python:3.11-slim',
   memory_mb: 512,
   cpu: 1,
   timeout_seconds: 300,
+  disk_gb: 10,
   network_policy: 'disabled',
   allowed_domains: [],
+  python_requirements: '',
+  system_tools: [],
   run_as_non_root: true,
+  disable_privileged: true,
+  read_only_root: true,
+  disable_setuid: true,
+  seccomp: false,
+  kubeconfig_mode: 'default',
+  kubeconfig: '',
+  namespace: '',
+  service_account: '',
+  e2b_api_key: '',
+  e2b_template: 'python-3.11',
 })
 
 export default function ProjectSettings() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [project, setProject] = useState<Project | null>(null)
-  const [tab, setTab] = useState<(typeof tabs)[number]>('基本信息')
+  const [tab, setTab] = useState<(typeof tabs)[number]['id']>('basic')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [repoUrl, setRepoUrl] = useState('')
@@ -30,7 +52,6 @@ export default function ProjectSettings() {
   const [toolchain, setToolchain] = useState('')
   const [skills, setSkills] = useState<ProjectSkill[]>([])
   const [sandbox, setSandbox] = useState<SandboxSettings>(emptySandbox())
-  const [domains, setDomains] = useState('')
   const [members, setMembers] = useState<ProjectMember[]>([])
   const [agents, setAgents] = useState<AgentConfig[]>([])
   const [selectedAgent, setSelectedAgent] = useState<AgentConfig | null>(null)
@@ -40,7 +61,8 @@ export default function ProjectSettings() {
   const [showSkill, setShowSkill] = useState(false)
   const [viewingSkill, setViewingSkill] = useState<ProjectSkill | null>(null)
   const [message, setMessage] = useState('')
-  const [sandboxResult, setSandboxResult] = useState('')
+  const [testingSandbox, setTestingSandbox] = useState(false)
+  const [sandboxResult, setSandboxResult] = useState<SandboxTestResult | null>(null)
   const [branch, setBranch] = useState('')
   const [sourceFile, setSourceFile] = useState<File | null>(null)
   const [importing, setImporting] = useState(false)
@@ -56,8 +78,7 @@ export default function ProjectSettings() {
       setPrompt(data.prompt_template || '')
       setToolchain(data.toolchain || '')
       setSkills(data.skills || [])
-      setSandbox(data.sandbox || emptySandbox())
-      setDomains((data.sandbox?.allowed_domains || []).join('\n'))
+      setSandbox({ ...emptySandbox(), ...(data.sandbox || {}) })
       setMembers(data.members || [])
     }).catch(() => setProject(null))
     agentService.getAgentConfigs(id).then(setAgents).catch(() => setAgents([]))
@@ -89,10 +110,7 @@ export default function ProjectSettings() {
       toolchain,
       skills,
       members,
-      sandbox: {
-        ...sandbox,
-        allowed_domains: domains.split('\n').map((item) => item.trim()).filter(Boolean),
-      },
+      sandbox,
     })
     setProject(updated)
     setSkills(updated.skills || [])
@@ -101,9 +119,13 @@ export default function ProjectSettings() {
 
   const testSandbox = async () => {
     if (!id) return
-    await save()
-    const result = await projectService.testSandbox(id)
-    setSandboxResult(result.message)
+    setTestingSandbox(true)
+    try {
+      await save()
+      setSandboxResult(await projectService.testSandbox(id))
+    } finally {
+      setTestingSandbox(false)
+    }
   }
 
   const applyCodeProject = (updated: Project) => {
@@ -154,25 +176,25 @@ export default function ProjectSettings() {
     <div className="p-6 bg-gray-50 min-h-full">
       <div className="max-w-6xl mx-auto">
         <button type="button" onClick={() => navigate(`/projects/${id}`)} className="mb-4 text-sm text-gray-600">← 返回项目</button>
-        <h1 className="text-2xl font-semibold text-gray-800 mb-4">项目设置</h1>
-        <div className="mb-4 flex flex-wrap gap-2">
+        <h1 className="text-2xl font-semibold text-gray-800 mb-4">项目设置 · {project.name}</h1>
+        <div className="mb-4 flex flex-wrap gap-1 border-b border-gray-200">
           {tabs.map((item) => (
             <button
-              key={item}
+              key={item.id}
               type="button"
               onClick={() => {
-                setTab(item)
-                if (item === 'Skills' && id) {
+                setTab(item.id)
+                if (item.id === 'skills' && id) {
                   projectService.getProject(id).then((data) => setSkills(data.skills || [])).catch(() => undefined)
                 }
               }}
-              className={`rounded-lg px-3 py-1.5 text-sm ${tab === item ? 'bg-primary text-white' : 'bg-white border border-gray-200 text-gray-600'}`}
+              className={`px-4 py-2 text-sm ${tab === item.id ? 'border-b-2 border-primary text-primary' : 'text-gray-600'}`}
             >
-              {item}
+              {item.label}
             </button>
           ))}
         </div>
-        {tab === 'Agent' && (
+        {tab === 'agent' && (
           <div className="mb-4">
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-gray-800">Agent 配置</h2>
@@ -197,7 +219,7 @@ export default function ProjectSettings() {
           </div>
         )}
         <form onSubmit={save} className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
-          {tab === '基本信息' && (
+          {tab === 'basic' && (
             <>
               <label className="block text-sm text-gray-600">名称
                 <input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2" />
@@ -241,7 +263,7 @@ export default function ProjectSettings() {
               </div>
             </>
           )}
-          {tab === 'Agent' && (
+          {tab === 'agent' && (
             <>
               <h2 className="text-sm font-semibold text-gray-800">项目级 Prompt 与工具链</h2>
               <label className="block text-sm text-gray-600">Prompt 模板
@@ -252,7 +274,7 @@ export default function ProjectSettings() {
               </label>
             </>
           )}
-          {tab === 'Skills' && (
+          {tab === 'skills' && (
             <>
               {skills.map((skill) => (
                 <div key={skill.key} className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 px-3 py-2 text-sm">
@@ -277,50 +299,17 @@ export default function ProjectSettings() {
               <button type="button" onClick={() => setShowSkill(true)} className="rounded-lg bg-gray-100 px-3 py-2 text-sm">添加技能</button>
             </>
           )}
-          {tab === 'Sandbox' && (
-            <>
-              <label className="block text-sm text-gray-600">后端
-                <select value={sandbox.backend} onChange={(event) => setSandbox({ ...sandbox, backend: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2">
-                  <option value="local">local</option>
-                  <option value="docker">docker</option>
-                  <option value="kubernetes">kubernetes</option>
-                  <option value="e2b">e2b</option>
-                </select>
-              </label>
-              <div className="grid grid-cols-3 gap-3">
-                <label className="text-sm text-gray-600">内存 MB
-                  <input type="number" value={sandbox.memory_mb} onChange={(event) => setSandbox({ ...sandbox, memory_mb: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2" />
-                </label>
-                <label className="text-sm text-gray-600">CPU
-                  <input type="number" value={sandbox.cpu} onChange={(event) => setSandbox({ ...sandbox, cpu: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2" />
-                </label>
-                <label className="text-sm text-gray-600">超时秒
-                  <input type="number" value={sandbox.timeout_seconds} onChange={(event) => setSandbox({ ...sandbox, timeout_seconds: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2" />
-                </label>
-              </div>
-              <label className="block text-sm text-gray-600">网络策略
-                <select value={sandbox.network_policy} onChange={(event) => setSandbox({ ...sandbox, network_policy: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2">
-                  <option value="disabled">禁用网络</option>
-                  <option value="allowlist">白名单</option>
-                  <option value="open">允许所有</option>
-                </select>
-              </label>
-              <label className="block text-sm text-gray-600">允许域名，一行一个
-                <textarea value={domains} onChange={(event) => setDomains(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2" rows={3} />
-              </label>
-              <label className="flex items-center gap-2 text-sm text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={sandbox.run_as_non_root}
-                  onChange={(event) => setSandbox({ ...sandbox, run_as_non_root: event.target.checked })}
-                />
-                非 root 运行
-              </label>
-              <button type="button" onClick={testSandbox} className="rounded-lg bg-gray-800 px-3 py-2 text-sm text-white">连通性测试</button>
-              {sandboxResult && <p className="text-sm text-gray-600">{sandboxResult}</p>}
-            </>
+          {tab === 'sandbox' && (
+            <SandboxConfigPanel
+              sandbox={sandbox}
+              testing={testingSandbox}
+              result={sandboxResult}
+              onChange={setSandbox}
+              onTest={testSandbox}
+              onCloseResult={() => setSandboxResult(null)}
+            />
           )}
-          {tab === '成员' && (
+          {tab === 'members' && (
             <>
               <div className="flex gap-2">
                 <input value={memberName} onChange={(event) => setMemberName(event.target.value)} placeholder="用户名" className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm" />
@@ -350,7 +339,7 @@ export default function ProjectSettings() {
               {members.length === 0 && <p className="text-sm text-gray-400">还没有成员</p>}
             </>
           )}
-          {tab === '高级' && (
+          {tab === 'advanced' && (
             <div className="space-y-3">
               <p className="text-sm text-gray-600">当前状态：{project.status}</p>
               <button
@@ -367,7 +356,7 @@ export default function ProjectSettings() {
               </button>
             </div>
           )}
-          {tab !== '高级' && (
+          {tab !== 'advanced' && tab !== 'sandbox' && (
             <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm text-white">保存</button>
           )}
           {message && <p className="text-sm text-green-600">{message}</p>}

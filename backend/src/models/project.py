@@ -44,12 +44,26 @@ class ProjectMember(BaseModel):
 class SandboxSettings(BaseModel):
     """项目级沙箱配置。"""
     backend: str = "local"
+    image: str = "python:3.11-slim"
     memory_mb: int = 512
     cpu: float = 1.0
     timeout_seconds: int = 300
+    disk_gb: int = 10
     network_policy: str = "disabled"
     allowed_domains: List[str] = Field(default_factory=list)
+    python_requirements: str = ""
+    system_tools: List[str] = Field(default_factory=list)
     run_as_non_root: bool = True
+    disable_privileged: bool = True
+    read_only_root: bool = True
+    disable_setuid: bool = True
+    seccomp: bool = False
+    kubeconfig_mode: str = "default"
+    kubeconfig: str = ""
+    namespace: str = ""
+    service_account: str = ""
+    e2b_api_key: str = ""
+    e2b_template: str = "python-3.11"
 
 
 def default_project_skills() -> List[ProjectSkill]:

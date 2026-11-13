@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 from uuid import UUID
 
 from ..db import DocumentDict
+from ..store import prompt_for as stored_prompt
 from ..models.agent import (
     AgentConfig,
     AgentConfigCreate,
@@ -66,8 +67,13 @@ class AgentService:
         for agent in list(self._agents.values()):
             self._project_agents.setdefault(agent.project_id, []).append(agent.id)
             if not (agent.prompt or "").strip():
-                agent.prompt = DEFAULT_PROMPTS.get(agent.agent_type, "")
+                agent.prompt = self._default_prompt(agent.agent_type)
                 self._agents[agent.id] = agent
+
+    @staticmethod
+    def _default_prompt(agent_type) -> str:
+        key = agent_type.value if hasattr(agent_type, "value") else str(agent_type)
+        return stored_prompt(key) or DEFAULT_PROMPTS.get(agent_type, "")
 
     def get_agents_by_project(self, project_id: UUID) -> List[AgentConfig]:
         """获取项目的所有 Agent 配置"""
@@ -95,7 +101,7 @@ class AgentService:
             temperature=data.temperature if data.temperature is not None else 0.7,
             max_tokens=data.max_tokens or 4096,
             skills=data.skills or [],
-            prompt=(data.prompt or "").strip() or DEFAULT_PROMPTS.get(data.agent_type, ""),
+            prompt=(data.prompt or "").strip() or self._default_prompt(data.agent_type),
             enabled=data.enabled if data.enabled is not None else True
         )
 

@@ -101,6 +101,18 @@ export default function TestReportCard({ report }: TestReportCardProps) {
         </div>
       </div>
 
+      {report.summary && (
+        <p className="mt-6 whitespace-pre-wrap text-sm text-gray-600">{report.summary}</p>
+      )}
+
+      {report.coverage_info?.files && Object.keys(report.coverage_info.files).length > 0 && (
+        <ul className="mt-4 space-y-1 font-mono text-xs text-gray-600">
+          {Object.entries(report.coverage_info.files).map(([path, info]) => (
+            <li key={path}>{path} {Number(info.lines_percent || 0).toFixed(0)}%</li>
+          ))}
+        </ul>
+      )}
+
       <div className="mt-6 pt-6 border-t border-gray-100 space-y-4">
         <CoverageBar percent={report.coverage_percent} size="md" />
 

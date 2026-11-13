@@ -112,6 +112,27 @@ class ChatService:
         self._sessions[session.id] = session
         return session
 
+    def record_ticket(self, session_id: UUID, ticket_id: str) -> Optional[ChatSession]:
+        """把已拦截的对话改成已提交，并写上工单号。"""
+        session = self._sessions.get(session_id)
+        if session is None:
+            return None
+        marker = "补齐项目资料和知识库后才能提交需求。"
+        replacement = f"需求已提交到 Review 工作台，工单 {ticket_id}。"
+        changed = False
+        for message in session.messages:
+            if marker in message.content:
+                message.content = message.content.replace(marker, replacement)
+                changed = True
+            if message.classification is not None and not message.classification.ticket_id:
+                message.classification.ticket_id = ticket_id
+                changed = True
+        if not changed:
+            return session
+        session.updated_at = datetime.utcnow()
+        self._sessions[session.id] = session
+        return session
+
     def append_review_card(
         self,
         session_id: UUID,

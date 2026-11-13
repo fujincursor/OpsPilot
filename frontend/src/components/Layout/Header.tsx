@@ -24,9 +24,9 @@ export default function Header({ agentStatus, userName }: HeaderProps) {
       .catch(() => setStatus('offline'))
   }, [agentStatus])
   const statusConfig = {
-    ready: { emoji: '🟢', text: 'Agent 就绪' },
-    busy: { emoji: '🟡', text: 'Agent 执行中' },
-    offline: { emoji: '🔴', text: 'Agent 离线' },
+    ready: { dot: 'bg-green-500', text: '系统正常' },
+    busy: { dot: 'bg-amber-400', text: '执行中' },
+    offline: { dot: 'bg-red-500', text: '系统离线' },
   }
 
   const statusInfo = statusConfig[status]
@@ -113,8 +113,9 @@ export default function Header({ agentStatus, userName }: HeaderProps) {
         <NotificationBell />
 
         {/* Agent Status */}
-        <span className="text-sm text-gray-600 flex items-center gap-1">
-          {statusInfo.emoji} {statusInfo.text}
+        <span className="text-sm text-gray-600 flex items-center gap-1.5">
+          <span className={`h-2 w-2 rounded-full ${statusInfo.dot}`} />
+          {statusInfo.text}
         </span>
 
         {/* User Avatar */}

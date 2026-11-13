@@ -320,30 +320,286 @@ class TestService:
 
         task.status = TestStatus.GENERATING
         self._save_task(task)
+        return await self._generate_personalized(task, codegen_task, test_agent, project_id)
 
-        try:
-            files = self._files_under_test(codegen_task)
-            test_cases = self._build_sandbox_cases(files)
-            focus = agent_runtime.advise(
-                test_agent,
-                "请按你的提示词说明这批代码应该如何测试，给出三到五条检查重点。\n"
-                + "\n".join(f"- {item.path}" for item in files),
+    async def _generate_personalized(self, task: TestTask, codegen_task: CodeGenTask, test_agent, project_id) -> TestTask:
+        """按修改后的代码生成覆盖用例，在沙箱执行，并写出报告。"""
+        from .agent_runtime import agent_runtime
+        from .sandbox_service import sandbox_service
+        from .test_execution import (
+            add_fallback,
+            build_prompt,
+            change_focus,
+            changed_sources,
+            coverage_from_files,
+            execute_suite,
+            invocation_problems,
+            materialize_changed_modules,
+            missed_changed,
+            parse_suite,
+            skill_text,
+            suite_from_payload,
+        )
+
+        sources = changed_sources(codegen_task.files)
+        if not sources:
+            return self._finish_with_report(
+                task,
+                [],
+                [],
+                CoverageInfo(),
+                "这次代码变更没有可执行的新增或修改文件。",
             )
-            if focus and test_cases:
-                test_cases[0].description = focus[:500]
-            task.test_cases = test_cases
-            self._save_task(task)
+        originals = self._originals(codegen_task, sources)
+        targets = change_focus(sources, originals)
+        if not any(item.added_lines or item.symbols for item in targets):
+            return self._finish_with_report(
+                task,
+                [],
+                [],
+                CoverageInfo(),
+                "这次变更没有可执行的新增或修改语句。",
+            )
+        modules = materialize_changed_modules(targets, sources)
+        measured = {
+            "files": [item.path for item in sources],
+            "changed_lines": {item.path: item.added_lines for item in targets if item.added_lines},
+        }
+
+        skill = skill_text()
+        summary = ""
+        cases: List[TestCase] = []
+        test_files: Dict[str, str] = {}
+        uncovered: Optional[Dict[str, List[int]]] = None
+        feedback = ""
+        outcome: Optional[dict] = None
+        try:
+            for attempt in range(2):
+                response = await asyncio.to_thread(
+                    agent_runtime.complete,
+                    test_agent,
+                    build_prompt(sources, skill, targets, uncovered, feedback),
+                    f"test-{task.id}",
+                )
+                payload = parse_suite(response.message if response.success else "")
+                if payload is None:
+                    feedback = response.message or "测试代理没有返回用例"
+                    task.error_message = feedback
+                    continue
+                summary, cases, test_files = suite_from_payload(payload)
+                if not cases or not test_files:
+                    feedback = "测试代理没有生成可执行用例"
+                    task.error_message = feedback
+                    continue
+                problems = invocation_problems(test_files, targets)
+                if problems and attempt == 0:
+                    feedback = "；".join(problems)
+                    task.error_message = feedback
+                    continue
+                if problems:
+                    test_files, cases = add_fallback(test_files, cases, targets)
+                    summary = (summary + " 生成的用例没有调用变更函数，已补上直接调用并执行。").strip()
+                task.test_cases = cases
+                task.status = TestStatus.RUNNING
+                self._save_task(task)
+                sandbox = sandbox_service.create_sandbox(project_id or task.requirement_id)
+                sandbox_service.seed_workspace(sandbox.sandbox_id)
+                task.sandbox_id = sandbox.sandbox_id
+                self._save_task(task)
+                outcome = await asyncio.to_thread(
+                    execute_suite,
+                    sandbox.sandbox_id,
+                    sources,
+                    test_files,
+                    modules,
+                    measured,
+                )
+                file_map = outcome.get("files") or {}
+                uncovered = missed_changed(file_map)
+                if not uncovered:
+                    feedback = ""
+                    break
+                feedback = "变更代码还没有被执行到。"
         except Exception as exc:
-            task.status = TestStatus.FAILED
-            task.error_message = f"Test generation failed: {exc}"
-            return self._save_task(task)
+            task.error_message = f"测试执行失败: {exc}"
+            return self._finish_with_report(task, cases, [], CoverageInfo(), task.error_message)
 
-        if not test_cases:
-            task.status = TestStatus.FAILED
-            task.error_message = "没有可执行的源码文件，无法运行测试"
-            return self._save_task(task)
+        if outcome is None:
+            message = task.error_message or "没有生成可执行的测试用例"
+            return self._finish_with_report(task, cases, [], CoverageInfo(), message)
 
-        return await self._run_cases_in_sandbox(task, files, test_cases)
+        results = self._results_for_cases(cases, outcome.get("cases") or [])
+        file_map = outcome.get("files") or {}
+        missed = missed_changed(file_map)
+        if missed:
+            detail = "；".join(
+                f"{path} 未执行行 {','.join(str(number) for number in numbers[:12])}" if numbers else path
+                for path, numbers in missed.items()
+            )
+            gap = TestCase(
+                name="执行变更代码",
+                description="确认新增或修改的语句在沙箱中被调用",
+                expected_result="变更语句被实际执行",
+                file_path="tests/generated",
+            )
+            cases.append(gap)
+            results.append(TestResult(
+                test_case_id=gap.id,
+                status=TestResultStatus.FAILED,
+                error_message=f"没有执行到变更代码：{detail}"[:1000],
+            ))
+        coverage = coverage_from_files(file_map)
+        report_summary = self._report_summary(summary, coverage, file_map)
+        task = self._finish_with_report(task, cases, results, coverage, report_summary)
+        task.error_message = None
+        return task
+
+    def _results_for_cases(self, cases: List[TestCase], raw_cases: List[dict]) -> List[TestResult]:
+        by_name = {str(item.get("name") or ""): item for item in raw_cases}
+        results: List[TestResult] = []
+        seen: set[str] = set()
+        for case in cases:
+            seen.add(case.name)
+            item = by_name.get(case.name)
+            if item is None:
+                results.append(TestResult(
+                    test_case_id=case.id,
+                    status=TestResultStatus.FAILED,
+                    error_message="沙箱没有执行到这条用例",
+                ))
+                continue
+            status = TestResultStatus.PASSED if item.get("status") == "passed" else TestResultStatus.FAILED
+            results.append(TestResult(
+                test_case_id=case.id,
+                status=status,
+                actual_result=str(item.get("detail") or "")[:1000],
+                error_message=None if status == TestResultStatus.PASSED else str(item.get("detail") or "测试失败")[:1000],
+                stack_trace=item.get("trace"),
+            ))
+        for name, item in by_name.items():
+            if not name or name in seen:
+                continue
+            status = TestResultStatus.PASSED if item.get("status") == "passed" else TestResultStatus.FAILED
+            case = TestCase(name=name[:200], description="沙箱执行到的用例", file_path="tests/generated")
+            cases.append(case)
+            results.append(TestResult(
+                test_case_id=case.id,
+                status=status,
+                actual_result=str(item.get("detail") or "")[:1000],
+                error_message=None if status == TestResultStatus.PASSED else str(item.get("detail") or "测试失败")[:1000],
+                stack_trace=item.get("trace"),
+            ))
+        return results
+
+    def _report_summary(self, summary: str, coverage: CoverageInfo, file_map: dict) -> str:
+        gaps = []
+        for path, info in file_map.items():
+            percent = float(info.get("lines_percent") or 0)
+            if percent < 99.9:
+                uncovered = info.get("uncovered") or []
+                detail = f"{path} {percent:.0f}%"
+                if uncovered:
+                    detail += " 未覆盖行 " + ",".join(str(number) for number in uncovered[:12])
+                gaps.append(detail)
+        lines = [summary or "已根据变更代码生成用例，并在沙箱中执行。"]
+        lines.append(f"变更代码行覆盖率 {coverage.lines_percent:.0f}%。")
+        if gaps:
+            lines.append("这些变更还没有被执行到：" + "；".join(gaps))
+        else:
+            lines.append("变更语句已在沙箱中执行。")
+        return "\n".join(lines)[:5000]
+
+    def _finish_with_report(
+        self,
+        task: TestTask,
+        cases: List[TestCase],
+        results: List[TestResult],
+        coverage: CoverageInfo,
+        summary: str,
+    ) -> TestTask:
+        if not cases and summary:
+            cases = [TestCase(name="生成测试用例", description=summary[:2000], expected_result="生成可执行用例")]
+            results = [TestResult(
+                test_case_id=cases[0].id,
+                status=TestResultStatus.FAILED,
+                error_message=summary[:1000],
+            )]
+        task.test_cases = cases
+        task.results = results
+        task.coverage = coverage
+        report = test_agent_service.generate_test_report(
+            task_id=task.id,
+            test_cases=cases,
+            results=results,
+            coverage=coverage,
+        )
+        report.summary = summary
+        self._reports[task.id] = report
+        task.status = TestStatus.COMPLETED
+        task.completed_at = datetime.utcnow()
+        task.error_message = None
+        return self._save_task(task)
+
+    async def _rerun_personalized(
+        self,
+        task: TestTask,
+        codegen_task: CodeGenTask,
+        cases: List[TestCase],
+        test_files: Dict[str, str],
+    ) -> TestTask:
+        from .sandbox_service import sandbox_service
+        from .test_execution import (
+            change_focus,
+            changed_sources,
+            coverage_from_files,
+            execute_suite,
+            materialize_changed_modules,
+        )
+
+        sources = changed_sources(codegen_task.files)
+        targets = change_focus(sources, self._originals(codegen_task, sources))
+        modules = materialize_changed_modules(targets, sources)
+        measured = {
+            "files": [item.path for item in sources],
+            "changed_lines": {item.path: item.added_lines for item in targets if item.added_lines},
+        }
+        project_id = task.requirement_id
+        if self._requirement_service:
+            requirement = self._requirement_service.get(task.requirement_id)
+            if requirement is not None:
+                project_id = requirement.project_id
+        task.status = TestStatus.RUNNING
+        self._save_task(task)
+        sandbox = sandbox_service.create_sandbox(project_id)
+        sandbox_service.seed_workspace(sandbox.sandbox_id)
+        task.sandbox_id = sandbox.sandbox_id
+        self._save_task(task)
+        try:
+            outcome = await asyncio.to_thread(
+                execute_suite,
+                sandbox.sandbox_id,
+                sources,
+                test_files,
+                modules,
+                measured,
+            )
+        except Exception as exc:
+            return self._finish_with_report(task, cases, [], CoverageInfo(), f"测试执行失败: {exc}")
+        results = self._results_for_cases(cases, outcome.get("cases") or [])
+        coverage = coverage_from_files(outcome.get("files") or {})
+        summary = self._report_summary("已在沙箱中重新执行修改后的代码。", coverage, outcome.get("files") or {})
+        return self._finish_with_report(task, cases, results, coverage, summary)
+
+    def _originals(self, task: CodeGenTask, sources: List[CodeFile]) -> Dict[str, str]:
+        """测试发生在写回之前，用工作区里的旧文件计算变更行。"""
+        originals: Dict[str, str] = {}
+        root = None if task.applied_at else self._codegen_service._task_root(task)
+        for item in sources:
+            if root is None or item.action == FileAction.CREATE:
+                originals[item.path] = ""
+                continue
+            originals[item.path] = self._codegen_service._read_repo_file(item.path, root)
+        return originals
 
     def _save_task(self, task: TestTask) -> TestTask:
         task.updated_at = datetime.utcnow()
@@ -421,6 +677,7 @@ class TestService:
                 project_id = requirement.project_id
 
         sandbox = sandbox_service.create_sandbox(project_id)
+        sandbox_service.seed_workspace(sandbox.sandbox_id)
         task.sandbox_id = sandbox.sandbox_id
         self._save_task(task)
 
@@ -606,6 +863,13 @@ class TestService:
         codegen_task = self._codegen_service.get_task(task.codegen_task_id) if self._codegen_service else None
         files = self._files_under_test(codegen_task) if codegen_task else []
         cases = tests_to_run if test_case_ids else task.test_cases
+        generated = {
+            case.file_path: case.code
+            for case in cases
+            if str(case.file_path).startswith("tests/generated/") and case.code.strip()
+        }
+        if generated and codegen_task is not None:
+            return await self._rerun_personalized(task, codegen_task, cases, generated)
         return await self._run_cases_in_sandbox(task, files, cases)
 
     def submit_test_review(
@@ -632,8 +896,9 @@ class TestService:
             return None
 
         report = self.get_test_report(task_id)
-        if report and report.failed > 0 and not approve_with_failures:
+        if report is None:
             return None
+        del approve_with_failures
 
         task = self._save_task(task)
         self._create_review_item(task, report, reviewer_notes)
@@ -649,17 +914,19 @@ class TestService:
 
         summary = ""
         if report:
-            summary = f"通过 {report.passed} 个，失败 {report.failed} 个，覆盖率 {report.coverage_percent:.1f}%。"
-        description = "\n".join(part for part in (summary, notes or "测试已完成，等待审核。") if part)
+            summary = report.summary or f"通过 {report.passed} 个，失败 {report.failed} 个，覆盖率 {report.coverage_percent:.1f}%。"
+        description = "\n".join(part for part in (summary, notes or "测试已完成，等待人工评审。") if part)
         hitl_service.create_review_item(
             item_type=ReviewItemType.TEST,
             item_id=task.id,
             data=ReviewItemCreate(
-                title=f"测试审核：{requirement.title}"[:200],
+                title=f"测试审批：{requirement.title}"[:200],
                 description=description[:5000],
                 item_type=ReviewItemType.TEST,
                 item_id=task.id,
                 project_id=requirement.project_id,
+                requirement_id=requirement.id,
+                session_id=requirement.session_id,
                 priority=ReviewPriority.MEDIUM,
             ),
         )

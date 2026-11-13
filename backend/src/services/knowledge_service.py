@@ -10,16 +10,15 @@ from ..models.knowledge import (
     KnowledgeBaseCreate,
     KnowledgeBaseUpdate,
     KnowledgeStatus,
-    KnowledgeType,
     Document,
     DocumentCreate,
     EmbeddingStatus,
-    KnowledgeChunk,
     KnowledgeReadyStatus,
     KnowledgeSearchResult,
     IndexJob,
 )
-from .knowledge_indexer import chunk_text, cosine_similarity, embed_texts, parse_document
+from .knowledge_indexer import chunk_text, embed_texts, parse_document
+from .vector_store import VectorStoreUnavailable, delete_document, search as search_chunks, upsert_chunks
 
 if TYPE_CHECKING:
     from .project_service import ProjectService
@@ -37,99 +36,15 @@ class KnowledgeService:
             model=KnowledgeBase,
         )
         self._documents: Dict[UUID, Document] = DocumentDict("documents", model=Document)
-        self._chunks: Dict[UUID, KnowledgeChunk] = DocumentDict(
-            "knowledge_chunks",
-            model=KnowledgeChunk,
-        )
         self._kb_to_docs: Dict[UUID, List[UUID]] = {}
-        self._doc_to_chunks: Dict[UUID, List[UUID]] = {}
         for document in self._documents.values():
             self._kb_to_docs.setdefault(document.knowledge_base_id, []).append(document.id)
-        for chunk in self._chunks.values():
-            self._doc_to_chunks.setdefault(chunk.document_id, []).append(chunk.id)
         self._index_pending_documents()
         self._project_service: Optional["ProjectService"] = None
-        self._init_demo_data()
 
     def set_project_service(self, project_service: "ProjectService"):
         """设置项目服务引用"""
         self._project_service = project_service
-
-    def _init_demo_data(self):
-        """初始化演示数据（稍后由服务注入后与项目关联）"""
-        pass
-
-    def init_demo_knowledge(self, project_id: UUID):
-        """为项目初始化演示知识库"""
-        existing = self.get_knowledge_bases(project_id)
-        if existing:
-            return
-
-        demo_kbs = [
-            KnowledgeBaseCreate(
-                name="运维手册",
-                description="运维操作标准流程文档",
-                type=KnowledgeType.DOC
-            ),
-            KnowledgeBaseCreate(
-                name="代码规范",
-                description="项目代码规范和最佳实践",
-                type=KnowledgeType.CODE
-            ),
-            KnowledgeBaseCreate(
-                name="常见问题",
-                description="常见运维问题及解决方案",
-                type=KnowledgeType.FAQ
-            ),
-        ]
-
-        for kb_data in demo_kbs:
-            kb = self.create_knowledge_base(project_id, kb_data)
-            self._add_demo_documents(kb.id, kb.type)
-            kb.status = KnowledgeStatus.READY
-            kb.updated_at = datetime.utcnow()
-
-    def _add_demo_documents(self, kb_id: UUID, kb_type: KnowledgeType):
-        """添加演示文档"""
-        demo_docs_map = {
-            KnowledgeType.DOC: [
-                DocumentCreate(
-                    title="服务器运维手册",
-                    content="包含服务器日常运维操作流程...",
-                    file_type="markdown"
-                ),
-                DocumentCreate(
-                    title="数据库运维指南",
-                    content="数据库备份、恢复、性能优化指南...",
-                    file_type="markdown"
-                ),
-            ],
-            KnowledgeType.CODE: [
-                DocumentCreate(
-                    title="Python 编码规范",
-                    content="遵循 PEP8 标准的 Python 代码规范...",
-                    file_type="markdown"
-                ),
-            ],
-            KnowledgeType.FAQ: [
-                DocumentCreate(
-                    title="服务器 CPU 过高怎么办",
-                    content="1. 使用 top 命令查看进程...\n2. 分析是否有异常进程...",
-                    file_type="markdown"
-                ),
-                DocumentCreate(
-                    title="如何处理磁盘空间不足",
-                    content="1. 使用 df -h 查看磁盘使用情况...\n2. 清理日志文件...",
-                    file_type="markdown"
-                ),
-            ],
-        }
-
-        docs = demo_docs_map.get(kb_type, [])
-        for doc_data in docs:
-            doc = self.add_document(kb_id, doc_data)
-            if doc:
-                doc.embedding_status = EmbeddingStatus.COMPLETED
 
     def get_knowledge_bases(self, project_id: UUID) -> List[KnowledgeBase]:
         """获取项目的知识库列表"""
@@ -310,26 +225,31 @@ class KnowledgeService:
 
         model_name, vectors = embed_texts([query])
         query_vector = vectors[0]
+        hits = search_chunks(
+            query_vector,
+            [str(item) for item in allowed_ids],
+            model_name,
+            max(top_k * 5, top_k),
+        )
         best_by_document: dict[UUID, KnowledgeSearchResult] = {}
-
-        for chunk in self._chunks.values():
-            if chunk.knowledge_base_id not in allowed_ids:
-                continue
-            if chunk.embedding_model != model_name:
-                continue
-            document = self._documents.get(chunk.document_id)
+        for hit in hits:
+            payload = hit["payload"]
+            document_id = UUID(str(payload.get("document_id")))
+            knowledge_base_id = UUID(str(payload.get("knowledge_base_id")))
+            document = self._documents.get(document_id)
             if not document or document.embedding_status != EmbeddingStatus.COMPLETED:
                 continue
-            score = cosine_similarity(query_vector, chunk.embedding)
+            score = float(hit["score"])
             if score <= 0:
                 continue
-            current = best_by_document.get(chunk.document_id)
+            current = best_by_document.get(document_id)
             if current and current.score >= score:
                 continue
-            snippet = chunk.content if len(chunk.content) <= snippet_chars else chunk.content[:snippet_chars] + "..."
-            best_by_document[chunk.document_id] = KnowledgeSearchResult(
-                document_id=chunk.document_id,
-                knowledge_base_id=chunk.knowledge_base_id,
+            content = str(payload.get("content") or "")
+            snippet = content if len(content) <= snippet_chars else content[:snippet_chars] + "..."
+            best_by_document[document_id] = KnowledgeSearchResult(
+                document_id=document_id,
+                knowledge_base_id=knowledge_base_id,
                 title=document.title,
                 content_snippet=snippet,
                 score=round(score, 4),
@@ -344,21 +264,16 @@ class KnowledgeService:
             document.knowledge_base_id
             for document in self._documents.values()
             if document.embedding_status in {EmbeddingStatus.PENDING, EmbeddingStatus.PROCESSING}
-            or (
-                document.embedding_status == EmbeddingStatus.COMPLETED
-                and not self._doc_to_chunks.get(document.id)
-            )
         ]
         for document in list(self._documents.values()):
-            needs_index = document.embedding_status in {
-                EmbeddingStatus.PENDING,
-                EmbeddingStatus.PROCESSING,
-            } or (
-                document.embedding_status == EmbeddingStatus.COMPLETED
-                and not self._doc_to_chunks.get(document.id)
-            )
-            if needs_index:
-                self._index_document(document)
+            if document.embedding_status in {EmbeddingStatus.PENDING, EmbeddingStatus.PROCESSING}:
+                try:
+                    self._index_document(document)
+                except VectorStoreUnavailable as exc:
+                    document.embedding_status = EmbeddingStatus.FAILED
+                    document.error_message = str(exc)
+                    document.chunk_count = 0
+                    self._documents[document.id] = document
         for kb_id in set(pending_ids):
             self._refresh_kb_status(kb_id)
 
@@ -376,17 +291,23 @@ class KnowledgeService:
             return
 
         self._delete_chunks(document.id)
-        for index, (piece, vector) in enumerate(zip(pieces, vectors)):
-            chunk = KnowledgeChunk(
-                document_id=document.id,
-                knowledge_base_id=document.knowledge_base_id,
-                chunk_index=index,
-                content=piece,
-                embedding=vector,
-                embedding_model=model_name,
-            )
-            self._chunks[chunk.id] = chunk
-            self._doc_to_chunks.setdefault(document.id, []).append(chunk.id)
+        knowledge_base = self._knowledge_bases.get(document.knowledge_base_id)
+        project_id = str(knowledge_base.project_id) if knowledge_base else ""
+        upsert_chunks([
+            {
+                "id": uuid4(),
+                "vector": vector,
+                "payload": {
+                    "document_id": str(document.id),
+                    "knowledge_base_id": str(document.knowledge_base_id),
+                    "project_id": project_id,
+                    "content": piece,
+                    "chunk_index": index,
+                    "embedding_model": model_name,
+                },
+            }
+            for index, (piece, vector) in enumerate(zip(pieces, vectors))
+        ])
 
         document.embedding_status = EmbeddingStatus.COMPLETED
         document.embedding_model = model_name
@@ -395,8 +316,7 @@ class KnowledgeService:
         self._documents[document.id] = document
 
     def _delete_chunks(self, document_id: UUID) -> None:
-        for chunk_id in self._doc_to_chunks.pop(document_id, []):
-            self._chunks.pop(chunk_id, None)
+        delete_document(document_id)
 
     def _refresh_kb_status(self, kb_id: UUID) -> None:
         kb = self._knowledge_bases.get(kb_id)
